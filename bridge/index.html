@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Fix the Bridge</title>
+  <style>
+    html, body { margin:0; padding:0; height:100%; background:#0b0f14; overflow:hidden; }
+    #canvas { display:block; width:100vw; height:100vh; touch-action:none; }
+
+    #ui {
+      position: fixed; left: 12px; right: 12px; top: 10px;
+      display:flex; gap:10px; align-items:flex-start; justify-content:space-between;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        color: #000;
+        background: rgba(255, 255, 255, 0.75);
+        padding: 12px 16px;
+        border-radius: 12px;
+        backdrop-filter: blur(4px);
+      z-index: 10;
+      pointer-events:none;
+    }
+    .panel {
+  pointer-events: auto;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+
+  /* Light panel so black text is readable */
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+  padding: 10px 12px;
+
+  backdrop-filter: blur(6px);
+  max-width: 760px;
+
+  color: #000;
+}
+
+button {
+  appearance: none;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+
+  background: rgba(255, 255, 255, 0.85);
+  color: #000;
+
+  padding: 10px 12px;
+  border-radius: 12px;
+
+  font-size: 14px;
+  font-weight: 750;
+}
+
+button:active { transform: translateY(1px); }
+
+#hint {
+  opacity: 0.9;
+  font-size: 12px;
+  color: #000;
+}
+
+.kbd {
+  opacity: 0.95;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 8px;
+
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: rgba(255, 255, 255, 0.9);
+
+  white-space: nowrap;
+  color: #000;
+}
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div class="panel">
+      <div><b>Moves:</b> <span id="moves">0</span></div>
+      <div id="msg"></div>
+      <div id="hint">
+        Drag to rotate (cube hovers over the gap). Release to snap + check.
+        Keyboard: <span class="kbd">←</span><span class="kbd">→</span> rotate,
+        <span class="kbd">↑</span><span class="kbd">↓</span> flip, <span class="kbd">Enter</span> place.
+      </div>
+    </div>
+    <div class="panel">
+      <button id="reset">Reset</button>
+      <button id="new">New Level</button>
+      <button id="check">Check</button>
+    </div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
