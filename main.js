@@ -3,7 +3,7 @@ import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 // ---- Edit these: your 10 games ----
 const GAMES = [
   { title: "Fix the Bridge", url: "./bridge/" },
-  { title: "Game 2", url: "#" },
+  { title: "Math Ninja", url: "./ninja/" },
   { title: "Game 3", url: "#" },
   { title: "Game 4", url: "#" },
   { title: "Game 5", url: "#" },
