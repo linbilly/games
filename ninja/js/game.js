@@ -9,37 +9,53 @@ const MODE_INFO = {
   mixed: { name: 'Mixed Arena', maxAnswer: 20, baseTime: 6.0 },
 };
 
+const SPEED_PRESET = {
+  turtle: 0.20,
+  slow: 0.60,
+  normal: 1.00,
+  falcon: 2.00,
+};
+
 export class Game{
   constructor(canvas, ui){
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.ui = ui;
 
-    this.state = 'menu'; // menu, playing, paused, over, boss
-    this.settings = { mode:'add20', sound:true, hints:true, adaptive:true };
+    this.state = 'menu'; // menu, playing, paused, over
+    this.settings = { mode:'add20', sound:true, hints:true, adaptive:true, speed:'normal' };
 
     this.score = 0;
     this.streak = 0;
     this.hearts = 3;
     this.qCount = 0;
 
-    // enemy movement
-    this.enemy = { x: 780, y: 360, speed: 55, wobble: 0 };
+    this.enemy = { x: 780, y: 360, wobble: 0 };
     this.player = { x: 180, y: 360 };
 
-    // timing
     this.qStart = 0;
-    this.timeLeft = 0;
     this.timeLimit = 6;
+    this.timeLeft = 6;
 
-    // current question
+    // speed scaling
+    this.baseSpeed = 1.0;      // selected in menu
+    this.questionSpeed = 1.0;  // can drop to 50% after wrong answer (for rest of question)
+
+    // question
     this.q = null;
-    this.choices = [];
     this.locked = false;
 
     // progress/adaptive
     this.progressKey = 'math_ninja_progress_v1';
     this.progress = this.loadProgress();
+
+    // FX
+    this.shakeStart = 0;
+    this.shakeUntil = 0;
+    this.shakeMag = 0;
+
+    this.damageStart = 0;
+    this.damageUntil = 0;
 
     // audio
     this.audio = this.makeAudio();
@@ -64,6 +80,8 @@ export class Game{
 
   start(settings){
     this.settings = settings;
+    this.baseSpeed = SPEED_PRESET[this.settings.speed] ?? 1.0;
+
     this.state = 'playing';
     this.score = 0;
     this.streak = 0;
@@ -71,23 +89,48 @@ export class Game{
     this.qCount = 0;
     this.enemy.x = 780;
     this.enemy.wobble = 0;
+
     this.nextQuestion();
     this.ui.showToast('Fight!');
   }
 
   pause(p){
     if(p){
-      if(this.state === 'playing' || this.state === 'boss') this.state = 'paused';
+      if(this.state === 'playing') this.state = 'paused';
     }else{
       if(this.state === 'paused') this.state = 'playing';
-      // restart timer for fairness
+      // fairness
       this.qStart = now();
     }
   }
 
   resetProgress(){
     localStorage.removeItem(this.progressKey);
-    this.progress = this.loadProgress();
+    this.progress = this.freshProgress();
+    this.ui.updateProgressLine(this.getProgressSummary());
+  }
+
+  freshProgress(){
+    return {
+      totalAnswered: 0,
+      totalCorrect: 0,
+      totalTimeCorrectMs: 0,
+      bestStreak: 0,
+      weakMap: {},
+    };
+  }
+
+  loadProgress(){
+    try{
+      const raw = localStorage.getItem(this.progressKey);
+      return raw ? Object.assign(this.freshProgress(), JSON.parse(raw)) : this.freshProgress();
+    }catch{
+      return this.freshProgress();
+    }
+  }
+
+  saveProgress(){
+    localStorage.setItem(this.progressKey, JSON.stringify(this.progress));
   }
 
   getProgressSummary(){
@@ -100,54 +143,49 @@ export class Game{
     return `Progress: answered ${total} · accuracy ${acc}% · best streak ${best} · avg correct time ${avgS}s`;
   }
 
-  loadProgress(){
-    try{
-      const raw = localStorage.getItem(this.progressKey);
-      if(!raw) return this.freshProgress();
-      const obj = JSON.parse(raw);
-      return Object.assign(this.freshProgress(), obj);
-    }catch{
-      return this.freshProgress();
-    }
+  updateHUD(){
+    const info = MODE_INFO[this.settings.mode] || MODE_INFO.add20;
+    this.ui.setHUD({
+      modeName: info.name,
+      score: this.score,
+      streak: this.streak,
+      hearts: this.hearts,
+    });
   }
 
-  freshProgress(){
-    return {
-      totalAnswered: 0,
-      totalCorrect: 0,
-      totalTimeCorrectMs: 0,
-      bestStreak: 0,
-      // weakMap: key -> missCount
-      weakMap: {},
-    };
-  }
+  pickQuestion(){
+    if(!this.settings.adaptive) return makeQuestion(this.settings.mode);
 
-  saveProgress(){
-    localStorage.setItem(this.progressKey, JSON.stringify(this.progress));
+    const candidates = [];
+    for(let i=0;i<10;i++) candidates.push(makeQuestion(this.settings.mode));
+
+    const wm = this.progress.weakMap || {};
+    const weights = candidates.map(q => 1 + (wm[q.key] || 0) * 1.4);
+    const idx = weightedPick(candidates, weights);
+    return candidates[idx];
   }
 
   nextQuestion(){
     this.locked = false;
-    this.qCount++;
+    this.qCount += 1;
 
-    // boss every 20 in mixed mode
-    if(this.settings.mode === 'mixed' && this.qCount % 20 === 0){
-      this.startBoss();
-      return;
-    }
+    // speed for this question starts at base speed
+    this.questionSpeed = this.baseSpeed;
 
+    // generate question
     this.q = this.pickQuestion();
     const modeInfo = MODE_INFO[this.settings.mode] || MODE_INFO.add20;
 
-    // time limit adapts slightly with streak
-    const streakFactor = Math.min(1.6, 1 + this.streak*0.03);
-    this.timeLimit = modeInfo.baseTime / streakFactor;
-    this.timeLeft = this.timeLimit;
+    // time limit scales inversely with speed (turtle = more time, falcon = less)
+    this.timeLimit = modeInfo.baseTime / Math.max(0.1, this.baseSpeed);
     this.qStart = now();
+    this.timeLeft = this.timeLimit;
 
-    this.choices = makeChoices(this.q.answer, { min:0, max:modeInfo.maxAnswer, count:4 });
+    // choices
+    const choices = makeChoices(this.q.answer, { min:0, max:modeInfo.maxAnswer, count:4 });
+
     this.ui.setQuestion(this.q.text);
-    this.ui.renderChoices(this.choices, (val, btn)=> this.pickAnswer(val, btn));
+    this.ui.renderChoices(choices, (val, btn)=> this.pickAnswer(val, btn));
     this.ui.lockChoices(false);
 
     const showHint = this.settings.hints && Math.random() < 0.65;
@@ -156,199 +194,134 @@ export class Game{
     this.updateHUD();
   }
 
-  pickQuestion(){
-    if(!this.settings.adaptive) return makeQuestion(this.settings.mode);
-
-    // Adaptive: generate a small candidate set and pick with weights from weakMap
-    const candidates = [];
-    for(let i=0;i<10;i++) candidates.push(makeQuestion(this.settings.mode));
-
-    const wm = this.progress.weakMap || {};
-    const weights = candidates.map(q=>{
-      const miss = wm[q.key] || 0;
-      // emphasize missed facts, but keep variety
-      return 1 + miss * 1.4;
-    });
-
-    const idx = weightedPick(candidates, weights);
-    return candidates[idx];
-  }
-
   pickAnswer(value, btn){
-  if(this.state === 'paused' || this.state === 'over') return;
-
-  const ok = (value === this.q.answer);
-
-  // Prevent double-click on same button
-  btn.disabled = true;
-
-  if(ok){
+    if(this.state !== 'playing') return;
     if(this.locked) return;
-    this.locked = true;
-    this.ui.lockChoices(true);
 
-    const t = performance.now() - this.qStart;
+    const ok = (value === this.q.answer);
 
-    // Progress tracking
-    this.progress.totalAnswered += 1;
-    this.progress.totalCorrect += 1;
-    this.progress.totalTimeCorrectMs += t;
-    this.progress.bestStreak = Math.max(this.progress.bestStreak, this.streak + 1);
-    this.saveProgress();
+    if(ok){
+      this.locked = true;
+      this.ui.lockChoices(true);
+      this.ui.markChoice(btn, true);
 
-    this.ui.markChoice(btn, true);
+      const t = now() - this.qStart;
 
-    const mult = this.speedMultiplier(t);
-    const pts = Math.round(100 * mult + (this.streak * 3));
-    this.score += pts;
-    this.streak += 1;
+      // progress
+      this.progress.totalAnswered += 1;
+      this.progress.totalCorrect += 1;
+      this.progress.totalTimeCorrectMs += t;
+      this.progress.bestStreak = Math.max(this.progress.bestStreak, this.streak + 1);
+      this.saveProgress();
 
-    this.playSfx('hit', mult);
+      // scoring
+      const mult = this.speedMultiplier(t);
+      this.score += Math.round(100 * mult + this.streak * 3);
+      this.streak += 1;
 
-    // knock enemy back
-    this.enemy.x = Math.min(820, this.enemy.x + 35 + 10 * mult);
+      this.playSfx('hit', mult);
 
-    this.updateHUD();
+      // feel-good knockback
+      this.enemy.x = Math.min(820, this.enemy.x + 30 + 10 * mult);
 
-    setTimeout(()=> this.nextQuestion(), 450);
+      this.updateHUD();
+      setTimeout(()=> this.nextQuestion(), 420);
+      return;
+    }
 
-  } else {
-
-    // ❌ Wrong answer behavior changed
+    // WRONG: stay on question, but punish + gray out choice
     this.ui.markChoice(btn, false);
     this.playSfx('miss', 1);
 
-      this.streak = 0;
-      this.hearts -= 1;
-      this.ui.showToast('Ouch!');
-      if(this.hearts <= 0){
-        this.gameOver();
-      }
-    // Gray out the wrong answer
-    btn.style.opacity = "0.4";
+    btn.disabled = true;
+    btn.style.opacity = "0.35";
     btn.style.cursor = "not-allowed";
 
-    // Increase weak count for adaptive system
-    this.progress.weakMap[this.q.key] =
-      (this.progress.weakMap[this.q.key] || 0) + 1;
-
+    // adaptive
     this.progress.totalAnswered += 1;
+    this.progress.weakMap[this.q.key] = (this.progress.weakMap[this.q.key] || 0) + 1;
     this.saveProgress();
 
-    
-  }
-}
+    // damage
+    this.streak = 0;
+    this.hearts -= 1;
 
+    // slow down 50% for rest of question
+    this.questionSpeed = this.baseSpeed * 0.5;
+
+    // FX
+    this.shakeStart = now();
+    this.shakeUntil = this.shakeStart + 220;
+    this.shakeMag = 10;
+
+    this.damageStart = now();
+    this.damageUntil = this.damageStart + 320;
+
+    this.updateHUD();
+
+    if(this.hearts <= 0){
+      this.gameOver();
+      return;
+    }
+
+    this.ui.showToast('Try again!');
+  }
 
   speedMultiplier(ms){
-    // <2s => 3x, 2-4 => 2x, >4 => 1x (smooth)
     const s = ms/1000;
     if(s <= 2) return 3;
     if(s <= 4) return 2;
     return 1;
   }
 
-  startBoss(){
-    // 10 questions / 20 seconds
-    this.state = 'boss';
-    this.boss = {
-      remaining: 10,
-      correct: 0,
-      timeTotal: 20.0,
-      started: now(),
-    };
-    this.ui.showToast('👺 Boss Battle!');
-    this.enemy.x = 760;
-    this.enemy.speed = 70;
-    this.nextBossQuestion();
-  }
-
-  nextBossQuestion(){
-    if(this.state !== 'boss') return;
-    if(this.boss.remaining <= 0){
-      this.finishBoss();
-      return;
-    }
-    this.q = this.pickQuestion();
-    this.choices = makeChoices(this.q.answer, { min:0, max:20, count:4 });
-    this.qStart = now();
-    this.locked = false;
-
-    this.ui.setQuestion(this.q.text);
-    this.ui.renderChoices(this.choices, (val, btn)=> this.pickBossAnswer(val, btn));
-    this.ui.lockChoices(false);
-    this.ui.setHint(this.settings.hints ? 'Boss round: go fast!' : '');
-    this.updateHUD();
-  }
-
-  pickBossAnswer(value, btn){
-    if(this.locked || this.state !== 'boss') return;
-    this.locked = true;
-    this.ui.lockChoices(true);
-
-    const ok = (value === this.q.answer);
-    this.ui.markChoice(btn, ok);
-
-    this.progress.totalAnswered += 1;
-    if(ok){
-      this.progress.totalCorrect += 1;
-      this.progress.totalTimeCorrectMs += (now() - this.qStart);
-    }else{
-      this.progress.weakMap[this.q.key] = (this.progress.weakMap[this.q.key] || 0) + 1;
-    }
-    this.saveProgress();
-
-    if(ok){
-      this.boss.correct += 1;
-      this.score += 150;
-      this.playSfx('hit', 2.2);
-    }else{
-      this.playSfx('miss', 1);
-    }
-
-    this.boss.remaining -= 1;
-    setTimeout(()=> this.nextBossQuestion(), 220);
-  }
-
-  finishBoss(){
-    const need = 8;
-    if(this.boss.correct >= need){
-      this.ui.showToast('Boss defeated! +500');
-      this.score += 500;
-      this.streak += 3;
-      this.enemy.x = 820;
-    }else{
-      this.ui.showToast('Boss escaped… -1 heart');
-      this.hearts -= 1;
-      this.streak = 0;
-      if(this.hearts <= 0){
-        this.gameOver();
-        return;
-      }
-    }
-    this.state = 'playing';
-    this.enemy.speed = 55;
-    setTimeout(()=> this.nextQuestion(), 500);
-  }
-
   gameOver(){
     this.state = 'over';
     this.ui.showToast(`Game Over — score ${this.score}`);
-    // Show menu automatically after a moment
     setTimeout(()=>{
       this.ui.showMenu(true);
       this.ui.updateProgressLine(this.getProgressSummary());
     }, 900);
   }
 
-  updateHUD(){
-    const info = MODE_INFO[this.settings.mode] || MODE_INFO.add20;
-    this.ui.setHUD({
-      modeName: this.state === 'boss' ? 'Boss Battle' : info.name,
-      score: this.score,
-      streak: this.streak,
-      hearts: this.hearts,
-    });
+  update(){
+    if(this.state !== 'playing'){
+      // still show timer pill as 0
+      this.ui.setTimer(0, false);
+      return;
+    }
+
+    // elapsed is slowed down by questionSpeed (after wrong answers)
+    const rawElapsed = (now() - this.qStart) / 1000;
+    const elapsed = Math.max(0, rawElapsed * this.questionSpeed);
+
+    this.timeLeft = Math.max(0, this.timeLimit - elapsed);
+    const urgency = this.timeLeft < 1.6;
+    this.ui.setTimer(this.timeLeft, urgency);
+
+    // enemy approaches
+    const progress = Math.min(1, elapsed / this.timeLimit);
+    const targetX = 330;
+    const startX = 780;
+    this.enemy.x = startX - (startX - targetX) * progress;
+
+    // wobble
+    this.enemy.wobble += 0.06;
+
+    // timeout = wrong + move on
+    if(this.timeLeft <= 0 && !this.locked){
+      this.locked = true;
+      this.ui.lockChoices(true);
+      this.streak = 0;
+      this.hearts -= 1;
+      this.playSfx('miss', 1);
+      this.updateHUD();
+
+      if(this.hearts <= 0){
+        this.gameOver();
+      }else{
+        setTimeout(()=> this.nextQuestion(), 650);
+      }
+    }
   }
 
   loop(){
@@ -357,61 +330,27 @@ export class Game{
     this.draw();
   }
 
-  update(){
-    if(this.state === 'playing'){
-      const dt = 1/60;
-      this.enemy.wobble += dt * 3.2;
-      // enemy approaches as time runs out
-      const elapsed = (now() - this.qStart)/1000;
-      this.timeLeft = Math.max(0, this.timeLimit - elapsed);
-      const urgency = this.timeLeft < 1.6;
-      this.ui.setTimer(this.timeLeft, urgency);
-
-      // move enemy closer as time elapses
-      const progress = Math.min(1, elapsed / this.timeLimit);
-      const targetX = 330; // “danger line”
-      const startX = 780;
-      this.enemy.x = startX - (startX - targetX) * progress;
-
-      if(this.timeLeft <= 0 && !this.locked){
-        // timeout counts as wrong
-        this.locked = true;
-        this.ui.lockChoices(true);
-        this.streak = 0;
-        this.hearts -= 1;
-        this.playSfx('miss', 1);
-        this.ui.showToast('Too slow!');
-        this.updateHUD();
-        if(this.hearts <= 0) this.gameOver();
-        else setTimeout(()=> this.nextQuestion(), 650);
-      }
-    }else if(this.state === 'boss'){
-      const elapsed = (now() - this.boss.started)/1000;
-      const left = Math.max(0, this.boss.timeTotal - elapsed);
-      this.ui.setTimer(left, left < 5);
-      // simple pressure: if time ends, fail boss
-      if(left <= 0){
-        this.boss.remaining = 0;
-        this.finishBoss();
-      }
-      // enemy “menacing” bounce
-      this.enemy.wobble += 0.08;
-      this.enemy.x = 700 + Math.sin(this.enemy.wobble)*10;
-    }else{
-      // paused/menu/over
-      this.ui.setTimer(0, false);
-    }
-  }
-
   draw(){
     const ctx = this.ctx;
     const w = 960, h = 540;
     ctx.clearRect(0,0,w,h);
 
-    // dojo background
+    // Screen shake
+    let shakeX = 0, shakeY = 0;
+    if(now() < this.shakeUntil){
+      const p = 1 - ((now() - this.shakeStart) / Math.max(1, (this.shakeUntil - this.shakeStart)));
+      const mag = this.shakeMag * Math.max(0, p);
+      shakeX = (Math.random() - 0.5) * mag;
+      shakeY = (Math.random() - 0.5) * mag;
+    }
+
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    // background
     drawDojo(ctx, w, h);
 
-    // floor shadow
+    // shadows
     ctx.globalAlpha = 0.35;
     ctx.beginPath();
     ctx.ellipse(this.player.x, this.player.y+70, 90, 18, 0, 0, Math.PI*2);
@@ -422,13 +361,70 @@ export class Game{
     ctx.fill();
     ctx.globalAlpha = 1;
 
-    // player
-    drawNinja(ctx, this.player.x, this.player.y, { color:'#6ee7ff', headband:'#b6f3ff', facing: 1, angry:false });
-    // enemy
-    const angry = this.state === 'boss' || (this.state === 'playing' && this.timeLeft < 1.5);
+    // Player with damage shake/flash and "-1"
+    let pX = this.player.x, pY = this.player.y;
+    const damaged = (this.state === 'playing' && now() < this.damageUntil);
+    if(damaged){
+      pX += (Math.random() - 0.5) * 8;
+      pY += (Math.random() - 0.5) * 6;
+    }
+    drawNinja(ctx, pX, pY, { color:'#6ee7ff', headband:'#b6f3ff', facing: 1, angry:false });
+
+    if(damaged){
+      const t = (now() - this.damageStart) / Math.max(1, (this.damageUntil - this.damageStart));
+      const a = Math.max(0, 1 - t);
+
+      // red flash on player
+      ctx.save();
+      ctx.globalAlpha = 0.25 * a;
+      ctx.beginPath();
+      ctx.arc(pX, pY-6, 70, 0, Math.PI*2);
+      ctx.fillStyle = '#ff2d2d';
+      ctx.fill();
+      ctx.restore();
+
+      // floating -1
+      const rise = 24 * t;
+      ctx.save();
+      ctx.globalAlpha = 0.95 * a;
+      ctx.font = '900 28px ui-sans-serif, system-ui';
+      ctx.fillStyle = '#ff5a5a';
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = 5;
+      const tx = pX - 10;
+      const ty = (pY - 92) - rise;
+      ctx.strokeText('-1', tx, ty);
+      ctx.fillText('-1', tx, ty);
+      ctx.restore();
+    }
+
+    // Slowdown aura around enemy when slowed (for rest of question)
+    if(this.state === 'playing' && this.questionSpeed < this.baseSpeed){
+      ctx.save();
+      ctx.globalAlpha = 0.28;
+      ctx.beginPath();
+      ctx.arc(this.enemy.x, this.enemy.y-8, 88, 0, Math.PI*2);
+      ctx.fillStyle = '#6ee7ff';
+      ctx.fill();
+      ctx.globalAlpha = 0.16;
+      ctx.beginPath();
+      ctx.arc(this.enemy.x, this.enemy.y-8, 128, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = 'rgba(110,231,255,0.55)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 10]);
+      ctx.beginPath();
+      ctx.arc(this.enemy.x, this.enemy.y-8, 110, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Enemy
+    const angry = (this.state === 'playing' && this.timeLeft < 1.5);
     drawNinja(ctx, this.enemy.x, this.enemy.y, { color:'#ff7c7c', headband:'#ffd1d1', facing: -1, angry });
 
-    // UI on canvas: danger line
+    // danger line
     ctx.save();
     ctx.globalAlpha = 0.22;
     ctx.strokeStyle = '#ffdf6e';
@@ -441,7 +437,7 @@ export class Game{
     ctx.restore();
 
     // fire mode glow
-    if(this.streak >= 5 && (this.state === 'playing' || this.state==='boss')){
+    if(this.streak >= 5 && this.state === 'playing'){
       ctx.save();
       ctx.globalAlpha = 0.18;
       ctx.beginPath();
@@ -451,19 +447,14 @@ export class Game{
       ctx.restore();
     }
 
-    // small text
-    ctx.save();
-    ctx.font = '700 13px ui-sans-serif, system-ui';
-    ctx.fillStyle = 'rgba(255,255,255,0.72)';
-    const msg = (this.state==='paused') ? 'Paused' : (this.state==='over' ? 'Game Over' : '');
-    if(msg) ctx.fillText(msg, 18, 28);
-    ctx.restore();
+    ctx.restore(); // end shake transform
   }
 
   makeAudio(){
-    // tiny WebAudio synth (no external files)
-    const ctx = (window.AudioContext || window.webkitAudioContext) ? new (window.AudioContext || window.webkitAudioContext)() : null;
-    return { ctx, enabled:true };
+    const ctx = (window.AudioContext || window.webkitAudioContext)
+      ? new (window.AudioContext || window.webkitAudioContext)()
+      : null;
+    return { ctx };
   }
 
   playSfx(type, intensity=1){
@@ -471,7 +462,6 @@ export class Game{
     const a = this.audio;
     if(!a.ctx) return;
 
-    // Resume on user gesture
     if(a.ctx.state === 'suspended'){
       a.ctx.resume().catch(()=>{});
     }
@@ -502,7 +492,6 @@ export class Game{
 }
 
 function drawDojo(ctx, w, h){
-  // sky glow
   const g = ctx.createLinearGradient(0,0,0,h);
   g.addColorStop(0, 'rgba(110,231,255,0.10)');
   g.addColorStop(0.45, 'rgba(255,255,255,0.03)');
@@ -632,7 +621,7 @@ function drawNinja(ctx, x, y, opts){
   ctx.beginPath(); ctx.roundRect(-62, 40, 28, 16, 8); ctx.fill();
   ctx.beginPath(); ctx.roundRect(34, 40, 28, 16, 8); ctx.fill();
 
-  // sword (enemy only by color check)
+  // sword
   ctx.save();
   ctx.globalAlpha = 0.85;
   ctx.strokeStyle = 'rgba(255,255,255,0.55)';

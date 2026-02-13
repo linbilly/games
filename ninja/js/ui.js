@@ -23,6 +23,8 @@ export class UI{
     this.chkHints = document.getElementById('chkHints');
     this.chkAdaptive = document.getElementById('chkAdaptive');
 
+    this.selSpeed = document.getElementById('selSpeed');
+
     this.toast = document.getElementById('toast');
     this.progressLine = document.getElementById('progressLine');
 
@@ -47,6 +49,7 @@ export class UI{
         sound: this.chkSound.checked,
         hints: this.chkHints.checked,
         adaptive: this.chkAdaptive.checked,
+        speed: this.selSpeed ? this.selSpeed.value : 'normal',
       };
       game.start(settings);
       this.showMenu(false);

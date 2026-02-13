@@ -37,10 +37,7 @@
           <div class="timerPill" id="timerPill"><span id="timerText">—</span></div>
         </div>
 
-        <div class="choices" id="choices" role="group" aria-label="Answer choices">
-          <!-- buttons inserted by JS -->
-        </div>
-
+        <div class="choices" id="choices" role="group" aria-label="Answer choices"></div>
         <div class="hint" id="hint" aria-live="polite"></div>
       </section>
 
@@ -84,6 +81,18 @@
           </div>
 
           <div class="row">
+            <label class="selectWrap">
+              <span class="selectLabel">Speed</span>
+              <select id="selSpeed" class="select">
+                <option value="turtle">🐢 Turtle (20%)</option>
+                <option value="slow">🕰️ Slow (60%)</option>
+                <option value="normal" selected>⚡ Normal (100%)</option>
+                <option value="falcon">🦅 Falcon (200%)</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row">
             <button id="btnStart" class="primaryBtn">Start</button>
             <button id="btnHow" class="ghostBtn">How to play</button>
             <button id="btnReset" class="dangerBtn">Reset progress</button>
@@ -98,8 +107,8 @@
             <ul>
               <li>Click the correct answer before the enemy reaches you.</li>
               <li>Fast answers give bonus points.</li>
-              <li>Build streaks for “Fire Mode”.</li>
-              <li>Boss fight every 20 questions in Mixed Arena.</li>
+              <li>Wrong answers cost 1 heart but you can try again (choices gray out).</li>
+              <li>Mixed Arena: boss fight every 20 questions.</li>
             </ul>
             <p class="tip"><strong>Tip:</strong> For subtraction, try “counting up” (e.g., 15 − 8: 8→10 (+2), 10→15 (+5), total 7).</p>
             <div class="row">
