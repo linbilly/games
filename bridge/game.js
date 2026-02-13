@@ -39,6 +39,7 @@ import { createFireworks } from "./effects.js";
 //
 const LEVELS = [
     
+
     
 
   {
@@ -182,8 +183,32 @@ const LEVELS = [
     targetRot: { x: 0, y: 1, z: 0 },
   },
 
-  {
+    {
     name: "Level 6: Find the Pattern",
+    skin: { PX: 0x7b61ff, NX: 0xffd400, PZ: 0x00d084, NZ: 0xff5a5f },
+
+    bridge: [
+      { x: -4, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 0 } },
+      { x: -3, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 1 } },
+      { x: -2, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 2 } },
+      { x: -1, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 3 } },
+      { x:  1, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 1 } },
+      { x:  2, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 2 } },
+      { x:  3, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 3 } },
+      { x:  4, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 0 } },
+    ],
+
+    loose: {
+      tile: "straight",
+      startRot: { x: 3, y: 3, z: 3 },
+    },
+
+    // ✅ Winning orientation (you set this)
+    targetRot: { x: 0, y: 2, z: 0 },
+  },
+
+  {
+    name: "Level 7: Find the Pattern",
     skin: { PX: 0x7b61ff, NX: 0xffd400, PZ: 0x00d084, NZ: 0xff5a5f },
 
     bridge: [
@@ -207,7 +232,7 @@ const LEVELS = [
   },
 
   {
-    name: "Level 7: Find the Pattern",
+    name: "Level 8: Find the Pattern",
     skin: { PX: 0x7b61ff, NX: 0xffd400, PZ: 0x00d084, NZ: 0xff5a5f },
 
     bridge: [
@@ -228,6 +253,54 @@ const LEVELS = [
 
     // ✅ Winning orientation (you set this)
     targetRot: { x: 0, y: 2, z: 0 },
+  },
+
+  {
+    name: "Level 9: Find the Pattern",
+    skin: { PX: 0x7b61ff, NX: 0xffd400, PZ: 0x00d084, NZ: 0xff5a5f },
+
+    bridge: [
+      { x: -4, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 0 } },
+      { x: -3, z: 0, tile: "straight", rot: { x: 1, y: 2, z: 0 } },
+      { x: -2, z: 0, tile: "straight", rot: { x: 2, y: 2, z: 0 } },
+      { x: -1, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 0 } },
+      { x:  1, z: 0, tile: "straight", rot: { x: 2, y: 2, z: 0 } },
+      { x:  2, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 0 } },
+      { x:  3, z: 0, tile: "straight", rot: { x: 1, y: 2, z: 0 } },
+      { x:  4, z: 0, tile: "straight", rot: { x: 2, y: 2, z: 0 } },
+    ],
+
+    loose: {
+      tile: "straight",
+      startRot: { x: 2, y: 0, z: 0 },
+    },
+
+    // ✅ Winning orientation (you set this)
+    targetRot: { x: 1, y: 2, z: 0 },
+  },
+
+      {
+    name: "Level 10: Find the Pattern",
+    skin: { PX: 0x7b61ff, NX: 0xffd400, PZ: 0x00d084, NZ: 0xff5a5f },
+
+    bridge: [
+      { x: -4, z: 0, tile: "straight", rot: { x: 1, y: 2, z: 0 } },
+      { x: -3, z: 0, tile: "straight", rot: { x: 2, y: 2, z: 1 } },
+      { x: -2, z: 0, tile: "straight", rot: { x: 3, y: 2, z: 2 } },
+      { x: -1, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 3 } },
+      { x:  1, z: 0, tile: "straight", rot: { x: 2, y: 2, z: 1 } },
+      { x:  2, z: 0, tile: "straight", rot: { x: 3, y: 2, z: 2 } },
+      { x:  3, z: 0, tile: "straight", rot: { x: 0, y: 2, z: 3 } },
+      { x:  4, z: 0, tile: "straight", rot: { x: 1, y: 2, z: 0 } },
+    ],
+
+    loose: {
+      tile: "straight",
+      startRot: { x: 2, y: 0, z: 0 },
+    },
+
+    // ✅ Winning orientation (you set this)
+    targetRot: { x: 1, y: 2, z: 0 },
   },
 
 ];
