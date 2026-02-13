@@ -245,8 +245,8 @@ function onMove(e) {
   lastX = e.clientX;
   lastY = e.clientY;
 
-  yaw -= dx * 0.006;
-  pitch -= dy * 0.003;
+  yaw += dx * 0.006;
+  pitch += dy * 0.003;
   pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, pitch));
   updateCamera();
 }
