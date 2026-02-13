@@ -9,6 +9,9 @@ const MODE_INFO = {
   mixed: { name: 'Mixed Arena', maxAnswer: 20, baseTime: 6.0 },
 };
 
+const SPEED_TIERS_UI = ['turtle','slow','normal','falcon'];
+const SPEED_TIERS_AUTO = ['turtle','slow','normal'];
+
 const SPEED_PRESET = {
   turtle: 0.20,
   slow: 0.60,
@@ -40,6 +43,9 @@ export class Game{
     // speed scaling
     this.baseSpeed = 1.0;      // selected in menu
     this.questionSpeed = 1.0;  // can drop to 50% after wrong answer (for rest of question)
+
+    // auto leveling
+    this.correctSinceLevel = 0;
 
     // question
     this.q = null;
@@ -89,6 +95,9 @@ export class Game{
     this.qCount = 0;
     this.enemy.x = 780;
     this.enemy.wobble = 0;
+
+
+    this.correctSinceLevel = 0;
 
     this.nextQuestion();
     this.ui.showToast('Fight!');
@@ -145,8 +154,10 @@ export class Game{
 
   updateHUD(){
     const info = MODE_INFO[this.settings.mode] || MODE_INFO.add20;
+    const speedKey = this.settings.speed || 'normal';
+    const speedLabel = (speedKey==='turtle')?'🐢20%':(speedKey==='slow')?'🕰️60%':(speedKey==='normal')?'⚡100%':'🦅200%';
     this.ui.setHUD({
-      modeName: info.name,
+      modeName: `${info.name} · ${speedLabel}`,
       score: this.score,
       streak: this.streak,
       hearts: this.hearts,
@@ -219,6 +230,10 @@ export class Game{
       this.score += Math.round(100 * mult + this.streak * 3);
       this.streak += 1;
 
+      // auto leveling: every 10 correct answers, speed up + refill hearts
+      this.correctSinceLevel += 1;
+      this.levelUpIfNeeded();
+
       this.playSfx('hit', mult);
 
       // feel-good knockback
@@ -265,6 +280,69 @@ export class Game{
     }
 
     this.ui.showToast('Try again!');
+  }
+
+
+
+  levelUpIfNeeded(){
+    if(this.correctSinceLevel < 10) return;
+
+    // reward: full hearts
+    this.hearts = 3;
+
+    // ----- Mode progression -----
+    const MODE_ORDER = ['add10','add20','sub20','mixed'];
+    const curMode = this.settings.mode || 'add20';
+    const curModeIdx = MODE_ORDER.indexOf(curMode);
+    const nextModeIdx = (curModeIdx >= 0) ? Math.min(MODE_ORDER.length - 1, curModeIdx + 1) : 1;
+    const nextMode = MODE_ORDER[nextModeIdx];
+
+    const modeChanged = (nextMode !== curMode);
+    this.settings.mode = nextMode;
+
+    // ----- Speed progression (AUTO caps at 100% / normal) -----
+    // If user manually selected Falcon (200%), we won't change it automatically.
+    let speedChanged = false;
+    const curSpeedKey = this.settings.speed || 'normal';
+    const curSpeedVal = SPEED_PRESET[curSpeedKey] ?? 1.0;
+
+    if(curSpeedVal <= 1.0){
+      const idx = SPEED_TIERS_AUTO.indexOf(curSpeedKey);
+      const nextIdx = (idx >= 0) ? Math.min(SPEED_TIERS_AUTO.length - 1, idx + 1) : 2;
+      const nextKey = SPEED_TIERS_AUTO[nextIdx];
+      if(nextKey !== curSpeedKey){
+        this.settings.speed = nextKey;
+        speedChanged = true;
+      }
+    }
+
+    // apply baseSpeed from (possibly updated) settings.speed
+    this.baseSpeed = SPEED_PRESET[this.settings.speed] ?? this.baseSpeed;
+    this.questionSpeed = this.baseSpeed;
+
+    // reset counter
+    this.correctSinceLevel = 0;
+
+    // toast
+    const modeLabel = (nextMode === 'add10') ? 'Add ≤ 10' :
+                      (nextMode === 'add20') ? 'Add ≤ 20' :
+                      (nextMode === 'sub20') ? 'Subtract ≤ 20' : 'Mixed Arena';
+
+    const speedKey2 = this.settings.speed || 'normal';
+    const speedLabel = (speedKey2 === 'turtle') ? '🐢 Turtle (20%)' :
+                       (speedKey2 === 'slow') ? '🕰️ Slow (60%)' :
+                       (speedKey2 === 'normal') ? '⚡ Normal (100%)' : '🦅 Falcon (200%)';
+
+    if(modeChanged || speedChanged){
+      this.ui.showToast(`Level up! → ${modeLabel} · ${speedLabel} · Hearts refilled`);
+    }else{
+      this.ui.showToast('Nice! Hearts refilled');
+    }
+
+    this.updateHUD();
+
+    // immediately start a fresh question in the new mode/speed (feels snappy)
+    this.nextQuestion();
   }
 
   speedMultiplier(ms){
