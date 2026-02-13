@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Math Ninja: Fact Fluency Arena</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo">🥷</div>
+        <div>
+          <div class="title">Math Ninja</div>
+          <div class="subtitle">Fact Fluency Arena (Grade 3)</div>
+        </div>
+      </div>
+
+      <div class="hud" id="hud" aria-live="polite">
+        <div class="hudItem"><span class="label">Mode</span><span id="hudMode" class="value">—</span></div>
+        <div class="hudItem"><span class="label">Score</span><span id="hudScore" class="value">0</span></div>
+        <div class="hudItem"><span class="label">Streak</span><span id="hudStreak" class="value">0</span></div>
+        <div class="hudItem"><span class="label">Hearts</span><span id="hudHearts" class="value">❤❤❤</span></div>
+      </div>
+
+      <button id="btnMenu" class="ghostBtn" title="Menu">☰</button>
+    </header>
+
+    <main class="stageWrap">
+      <canvas id="stage" width="960" height="540" aria-label="Game stage"></canvas>
+
+      <section class="panel" id="panel">
+        <div class="questionRow">
+          <div class="qLabel">Solve:</div>
+          <div class="question" id="question">—</div>
+          <div class="timerPill" id="timerPill"><span id="timerText">—</span></div>
+        </div>
+
+        <div class="choices" id="choices" role="group" aria-label="Answer choices">
+          <!-- buttons inserted by JS -->
+        </div>
+
+        <div class="hint" id="hint" aria-live="polite"></div>
+      </section>
+
+      <section class="overlay" id="overlay" aria-hidden="false">
+        <div class="card">
+          <h1>🥷 Math Ninja</h1>
+          <p class="lead">Defeat ninjas by answering quickly and accurately. No finger counting — use smart strategies!</p>
+
+          <div class="modeGrid">
+            <button class="modeBtn" data-mode="add10">
+              <div class="modeName">Add ≤ 10</div>
+              <div class="modeDesc">Warm up & speed</div>
+            </button>
+            <button class="modeBtn" data-mode="add20">
+              <div class="modeName">Add ≤ 20</div>
+              <div class="modeDesc">Make-10, doubles</div>
+            </button>
+            <button class="modeBtn" data-mode="sub20">
+              <div class="modeName">Subtract ≤ 20</div>
+              <div class="modeDesc">Count-up strategy</div>
+            </button>
+            <button class="modeBtn" data-mode="mixed">
+              <div class="modeName">Mixed Arena</div>
+              <div class="modeDesc">Bosses & combos</div>
+            </button>
+          </div>
+
+          <div class="row">
+            <label class="toggle">
+              <input type="checkbox" id="chkSound" checked />
+              <span>Sound FX</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="chkHints" checked />
+              <span>Strategy hints</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="chkAdaptive" checked />
+              <span>Adaptive (more weak facts)</span>
+            </label>
+          </div>
+
+          <div class="row">
+            <button id="btnStart" class="primaryBtn">Start</button>
+            <button id="btnHow" class="ghostBtn">How to play</button>
+            <button id="btnReset" class="dangerBtn">Reset progress</button>
+          </div>
+
+          <div class="smallPrint" id="progressLine">Progress: —</div>
+        </div>
+
+        <div class="modal" id="howModal" aria-hidden="true">
+          <div class="modalCard">
+            <h2>How to play</h2>
+            <ul>
+              <li>Click the correct answer before the enemy reaches you.</li>
+              <li>Fast answers give bonus points.</li>
+              <li>Build streaks for “Fire Mode”.</li>
+              <li>Boss fight every 20 questions in Mixed Arena.</li>
+            </ul>
+            <p class="tip"><strong>Tip:</strong> For subtraction, try “counting up” (e.g., 15 − 8: 8→10 (+2), 10→15 (+5), total 7).</p>
+            <div class="row">
+              <button id="btnCloseHow" class="primaryBtn">Got it</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="toast" id="toast" aria-live="polite"></section>
+    </main>
+
+    <footer class="footer">
+      <div>Keyboard: <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> selects choices · <kbd>Esc</kbd> opens menu</div>
+    </footer>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
