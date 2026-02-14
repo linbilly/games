@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mirror Maze</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+<header>
+  <div class="title">🪞 Mirror Maze</div>
+  <div class="stats">
+    ❤️ <span id="hearts">3</span>
+    &nbsp;&nbsp;
+    ⭐ <span id="score">0</span>
+    &nbsp;&nbsp;
+    🧩 Lv <span id="level">1</span>
+    &nbsp;&nbsp;
+    🏁 CP <span id="checkpoint">1</span>
+  </div>
+</header>
+
+<main>
+  <div class="game-container">
+    <canvas id="game" width="980" height="640"></canvas>
+  </div>
+</main>
+
+<footer>
+  <button id="restartBtn">Restart</button>
+  <div class="instructions">
+    Move with ↑ ↓ or drag your ship. Click your ship to fire.
+    Hit = next level. Miss = alien fires back and you may drop a level (not below checkpoint).
+  </div>
+</footer>
+
+<script src="game.js"></script>
+</body>
+</html>
