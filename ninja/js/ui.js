@@ -36,6 +36,11 @@ export class UI{
     this.btnContinue = document.getElementById('btnContinue');
     this.btnEndGame = document.getElementById('btnEndGame');
 
+    this.summaryModal = document.getElementById('summaryModal');
+    this.summaryTitle = document.getElementById('summaryTitle');
+    this.summaryBody = document.getElementById('summaryBody');
+    this.btnSummaryOk = document.getElementById('btnSummaryOk');
+
 
     this.howModal = document.getElementById('howModal');
     this.btnCloseHow = document.getElementById('btnCloseHow');
@@ -69,6 +74,13 @@ export class UI{
       this.showMenu(true);
       this.updateHeaderButtons();
     });
+
+    this.btnSummaryOk.addEventListener('click', ()=>{
+      this.showSummary(false);
+      this.showMenu(true);
+      this.updateHeaderButtons();
+    });
+
 
     // Start / Resume / Continue
     this.btnStart.addEventListener('click', ()=>{
@@ -191,7 +203,7 @@ export class UI{
       titleEl.textContent = title;
     }
 
-    if(text) this.levelUpText.textContent = text;
+    if(text) this.levelUpText.innerHTML = text;
     this.updateHeaderButtons();
   }
 
@@ -264,4 +276,18 @@ export class UI{
   updateProgressLine(text){
     this.progressLine.textContent = text;
   }
+
+  showSummary(show, { title = 'Game Summary', html = '' } = {}){
+    // Show overlay (opaque menu background) and only this modal
+    this.overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
+    this.overlay.classList.remove('levelup'); // ensure menu card not hidden weirdly
+
+    this.summaryModal.setAttribute('aria-hidden', show ? 'false' : 'true');
+
+    if(show){
+      if(this.summaryTitle) this.summaryTitle.textContent = title;
+      if(this.summaryBody) this.summaryBody.innerHTML = html;
+    }
+  }
+
 }

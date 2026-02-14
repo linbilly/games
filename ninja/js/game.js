@@ -39,6 +39,8 @@ export class Game{
     this.streak = 0;
     this.hearts = 3;
     this.correctSinceLevel = 0;
+    this.sessionStats = {}; // { mode: { answered: n, correct: n } }
+
 
     this.baseSpeed = 1.0;
     this.questionSpeed = 1.0;
@@ -108,6 +110,63 @@ export class Game{
 
   }
 
+  recordAttempt(mode, isCorrect){
+    if(!this.sessionStats[mode]){
+      this.sessionStats[mode] = { answered: 0, correct: 0 };
+    }
+    this.sessionStats[mode].answered += 1;
+    if(isCorrect) this.sessionStats[mode].correct += 1;
+  }
+
+  buildAccuracySummary(){
+
+    const modes = Object.keys(this.sessionStats);
+
+    if(modes.length === 0){
+      return `
+        <ul>
+          <li>No answers recorded</li>
+        </ul>
+      `;
+    }
+
+    // Order by MODE_ORDER if available
+    const ordered = (typeof MODE_ORDER !== 'undefined')
+      ? MODE_ORDER.filter(m => this.sessionStats[m])
+          .concat(modes.filter(m => !MODE_ORDER.includes(m)))
+      : modes;
+
+    let totalA = 0;
+    let totalC = 0;
+
+    let html = `<ul style="margin:0; padding-left:18px;">`;
+
+    for(const m of ordered){
+      const s = this.sessionStats[m];
+      totalA += s.answered;
+      totalC += s.correct;
+
+      const pct = s.answered
+        ? Math.round((s.correct / s.answered) * 100)
+        : 0;
+
+      const name = (MODE_INFO[m]?.name) || m;
+
+      html += `
+        <li>
+          <strong>${name}</strong><br>
+          ${s.correct}/${s.answered} correct (${pct}%)
+        </li>
+      `;
+    }
+
+    html += `</ul>`;
+
+    return html;
+  }
+
+
+
   init(){
     this.resizeForDPR();
     window.addEventListener('resize', ()=> this.resizeForDPR());
@@ -147,6 +206,8 @@ export class Game{
   }
 
   start(settings){
+    this.sessionStats = {};
+
     this.settings = settings;
     this.baseSpeed = SPEED_PRESET[this.settings.speed] ?? 1.0;
     this.questionSpeed = this.baseSpeed;
@@ -273,6 +334,8 @@ export class Game{
     const ok = (value === this.q.answer);
 
     if(ok){
+      this.recordAttempt(this.settings.mode, true);
+
       this.locked=true;
       this.ui.lockChoices(true);
       this.ui.markChoice(btn,true);
@@ -312,6 +375,9 @@ export class Game{
       this.progress.totalAnswered++;
       this.progress.weakMap[this.q.key] = (this.progress.weakMap[this.q.key]||0) + 1;
       this.saveProgress();
+
+      this.recordAttempt(this.settings.mode, false);
+
 
       this.streak=0;
       this.hearts -= 1;
@@ -384,9 +450,13 @@ export class Game{
 
   quit(){
     this.state = 'menu';
-    this.ui.showToast('Quit');
     this.ui.showMenu(true);
+
+    const html = this.buildAccuracySummary();
+
+    this.ui.showSummary(true, { title: 'Game Summary', html });
   }
+
 
   update(){
     if(this.state==='paused' || this.state==='levelup'){
