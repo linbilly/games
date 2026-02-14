@@ -1,3 +1,5 @@
+console.log("LOADED game.js", new Date().toISOString());
+
 import { makeQuestion, makeChoices, makeHint, weightedPick } from './questions.js';
 
 const MODE_INFO = {
@@ -62,29 +64,48 @@ export class Game{
 
     this.audio = this.initAudio();
 
-    // Defeat handler: instead of ending, drop down a level and refill hearts
+    // Defeat handler: keep category, slow speed tier (Normal → Slow → Turtle), refill hearts
     this.onDefeat = () => {
-      const curMode = this.settings.mode || 'add20';
-      const curIdx = MODE_ORDER.indexOf(curMode);
-      const downIdx = Math.max(0, curIdx - 1);
-      const newMode = MODE_ORDER[downIdx] || MODE_ORDER[0];
+      console.log("onDefeat fired");
 
-      this.settings.mode = newMode;
+      const defeatedScore = this.score;
+      const defeatedStreak = this.streak;
 
+      // Speed tiers: Normal → Slow → Turtle
+      const tierOrder = ['normal', 'slow', 'turtle'];
+      const curTier = tierOrder.includes(this.settings.speed) ? this.settings.speed : 'normal';
+      const nextTier = tierOrder[Math.min(tierOrder.length - 1, tierOrder.indexOf(curTier) + 1)];
+
+      this.settings.speed = nextTier;
+      this.baseSpeed = SPEED_PRESET[nextTier] ?? 1.0;
+      this.questionSpeed = this.baseSpeed;
+
+      // Reset run state (same category)
       this.hearts = 3;
       this.streak = 0;
       this.correctSinceLevel = 0;
       this.locked = false;
 
       this.enemy.x = 780;
-      this.questionSpeed = this.baseSpeed;
 
-      const modeLabel = (MODE_INFO[newMode]?.name) || newMode;
+      const speedLabel =
+        nextTier === 'turtle' ? 'Turtle (20%)' :
+        nextTier === 'slow'   ? 'Slow (60%)' :
+                                'Normal (100%)';
 
       this.state = 'levelup';
       this.ui.lockChoices(true);
-      this.ui.showLevelUp(true, `Defeated! Down a level → ${modeLabel}. Hearts refilled to 3.`);
+
+      // Force popup title to "Sorry" even if your UI doesn't support a title parameter
+      const titleEl = document.getElementById('levelUpTitle');
+      if (titleEl) titleEl.textContent = 'Sorry!';
+
+      this.ui.showLevelUp(
+        true,
+        `Stats:\n• Score: ${defeatedScore}\n• Streak: ${defeatedStreak}\n\n Slow down → ${speedLabel}\nHearts refilled to 3.`
+      );
     };
+
   }
 
   init(){
@@ -282,69 +303,77 @@ export class Game{
       return;
     }
 
-    // Wrong: keep same question
-    this.ui.markChoice(btn,false);
-    btn.disabled=true;
-    btn.style.opacity="0.35";
-    btn.style.cursor="not-allowed";
+      // Wrong: keep same question
+      this.ui.markChoice(btn,false);
+      btn.disabled=true;
+      btn.style.opacity="0.35";
+      btn.style.cursor="not-allowed";
 
-    this.progress.totalAnswered++;
-    this.progress.weakMap[this.q.key] = (this.progress.weakMap[this.q.key]||0) + 1;
-    this.saveProgress();
+      this.progress.totalAnswered++;
+      this.progress.weakMap[this.q.key] = (this.progress.weakMap[this.q.key]||0) + 1;
+      this.saveProgress();
 
-    this.streak=0;
-    this.hearts -= 1;
+      this.streak=0;
+      this.hearts -= 1;
 
-    // slow down for rest of question
-    this.questionSpeed = this.baseSpeed * 0.5;
+      // slow down for rest of question
+      this.questionSpeed = this.baseSpeed * 0.5;
 
-    this.shakeUntil = now()+220;
-    this.damageUntil = now()+320;
+      this.shakeUntil = now()+220;
+      this.damageUntil = now()+320;
 
-    this.playSfx('miss');
-    this.updateHUD();
+      this.playSfx('miss');
+      this.updateHUD();
 
-    if(this.hearts<=0) this.onDefeat();
-    else this.ui.showToast('Try again!');
-  }
+      if(this.hearts <= 0){
+        console.log("about to call onDefeat from wrong answer");
+        this.onDefeat();
+        return;
+      }
+      else this.ui.showToast('Try again!');
+    }
 
     onDefeat(){
-    const defeatedScore = this.score;
-    const defeatedStreak = this.streak;
+      console.log("onDefeat fired", this.settings.speed);
+      const defeatedScore = this.score;
+      const defeatedStreak = this.streak;
 
-    // Drop down a level instead of ending the run
-    const curMode = this.settings.mode || 'add20';
-    const curIdx = MODE_ORDER.indexOf(curMode);
-    const downIdx = Math.max(0, curIdx - 1);
-    const newMode = MODE_ORDER[downIdx] || MODE_ORDER[0];
+      // Keep same category. Drop speed tier: Normal → Slow → Turtle
+      const tierOrder = ['normal', 'slow', 'turtle'];
+      const currentTier = (this.settings.speed && tierOrder.includes(this.settings.speed))
+        ? this.settings.speed
+        : 'normal';
 
-    this.settings.mode = newMode;
+      const nextTier = tierOrder[Math.min(tierOrder.length - 1, tierOrder.indexOf(currentTier) + 1)];
+      this.settings.speed = nextTier;
 
-    // Reset player state
-    this.hearts = 3;
-    this.streak = 0;
-    this.correctSinceLevel = 0;
-    this.locked = false;
+      // Apply the new baseSpeed
+      this.baseSpeed = SPEED_PRESET[this.settings.speed] ?? 1.0;
+      this.questionSpeed = this.baseSpeed;
 
-    // Reset enemy position and timing
-    this.enemy.x = 780;
-    this.questionSpeed = this.baseSpeed;
+      // Reset run state (same question flow as your current defeat behavior)
+      this.hearts = 3;
+      this.streak = 0;
+      this.correctSinceLevel = 0;
+      this.locked = false;
+      this.enemy.x = 780;
 
-    const modeLabel = (MODE_INFO[newMode]?.name) || newMode;
+      const speedLabel =
+        nextTier === 'turtle' ? 'Turtle (20%)' :
+        nextTier === 'slow'   ? 'Slow (60%)' :
+                                'Normal (100%)';
 
-    // Pause + show message (same style as level up)
-    this.state = 'levelup';
-    this.ui.lockChoices(true);
-    this.ui.showLevelUp(
-      true,
-      `Defeated!\n` +
-      `• Score: ${defeatedScore}\n` +
-      `• Streak: ${defeatedStreak}\n\n` +
-      `Down a level → ${modeLabel}\n\n` +
-      `Hearts refilled to 3.`
-    );
+      this.state = 'levelup';
+      this.ui.lockChoices(true);
 
-  }
+      // NEW: pass a custom title
+      this.ui.showLevelUp(
+        true,
+        `Stats:\n• Score: ${defeatedScore}\n• Streak: ${defeatedStreak}\n\nSlow down → ${speedLabel}\nHearts refilled to 3.`,
+        'Sorry!'
+      );
+    }
+
 
 
   gameOver(){

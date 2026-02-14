@@ -177,13 +177,25 @@ export class UI{
     this.howModal.setAttribute('aria-hidden', show ? 'false' : 'true');
   }
 
-  showLevelUp(show, text=''){
+  showLevelUp(show, text = '', title = null){
+    // show immediately; reuse overlay but hide menu card via CSS class
     this.overlay.setAttribute('aria-hidden', show ? 'false' : 'true');
     this.overlay.classList.toggle('levelup', !!show);
     this.levelUpModal.setAttribute('aria-hidden', show ? 'false' : 'true');
+
+    // Title handling:
+    // - If title is provided, use it
+    // - Otherwise keep whatever is already in the DOM (don’t overwrite)
+    const titleEl = document.getElementById('levelUpTitle');
+    if(titleEl && title !== null){
+      titleEl.textContent = title;
+    }
+
     if(text) this.levelUpText.textContent = text;
     this.updateHeaderButtons();
   }
+
+
 
   setProgress(percent, labelText=''){
     const p = Math.max(0, Math.min(100, percent));
