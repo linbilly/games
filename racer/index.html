@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Math Racer 3D</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Three.js canvas injected here -->
+
+    <!-- MENU -->
+    <div id="menuOverlay" class="overlay">
+      <div class="card">
+        <div class="title">Math Racer 3D</div>
+        <div class="sub">Kindergarten → Grade 3</div>
+
+        <div class="row">
+          <label>Starting Level</label>
+          <select id="startLevel"></select>
+        </div>
+
+        <div class="row">
+          <label>Adaptive Difficulty</label>
+          <div class="toggle">
+            <input type="checkbox" id="adaptiveOn" checked />
+            <span class="muted">Auto move up/down by accuracy + speed</span>
+          </div>
+        </div>
+
+        <div class="row">
+          <label>Speed Goal</label>
+          <select id="goalMode">
+            <option value="practice">Practice (slower)</option>
+            <option value="race" selected>Race (faster)</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <div id="recommended" class="recommend"></div>
+        </div>
+
+        <div class="buttons">
+          <button id="btnPlay" class="primary">Play</button>
+          <button id="btnGarage">Garage</button>
+          <button id="btnStatsFromMenu">Stats</button>
+        </div>
+
+        <div class="hint muted">
+          iPad: drag left/right to steer • or use ◀ ▶ buttons • Snap assist helps land on lanes
+        </div>
+      </div>
+    </div>
+
+    <!-- GARAGE -->
+    <div id="garageOverlay" class="overlay hidden" aria-hidden="true">
+      <div class="card">
+        <div class="panelHeader">
+          <div class="panelTitle">Garage</div>
+          <button id="btnCloseGarage" class="smallBtn">Close</button>
+        </div>
+        <div id="garageSummary" class="summary muted"></div>
+        <div id="carGrid" class="carGrid"></div>
+        <div class="hint muted">Unlock cars by total correct answers. Cars are cosmetic (dash tint + HUD label).</div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div id="statsOverlay" class="overlay hidden" aria-hidden="true">
+      <div class="card">
+        <div class="panelHeader">
+          <div class="panelTitle">Weak Facts</div>
+          <button id="btnCloseStats" class="smallBtn">Close</button>
+        </div>
+        <div class="panelSub">
+          <button id="btnResetStats" class="smallBtn">Reset Stats</button>
+        </div>
+        <div id="statsSummary" class="summary muted"></div>
+        <div id="weakList" class="weakList"></div>
+      </div>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="hudRow">
+        <div class="pill">Speed: <span id="speed">0</span></div>
+        <div class="pill">Score: <span id="score">0</span></div>
+        <div class="pill">Level: <span id="levelName">—</span></div>
+        <div class="pill">Car: <span id="carName">—</span></div>
+        <button id="btnSound" class="pill btn">Sound: <span id="soundState">Off</span></button>
+        <button id="btnStats" class="pill btn">Stats</button>
+        <button id="btnMenu" class="pill btn">Menu</button>
+      </div>
+
+      <div id="dash">
+        <div id="question">—</div>
+        <div id="feedback"></div>
+      </div>
+
+      <div id="centerMsg" class="centerMsg hidden"></div>
+    </div>
+
+    <!-- Gameplay input layers -->
+    <div id="touchZone"></div>
+    <div id="touchButtons">
+      <button id="btnLeft">◀</button>
+      <button id="btnRight">▶</button>
+    </div>
+
+    <button id="btnFullscreen" class="floating">⤢</button>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
