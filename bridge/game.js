@@ -389,6 +389,16 @@ export function createGame({ world, ui, decor }) {
   // ----------------------------
   // Helpers
   // ----------------------------
+
+  function isWalking() {
+    return characterPhase === "WALK";
+  }
+
+  function goNextLevel() {
+    levelIndex = (levelIndex + 1) % LEVELS.length;
+    loadLevel(levelIndex);
+  }
+
   function clearGroup(g) {
     while (g.children.length) g.remove(g.children[0]);
   }
@@ -722,6 +732,9 @@ export function createGame({ world, ui, decor }) {
     cancelSnap,
     startSnapAndPlace,
     applyWorldQuarterTurn,
+
+    isWalking,
+    goNextLevel,
   };
 
   // Init

@@ -73,6 +73,18 @@ if (world?.camera) {
 const decor = addHappyWorld(world);
 const game = createGame({ world, ui, decor });
 
+// Tap anywhere while the bot is walking to advance to next level.
+// Ignore taps on UI elements.
+window.addEventListener("pointerdown", (e) => {
+  const uiEl = document.getElementById("ui");
+  if (uiEl && uiEl.contains(e.target)) return;
+
+  if (game?.isWalking?.()) {
+    game.goNextLevel();
+  }
+}, { passive: true });
+
+
 // ✅ INPUT WIRING (this is what was missing)
 if (canvas) createInput({ canvas, world, game });
 
