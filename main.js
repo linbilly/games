@@ -364,6 +364,7 @@ updateCamera();
 // Animation
 let last = performance.now();
 function loop(now) {
+
   requestAnimationFrame(loop);
   const dt = Math.min(0.033, (now - last) / 1000);
   last = now;
@@ -392,4 +393,11 @@ function loop(now) {
 
   renderer.render(scene, camera);
 }
+// Face the first door at launch
+const firstDoor = doors[0];
+const p0 = firstDoor.position.clone();
+yaw = Math.atan2(p0.x, p0.z) + Math.PI; // camera opposite the door so it faces it
+pitch = 0.12;
+updateCamera();
+
 requestAnimationFrame(loop);
