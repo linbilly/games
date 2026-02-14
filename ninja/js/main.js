@@ -1,12 +1,10 @@
-import { Game } from './game.js';
 import { UI } from './ui.js';
+import { Game } from './game.js';
 
-const canvas = document.getElementById('stage');
 const ui = new UI();
+const canvas = document.getElementById('stage');
 const game = new Game(canvas, ui);
 
-ui.bind(game);
+ui.bindGame(game);
 game.init();
-
-// Start with menu open
 ui.showMenu(true);

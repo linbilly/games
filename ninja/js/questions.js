@@ -1,109 +1,12 @@
-// Question generation + adaptive weighting
-// Modes: add10, add20, sub20, mixed
+// Modes: add10, add20, sub20, mixed, add100nr, sub100nr, add100r1, add100r2, sub100r1, sub100r2
 
-function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
-
-export function makeQuestion(mode){
-  // returns { a, b, op, answer, text, key }
-  let a, b, op, ans;
-
-  function add(maxSum){
-    a = randInt(0, maxSum);
-    b = randInt(0, maxSum - a);
-    op = '+';
-    ans = a + b;
-  }
-
-  function sub(maxVal){
-    a = randInt(0, maxVal);
-    b = randInt(0, a); // ensure non-negative
-    op = '−';
-    ans = a - b;
-  }
-
-  if(mode === 'add10') add(10);
-  else if(mode === 'add20') add(20);
-  else if(mode === 'sub20') sub(20);
-  else { // mixed
-    if(Math.random() < 0.5) add(20); else sub(20);
-  }
-
-  const text = `${a} ${op} ${b}`;
-  const key = `${mode}:${a}${op}${b}`;
-
-  return { a, b, op, answer: ans, text, key };
-}
-
-export function makeChoices(correct, opts){
-  // opts: { min, max, count, avoid }
-  const count = opts?.count ?? 4;
-  const min = opts?.min ?? 0;
-  const max = opts?.max ?? 20;
-
-  const set = new Set([correct]);
-  // generate distractors close-ish to correct
-  while(set.size < count){
-    const spread = Math.random() < 0.75 ? 3 : 7;
-    const delta = randInt(-spread, spread);
-    let v = correct + delta;
-    if(Math.random() < 0.18) v = correct + randInt(-10, 10);
-    v = clamp(v, min, max);
-    if(v === correct) continue;
-    set.add(v);
-  }
-  const arr = Array.from(set);
-  shuffle(arr);
-  return arr;
-}
-
-export function makeHint(q){
-  // short, kid-friendly hints (not every time)
-  const { a, b, op, answer } = q;
-  if(op === '+'){
-    // make 10 / doubles / near doubles
-    if(a === b) return `Doubles! <strong>${a}+${a}=${answer}</strong>`;
-    if(Math.abs(a-b) === 1){
-      const d = Math.min(a,b);
-      return `Near doubles: <strong>${d}+${d}</strong> then +1`;
-    }
-    if(a === 9 || b === 9){
-      const other = a === 9 ? b : a;
-      return `Make 10: <strong>9+${other}=(10+${other-1})</strong>`;
-    }
-    if(a === 8 || b === 8){
-      const other = a === 8 ? b : a;
-      if(other >= 2) return `Make 10: <strong>8+${other}=(10+${other-2})</strong>`;
-    }
-    return `Look for <strong>make 10</strong> or <strong>doubles</strong>.`;
-  }else{
-    // subtraction: count up / make 10
-    if(a >= 10 && b <= 10 && b !== 0){
-      const to10 = Math.max(0, 10 - b);
-      if(to10 > 0 && a > 10){
-        const rest = a - 10;
-        return `Count up: <strong>${b}→10 (+${to10})</strong>, then <strong>10→${a} (+${rest})</strong>`;
-      }
-    }
-    if(b === 9) return `Try: <strong>−9 is like −10 then +1</strong>.`;
-    if(b === 8) return `Try: <strong>−8 is like −10 then +2</strong>.`;
-    return `Try <strong>counting up</strong> (jump to 10, then to ${a}).`;
-  }
-}
-
-export function normalizeWeights(map){
-  // map key->weight
-  let total = 0;
-  for(const w of map.values()) total += w;
-  if(total <= 0) return;
-  for(const [k,w] of map.entries()) map.set(k, w/total);
+export function randInt(min, max){
+  return Math.floor(Math.random()*(max-min+1)) + min;
 }
 
 export function weightedPick(items, weights){
-  // items: array, weights: array same length; returns index
-  let sum = 0;
-  for(const w of weights) sum += w;
-  if(sum <= 0) return Math.floor(Math.random()*items.length);
-  let r = Math.random()*sum;
+  const total = weights.reduce((a,b)=>a+b,0);
+  let r = Math.random()*total;
   for(let i=0;i<items.length;i++){
     r -= weights[i];
     if(r <= 0) return i;
@@ -111,12 +14,177 @@ export function weightedPick(items, weights){
   return items.length-1;
 }
 
-export function randInt(a,b){
-  return Math.floor(Math.random()*(b-a+1))+a;
+export function makeQuestion(mode){
+  let a,b,op,ans;
+
+  function addMaxSum(maxSum){
+    a = randInt(0, maxSum);
+    b = randInt(0, maxSum - a);
+    op = '+';
+    ans = a + b;
+  }
+
+  function subMaxVal(maxVal){
+    a = randInt(0, maxVal);
+    b = randInt(0, a);
+    op = '−';
+    ans = a - b;
+  }
+
+  function add2dNoRegroup(){
+    a = randInt(10, 99);
+    const aO = a % 10;
+    const bOMax = 9 - aO;
+    let bT = randInt(1, 9);
+    const bO = randInt(0, bOMax);
+    b = bT*10 + bO;
+    if(a+b>100){
+      const over = (a+b)-100;
+      const reduce = Math.ceil(over/10);
+      bT = Math.max(0, bT - reduce);
+      b = bT*10 + bO;
+    }
+    op = '+'; ans = a+b;
+  }
+
+  function sub2dNoRegroup(){
+    a = randInt(10, 99);
+    const aO = a % 10;
+    const aT = Math.floor(a/10);
+    const bO = randInt(0, aO);
+    const bT = randInt(0, aT);
+    b = bT*10 + bO;
+    op = '−'; ans = a-b;
+  }
+
+  function add2dPlus1dRegroup(){
+    a = randInt(10, 99);
+    const aO = a % 10;
+    b = randInt(Math.max(2, 10-aO), 9);
+    op = '+'; ans = a+b;
+    if(ans>100){
+      a = randInt(10, 90);
+      const ao = a%10;
+      b = randInt(Math.max(2, 10-ao), 9);
+      ans = a+b;
+    }
+  }
+
+  function add2dPlus2dRegroup(){
+    a = randInt(10, 99);
+    const aO = a % 10;
+    const bOMin = Math.max(0, 10-aO);
+    const bO = randInt(bOMin, 9);
+    let bT = randInt(1, 9);
+    b = bT*10 + bO;
+    op='+'; ans = a+b;
+    if(ans>100){
+      const over = ans-100;
+      const reduce = Math.ceil(over/10);
+      bT = Math.max(0, bT-reduce);
+      b = bT*10 + bO;
+      ans = a+b;
+    }
+    if((a%10)+(b%10) < 10){
+      const bump = 10 - ((a%10)+(b%10));
+      b = Math.min(99, b + bump);
+      ans = a+b;
+    }
+  }
+
+  function sub2dMinus1dRegroup(){
+    a = randInt(10, 99);
+    const aO = a % 10;
+    b = randInt(Math.max(2, aO+1), 9);
+    op='−'; ans = a-b;
+    if(ans < 0){
+      a = randInt(20, 99);
+      const ao=a%10;
+      b = randInt(Math.max(2, ao+1), 9);
+      ans = a-b;
+    }
+  }
+
+  function sub2dMinus2dRegroup(){
+    // ensure regroup in ones place (a ones < b ones), and a >= b, result >= 0
+    a = randInt(20, 99);
+    const aO = a % 10;
+    const aT = Math.floor(a/10);
+
+    // choose b ones larger than a ones to force borrowing
+    const bO = randInt(Math.min(9, aO+1), 9);
+
+    // choose b tens <= a tens -1 to keep b <= a after borrowing
+    const bTmax = Math.max(0, aT-1);
+    const bT = randInt(0, bTmax);
+
+    b = bT*10 + bO;
+    op = '−';
+    ans = a - b;
+
+    // safety: if went negative, retry a few times
+    let tries=0;
+    while(ans < 0 && tries < 20){
+      a = randInt(20, 99);
+      const ao = a % 10;
+      const at = Math.floor(a/10);
+      const bo = randInt(Math.min(9, ao+1), 9);
+      const bt = randInt(0, Math.max(0, at-1));
+      b = bt*10 + bo;
+      ans = a-b;
+      tries++;
+    }
+  }
+
+
+  if(mode==='add10') addMaxSum(10);
+  else if(mode==='add20') addMaxSum(20);
+  else if(mode==='sub20') subMaxVal(20);
+  else if(mode==='mixed'){ (Math.random()<0.5) ? addMaxSum(20) : subMaxVal(20); }
+  else if(mode==='add100nr') add2dNoRegroup();
+  else if(mode==='sub100nr') sub2dNoRegroup();
+  else if(mode==='add100r1') add2dPlus1dRegroup();
+  else if(mode==='add100r2') add2dPlus2dRegroup();
+  else if(mode==='sub100r1') sub2dMinus1dRegroup();
+  else if(mode==='sub100r2') sub2dMinus2dRegroup();
+  else addMaxSum(20);
+
+  const text = `${a} ${op} ${b}`;
+  const key = `${mode}:${a}${op}${b}`;
+  return { a,b,op,answer:ans,text,key };
 }
-export function shuffle(arr){
+
+export function makeChoices(answer, {min=0, max=20, count=4} = {}){
+  const set = new Set([answer]);
+  while(set.size < count){
+    const r = randInt(min, max);
+    set.add(r);
+  }
+  const arr = Array.from(set);
   for(let i=arr.length-1;i>0;i--){
     const j = Math.floor(Math.random()*(i+1));
-    [arr[i],arr[j]] = [arr[j],arr[i]];
+    [arr[i],arr[j]]=[arr[j],arr[i]];
   }
+  return arr;
+}
+
+export function makeHint(q){
+  const {a,b,op} = q;
+  if(a>=10 || b>=10){
+    const aT=Math.floor(a/10), aO=a%10;
+    const bT=Math.floor(b/10), bO=b%10;
+    if(op==='+'){
+      if(aO+bO>=10) return `Regroup! Ones: <strong>${aO}+${bO}=${aO+bO}</strong> → make a ten.`;
+      return `Split: <strong>${aT} tens</strong> + <strong>${aO} ones</strong>.`;
+    }else{
+      if(aO<bO) return `Borrow: trade 1 ten for <strong>10 ones</strong>.`;
+      return `Subtract tens, then ones.`;
+    }
+  }
+  if(op==='+'){
+    if(a===b) return 'Doubles!';
+    if(a+b===10) return 'Make 10!';
+    return 'Count on from the bigger number.';
+  }
+  return 'Count up: from the smaller to the bigger.';
 }

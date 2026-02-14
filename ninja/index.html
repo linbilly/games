@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Math Ninja: Fact Fluency Arena</title>
+  <title>Math Ninja</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -13,7 +13,7 @@
         <div class="logo">🥷</div>
         <div>
           <div class="title">Math Ninja</div>
-          <div class="subtitle">Fact Fluency Arena (Grade 3)</div>
+          <div class="subtitle">Fact Fluency + Grade 3 Progression</div>
         </div>
       </div>
 
@@ -24,6 +24,15 @@
         <div class="hudItem"><span class="label">Hearts</span><span id="hudHearts" class="value">❤❤❤</span></div>
       </div>
 
+      <div class="progressWrap" aria-label="Progress">
+        <div class="progressTop">
+          <span id="progressLabel">Progress</span>
+          <span id="progressPct">0%</span>
+        </div>
+        <div class="progressTrack"><div id="progressBar" class="progressBar"></div></div>
+      </div>
+
+      <button id="btnPause" class="ghostBtn" title="Pause/Resume">⏸</button>
       <button id="btnMenu" class="ghostBtn" title="Menu">☰</button>
     </header>
 
@@ -44,24 +53,24 @@
       <section class="overlay" id="overlay" aria-hidden="false">
         <div class="card">
           <h1>🥷 Math Ninja</h1>
-          <p class="lead">Defeat ninjas by answering quickly and accurately. No finger counting — use smart strategies!</p>
+          <p class="lead">Answer correctly to defeat the enemy. Level up every <strong>10 correct</strong> — hearts refill!</p>
 
-          <div class="modeGrid">
+          <div class="modeGrid" id="modeGrid">
             <button class="modeBtn" data-mode="add10">
               <div class="modeName">Add ≤ 10</div>
-              <div class="modeDesc">Warm up & speed</div>
+              <div class="modeDesc">Warm-up</div>
             </button>
             <button class="modeBtn" data-mode="add20">
               <div class="modeName">Add ≤ 20</div>
-              <div class="modeDesc">Make-10, doubles</div>
+              <div class="modeDesc">Make-10</div>
             </button>
             <button class="modeBtn" data-mode="sub20">
               <div class="modeName">Subtract ≤ 20</div>
-              <div class="modeDesc">Count-up strategy</div>
+              <div class="modeDesc">Count-up</div>
             </button>
             <button class="modeBtn" data-mode="mixed">
-              <div class="modeName">Mixed Arena</div>
-              <div class="modeDesc">Bosses & combos</div>
+              <div class="modeName">Mixed ≤ 20</div>
+              <div class="modeDesc">Combo arena</div>
             </button>
           </div>
 
@@ -72,11 +81,11 @@
             </label>
             <label class="toggle">
               <input type="checkbox" id="chkHints" checked />
-              <span>Strategy hints</span>
+              <span>Hints</span>
             </label>
             <label class="toggle">
               <input type="checkbox" id="chkAdaptive" checked />
-              <span>Adaptive (more weak facts)</span>
+              <span>Adaptive</span>
             </label>
           </div>
 
@@ -96,21 +105,33 @@
             <button id="btnStart" class="primaryBtn">Start</button>
             <button id="btnHow" class="ghostBtn">How to play</button>
             <button id="btnReset" class="dangerBtn">Reset progress</button>
+            <button id="btnQuit" class="ghostBtn">Quit</button>
           </div>
 
           <div class="smallPrint" id="progressLine">Progress: —</div>
+        </div>
+
+
+        <div class="modal" id="levelUpModal" aria-hidden="true">
+          <div class="modalCard">
+            <h2>Next challenge unlocked!</h2>
+            <p id="levelUpText" class="lead" style="margin-top:6px;">—</p>
+            <div class="row">
+              <button id="btnContinue" class="primaryBtn">Continue</button>
+              <button id="btnEndGame" class="dangerBtn">End game</button>
+            </div>
+          </div>
         </div>
 
         <div class="modal" id="howModal" aria-hidden="true">
           <div class="modalCard">
             <h2>How to play</h2>
             <ul>
-              <li>Click the correct answer before the enemy reaches you.</li>
-              <li>Fast answers give bonus points.</li>
-              <li>Wrong answers cost 1 heart but you can try again (choices gray out).</li>
-              <li>Mixed Arena: boss fight every 20 questions.</li>
+              <li>Click an answer choice.</li>
+              <li>Wrong answers cost 1 heart — try again (wrong choice greys out).</li>
+              <li>After a wrong answer, time slows (enemy slowdown aura shows).</li>
+              <li>Every 10 correct answers: <strong>level up</strong> + hearts refill.</li>
             </ul>
-            <p class="tip"><strong>Tip:</strong> For subtraction, try “counting up” (e.g., 15 − 8: 8→10 (+2), 10→15 (+5), total 7).</p>
             <div class="row">
               <button id="btnCloseHow" class="primaryBtn">Got it</button>
             </div>
