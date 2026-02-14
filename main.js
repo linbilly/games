@@ -15,7 +15,7 @@ import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 const GAMES = [
   { title: "Fix the Bridge", url: "./bridge/" },
   { title: "Math Ninja", url: "./ninja/" },
-  { title: "Game 3", url: "./games/game3/" },
+  { title: "Vanish 5", url: "./vanish/" },
   { title: "Game 4", url: "./games/game4/" },
   { title: "Game 5", url: "./games/game5/" },
   { title: "Game 6", url: "./games/game6/" },
