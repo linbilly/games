@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Vanish</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">V</div>
+      <div>
+        <div class="title">Vanish</div>
+        <div class="subtitle">Memory Connect (pieces fade after 3 seconds)</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="control">
+        <label>Mode</label>
+        <select id="modeSelect">
+          <option value="pvp">Two Players (Local)</option>
+          <option value="ai">Single Player vs AI</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label>Board</label>
+        <select id="boardSelect">
+          <option value="3">3×3 (Connect 3)</option>
+          <option value="9" selected>9×9 (Connect 5)</option>
+          <option value="13">13×13 (Connect 5)</option>
+        </select>
+      </div>
+
+      <div class="control" id="aiControl">
+        <label>AI</label>
+        <select id="aiSelect">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label>Vanish</label>
+        <select id="vanishSelect">
+          <option value="3000">3s (Hardcore)</option>
+          <option value="5000">5s</option>
+          <option value="10000" selected>10s</option>
+          <option value="20000">20s</option>
+          <option value="3600000">Off</option>
+        </select>
+      </div>
+
+      <button id="resumeBtn" class="btn ghost hidden">Resume</button>
+      <button id="newGameBtn" class="btn">New Game</button>
+
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="panel">
+      <div class="status">
+        <div class="pill" id="turnPill">Turn: P1</div>
+        <div class="pill dim" id="goalPill">Goal: Connect 5</div>
+        <div class="pill dim" id="modePill">Mode: PvP</div>
+      </div>
+
+      <div id="boardWrap" class="board-wrap">
+        <div id="board" class="board" aria-label="Game board"></div>
+        <div id="overlay" class="overlay hidden">
+          <div class="overlay-card">
+            <div id="overlayTitle" class="overlay-title">Message</div>
+            <div id="overlayBody" class="overlay-body">...</div>
+            <button id="overlayBtn" class="btn">Continue</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="hint">
+        Click a square to place. Pieces vanish visually, but remain on the board.<br/>
+        Misclick an occupied cell → board reveals briefly and you lose your turn.
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="legend">
+        <div class="legend-row">
+          <div class="chip p1"></div>
+          <div>
+            <div class="legend-title">Player 1</div>
+            <div class="legend-sub">Blue</div>
+          </div>
+        </div>
+        <div class="legend-row">
+          <div class="chip p2"></div>
+          <div>
+            <div class="legend-title" id="p2Label">Player 2</div>
+            <div class="legend-sub" id="p2Sub">Red</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mini">
+        <div class="mini-title">Rules</div>
+        <ul>
+          <li>Place one piece per turn.</li>
+          <li>Placed pieces fade and disappear after the vanish time.</li>
+          <li>Trying to place on an occupied cell is a mistake:
+            <ul>
+              <li>Board reveals for review</li>
+              <li>You lose your turn</li>
+            </ul>
+          </li>
+          <li>First to connect the goal length wins.</li>
+        </ul>
+      </div>
+
+      <div class="mini">
+        <div class="mini-title">Audio</div>
+        <div class="row">
+          <button id="audioBtn" class="btn ghost">Enable Sound</button>
+          <div class="toggle">
+            <input id="muteToggle" type="checkbox" />
+            <label for="muteToggle">Mute</label>
+          </div>
+        </div>
+        <div class="small dim">Browsers require a click before sound can play.</div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    Tip: In Single Player, AI can be unfair (perfect memory). Use Easy/Medium for a more human feel.
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
