@@ -28,6 +28,8 @@ const modePill = $("modePill");
 const newGameBtn = $("newGameBtn");
 const resumeBtn = $("resumeBtn");
 
+const turnPiece = $("turnPiece");
+
 
 const audioBtn = $("audioBtn");
 const muteToggle = $("muteToggle");
@@ -38,6 +40,9 @@ const p2Sub = $("p2Sub");
 let audioCtx = null;
 let audioEnabled = false;
 let muted = false;
+
+let mistakeResumeArmed = false; // board revealed after mistake; next click auto-resumes
+
 
 function ensureAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -113,6 +118,13 @@ function idx(r,c){ return r*size + c; }
 function inBounds(r,c){ return r>=0 && c>=0 && r<size && c<size; }
 
 function setPills(){
+
+  // Side turn indicator piece
+  if (turnPiece){
+    turnPiece.classList.toggle("p1", currentPlayer === P1);
+    turnPiece.classList.toggle("p2", currentPlayer !== P1);
+  }
+
   turnPill.textContent = `Turn: ${currentPlayer === P1 ? "P1" : (mode==="ai" ? "AI" : "P2")}`;
   goalPill.textContent = `Goal: Connect ${goal}`;
   modePill.textContent = `Mode: ${mode === "ai" ? "Single Player" : "PvP"}`;
@@ -250,6 +262,14 @@ function isOccupied(r,c){
 
 function onCellClick(r,c){
   if (gameOver || inputLocked) return;
+
+  // If the board is revealed from a mistake, the next player's first click auto-resumes.
+  if (mistakeResumeArmed){
+    mistakeResumeArmed = false;
+    setAllPiecesVisible(false);           // vanish
+    resumeBtn.classList.add("hidden");    // hide the Resume button if you have it
+  }
+
   if (mode === "ai" && currentPlayer === aiPlaysAs) return;
 
   if (isOccupied(r,c)){
@@ -300,9 +320,9 @@ function handleMistake(){
   resumeBtn.classList.remove("hidden");
 
   showOverlay(
-    "Mistake!",
-    "That square is already occupied. The board is revealed for review. You lose your turn. Close this message, then press Resume to continue.",
-    "Close"
+    "Uh oh!",
+    "You lose your turn. Opponent's turn next.",
+    "OK"
   );
 
   // Lose turn immediately
@@ -312,6 +332,19 @@ function handleMistake(){
     overlayBtn.onclick = null;
     hideOverlay();
     // Keep board revealed until Resume is clicked
+
+    // Allow next player to continue while board is still revealed.
+    inputLocked = false;
+    mistakeResumeArmed = true;
+
+    if (mode === "ai" && currentPlayer === aiPlaysAs && !gameOver){
+      setAllPiecesVisible(false);
+      resumeBtn.classList.add("hidden");
+      mistakeResumeArmed = false;
+      aiMoveSoon();
+    }
+
+
   };
 
   const resumeGame = () => {

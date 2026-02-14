@@ -262,3 +262,25 @@ select:focus{ border-color: rgba(58,160,255,.55); }
   color: rgba(231,236,255,.55);
   font-size: 12px;
 }
+
+/* Turn indicator (side panel) */
+.turn-box{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  border-radius:14px;
+  background: rgba(255,255,255,.045);
+  border:1px solid rgba(255,255,255,.10);
+  margin-bottom:10px;
+}
+.turn-label{ font-weight:900; color: var(--dim); font-size:12px; letter-spacing:.2px; }
+.turn-piece{
+  width:26px; height:26px; border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+  box-shadow: 0 10px 22px rgba(0,0,0,.35);
+}
+.turn-piece.p1{ background: rgba(58,160,255,.95); }
+.turn-piece.p2{ background: rgba(255,75,110,.95); }
+
