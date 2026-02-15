@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Make 5 / Make 10 Runner</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="wrap">
+    <div id="hud">
+      <div class="hud-left">
+        <div id="levelLabel">Level 1: Make 5</div>
+        <div id="coins">Coins: 0</div>
+      </div>
+      <div class="hud-right">
+        <button id="btnRestart" class="btn">Restart</button>
+        <button id="btnHelp" class="btn">Help</button>
+      </div>
+    </div>
+
+    <div id="gameArea">
+      <canvas id="game" width="960" height="540" aria-label="Game canvas"></canvas>
+
+      <!-- Multiple-choice UI (shown only when needed) -->
+      <div id="choicePanel" class="hidden" role="dialog" aria-label="Choose a brick">
+        <div id="prompt">Fill the hole!</div>
+        <div id="choices"></div>
+        <div id="tip">Tip: Pick the brick that completes the target.</div>
+      </div>
+
+      <!-- On-screen controls for touch -->
+      <div id="touchControls" aria-label="Touch controls">
+        <button id="leftBtn" class="touchBtn">◀</button>
+        <button id="rightBtn" class="touchBtn">▶</button>
+        <button id="jumpBtn" class="touchBtn">⤒</button>
+      </div>
+
+      <div id="banner" class="hidden"></div>
+      <div id="helpModal" class="modal hidden" role="dialog" aria-label="Help">
+        <div class="modalCard">
+          <h2>How to play</h2>
+          <ul>
+            <li>Move with <b>←</b> and <b>→</b>, jump with <b>Space</b> (or use the on-screen buttons).</li>
+            <li>Stand near a hole to open the brick choices.</li>
+            <li>Pick the brick that completes the target (<b>5</b> in Level 1, <b>10</b> in Level 2).</li>
+          </ul>
+          <button id="closeHelp" class="btn primary">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="footer">
+      <span>Keyboard: ← → Space</span>
+      <span class="sep">•</span>
+      <span>Touch: on-screen buttons</span>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
