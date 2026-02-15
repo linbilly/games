@@ -40,6 +40,8 @@ export class Game{
     this.hearts = 3;
     this.correctSinceLevel = 0;
     this.sessionStats = {}; // { mode: { answered: n, correct: n } }
+    this.levelStats = { answered: 0, correct: 0 }; // per-level only
+
 
 
     this.baseSpeed = 1.0;
@@ -87,6 +89,8 @@ export class Game{
       this.streak = 0;
       this.correctSinceLevel = 0;
       this.locked = false;
+      this.levelStats = { answered: 0, correct: 0 };
+
 
       this.enemy.x = 780;
 
@@ -111,12 +115,18 @@ export class Game{
   }
 
   recordAttempt(mode, isCorrect){
+    // per-run mode stats (for summary)
     if(!this.sessionStats[mode]){
       this.sessionStats[mode] = { answered: 0, correct: 0 };
     }
     this.sessionStats[mode].answered += 1;
     if(isCorrect) this.sessionStats[mode].correct += 1;
+
+    // per-level stats (for level-up accuracy)
+    this.levelStats.answered += 1;
+    if(isCorrect) this.levelStats.correct += 1;
   }
+
 
   buildAccuracySummary(){
 
@@ -185,7 +195,8 @@ export class Game{
   }
 
   freshProgress(){
-    return { totalAnswered:0, totalCorrect:0, totalTimeCorrectMs:0, bestStreak:0, weakMap:{} };
+    return { totalAnswered:0, totalCorrect:0, totalTimeCorrectMs:0, bestStreak:0, weakMap:{}, bestAccuracyByMode:{} };
+
   }
   loadProgress(){
     try{
@@ -207,6 +218,8 @@ export class Game{
 
   start(settings){
     this.sessionStats = {};
+    this.levelStats = { answered: 0, correct: 0 };
+
 
     this.settings = settings;
     this.baseSpeed = SPEED_PRESET[this.settings.speed] ?? 1.0;
@@ -291,15 +304,42 @@ export class Game{
     this.baseSpeed = SPEED_PRESET[this.settings.speed] ?? this.baseSpeed;
     this.questionSpeed = this.baseSpeed;
 
-    this.correctSinceLevel = 0;
+
+
+    // --- level accuracy + title ---
+    const attempts = this.levelStats.answered;
+    const correct = this.levelStats.correct;
+    const pct = attempts ? Math.round((correct / attempts) * 100) : 100;
+
+    // store best accuracy per mode (completed mode)
+    const bam = this.progress.bestAccuracyByMode || (this.progress.bestAccuracyByMode = {});
+    bam[curMode] = Math.max(bam[curMode] || 0, pct);
+    this.saveProgress();
+
+    // adaptive title
+    let title = 'New Challenge Unlocked!';
+    if(pct === 100) title = 'Perfect!';
+    else if(pct >= 90) title = 'Almost perfect!';
+    else if(pct >= 80) title = 'Good job.';
+
+    const titleEl = document.getElementById('levelUpTitle');
+    if(titleEl) titleEl.textContent = title;
+
+
 
     this.ui.showToast(`Level up!`);
     const info = MODE_INFO[this.settings.mode] || MODE_INFO.add20;
     const s=this.settings.speed||'normal';
     const speedLabel = (s==='turtle')?'Turtle (20%)':(s==='slow')?'Slow (60%)':(s==='normal')?'Normal (100%)':'Falcon (200%)';
     const msg = 'Well done!\n' +
-  `• Score: ${this.score}\n` +
-  `• Streak: ${this.streak}\n\n` +`Next challenge: ${info.name} · Speed = ${speedLabel}. Hearts refilled to 3.`;
+      `• Score: ${this.score}\n` +
+      `• Streak: ${this.streak}\n` +
+      `• Level accuracy: ${correct}/${attempts} (${pct}%)\n\n` +
+      `Next challenge: ${info.name} · Speed = ${speedLabel}. Hearts refilled to 3.`;
+
+    this.correctSinceLevel = 0;
+    this.levelStats = { answered: 0, correct: 0 };
+
     this.state = 'levelup';
     this.ui.lockChoices(true);
     this.ui.showLevelUp(true, msg);
@@ -399,46 +439,6 @@ export class Game{
       else this.ui.showToast('Try again!');
     }
 
-    onDefeat(){
-      console.log("onDefeat fired", this.settings.speed);
-      const defeatedScore = this.score;
-      const defeatedStreak = this.streak;
-
-      // Keep same category. Drop speed tier: Normal → Slow → Turtle
-      const tierOrder = ['normal', 'slow', 'turtle'];
-      const currentTier = (this.settings.speed && tierOrder.includes(this.settings.speed))
-        ? this.settings.speed
-        : 'normal';
-
-      const nextTier = tierOrder[Math.min(tierOrder.length - 1, tierOrder.indexOf(currentTier) + 1)];
-      this.settings.speed = nextTier;
-
-      // Apply the new baseSpeed
-      this.baseSpeed = SPEED_PRESET[this.settings.speed] ?? 1.0;
-      this.questionSpeed = this.baseSpeed;
-
-      // Reset run state (same question flow as your current defeat behavior)
-      this.hearts = 3;
-      this.streak = 0;
-      this.correctSinceLevel = 0;
-      this.locked = false;
-      this.enemy.x = 780;
-
-      const speedLabel =
-        nextTier === 'turtle' ? 'Turtle (20%)' :
-        nextTier === 'slow'   ? 'Slow (60%)' :
-                                'Normal (100%)';
-
-      this.state = 'levelup';
-      this.ui.lockChoices(true);
-
-      // NEW: pass a custom title
-      this.ui.showLevelUp(
-        true,
-        `Stats:\n• Score: ${defeatedScore}\n• Streak: ${defeatedStreak}\n\nSlow down → ${speedLabel}\nHearts refilled to 3.`,
-        'Sorry!'
-      );
-    }
 
 
 
@@ -486,6 +486,8 @@ export class Game{
     // If time runs out: do NOT advance question. Apply damage once, then allow unlimited time.
     if(this.timeLeft <= 0 && !this.timedOut){
       this.timedOut = true;
+      this.recordAttempt(this.settings.mode, false); // timeout counts as one error
+
 
       // Apply penalty once
       this.streak = 0;
