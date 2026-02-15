@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>Bridge Level Editor</title>
+  <style>
+    html, body { margin:0; height:100%; overflow:hidden; background:#0b0f14; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    canvas { width:100vw; height:100vh; display:block; touch-action:none; }
+
+    #ui {
+      position: fixed; left: 12px; right: 12px; top: 10px;
+      display:flex; gap:10px; align-items:flex-start; justify-content:space-between;
+      z-index: 10; pointer-events:none;
+    }
+    .panel {
+      pointer-events:auto;
+      background: rgba(255,255,255,0.86);
+      border: 1px solid rgba(0,0,0,0.12);
+      border-radius: 14px;
+      padding: 10px 12px;
+      backdrop-filter: blur(6px);
+      color:#000;
+      max-width: 980px;
+    }
+    .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .title { font-weight: 900; }
+    .hint { font-size: 12px; opacity: 0.9; line-height: 1.25; }
+    .pill {
+      display:inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.08);
+      border: 1px solid rgba(0,0,0,0.10);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .label { font-size: 12px; font-weight: 800; opacity: 0.9; }
+    .small { font-size: 12px; }
+
+    button, select, input {
+      appearance:none;
+      border: 1px solid rgba(0,0,0,0.16);
+      background: rgba(255,255,255,0.95);
+      color:#000;
+      padding: 8px 10px;
+      border-radius: 12px;
+      font-weight: 750;
+      font-size: 13px;
+    }
+    button { cursor:pointer; }
+    button:active { transform: translateY(1px); }
+
+    #out {
+      position: fixed; left: 12px; right: 12px; bottom: 12px;
+      z-index: 10;
+      pointer-events:none;
+      display:flex; justify-content:center;
+    }
+    #out .panel { pointer-events:auto; width: min(980px, calc(100% - 24px)); }
+    textarea {
+      width:100%;
+      height: 170px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,0.16);
+      padding: 10px;
+      resize: vertical;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="ui">
+    <div class="panel">
+      <div class="row">
+        <div class="title">🧩 Bridge Level Editor</div>
+        <span id="sel" class="pill">Selected: none</span>
+        <span id="coords" class="pill">x: -, z: -</span>
+        <span id="rot" class="pill">rot: -, -, -</span>
+      </div>
+      <div class="hint">
+        Tap cube to select. Drag to rotate cube in place (90° steps).
+        Rotate 90°: <b>← →</b> yaw(Y), <b>↑ ↓</b> pitch(X), <b>Q/E</b> roll(Z).
+        Delete removes selected. Export prints one line per cube.
+        <br/>
+        Note: the <b>center cube</b> (x=0) sets <b>targetRot</b>.
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <button id="addL">+ Add Left</button>
+        <button id="addR">+ Add Right</button>
+        <button id="del">Delete</button>
+        <button id="recenter">Recenter</button>
+        <button id="export">Export</button>
+        <button id="copy">Copy</button>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <span class="label">Selected Tile:</span>
+        <select id="tileSel">
+          <option value="straight">straight</option>
+          <option value="turn">turn</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div id="out">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between">
+        <div class="title">Level snippet</div>
+        <div class="hint">One line per cube. Center cube sets targetRot.</div>
+      </div>
+      <textarea id="json"></textarea>
+    </div>
+  </div>
+
+  <canvas id="c"></canvas>
+
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+    // =========================
+    // DOM refs (declare first)
+    // =========================
+    const canvas   = document.getElementById("c");
+    const selEl    = document.getElementById("sel");
+    const coordsEl = document.getElementById("coords");
+    const rotEl    = document.getElementById("rot");
+    const outEl    = document.getElementById("json");
+    const tileSel  = document.getElementById("tileSel");
+
+    const btnAddL = document.getElementById("addL");
+    const btnAddR = document.getElementById("addR");
+    const btnDel  = document.getElementById("del");
+    const btnRecenter = document.getElementById("recenter");
+    const btnExport = document.getElementById("export");
+    const btnCopy = document.getElementById("copy");
+
+    // =========================
+    // State (declare early)
+    // =========================
+    let selectedIndex = -1;
+
+    let dragRotating = false;
+    let activePointerId = null;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragAccumX = 0;
+    let dragAccumY = 0;
+
+    const DRAG_THRESHOLD_PX = 18;
+
+    // =========================
+    // Level-wide skin (6-face colors)
+    // (Used for visuals only; not output in requested snippet)
+    // =========================
+    let skin = {
+      PX: 0xff0000, // Red
+      NX: 0x0055ff, // Blue
+      PY: 0xffd400, // Yellow
+      NY: 0x00cc44, // Green
+      PZ: 0xaa00ff, // Purple
+      NZ: 0xffffff, // White
+    };
+
+
+    // =========================
+    // Data model
+    // Start with 9 cubes: x = -4..4 (includes center x=0)
+    // The center cube (x=0) is included in bridge list, but NOT printed.
+    // Its rotation becomes targetRot.
+    // =========================
+    let bridge = [];
+    function resetToNine() {
+      bridge = [];
+      for (let x = -4; x <= 4; x++) {
+        bridge.push({
+          x,
+          z: 0,
+          tile: "straight",
+          rot: { x: 0, y: 1, z: 0 },
+        });
+      }
+    }
+    resetToNine();
+
+    // =========================
+    // Three.js setup
+    // =========================
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
+    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    renderer.setClearColor(0x87cffa, 1);
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+    camera.position.set(9, 7, 12);
+    camera.lookAt(0, 0.8, 0);
+
+    scene.add(new THREE.HemisphereLight(0xeaf6ff, 0xb6f0c2, 0.95));
+    const sun = new THREE.DirectionalLight(0xfff2d2, 1.0);
+    sun.position.set(6, 10, 4);
+    scene.add(sun);
+
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(200, 200),
+      new THREE.MeshStandardMaterial({ color: 0xa8e6a3, roughness: 0.95 })
+    );
+    ground.rotation.x = -Math.PI/2;
+    scene.add(ground);
+
+    const grid = new THREE.GridHelper(60, 60, 0x000000, 0x000000);
+    grid.material.opacity = 0.12;
+    grid.material.transparent = true;
+    scene.add(grid);
+
+    const bridgeGroup = new THREE.Group();
+    scene.add(bridgeGroup);
+
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0x000000, transparent:true, opacity:0.12 });
+    const outlineMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent:true, opacity:0.08 });
+    let outlineMesh = null;
+
+    function makeFaceMat(hex) {
+      return new THREE.MeshStandardMaterial({
+        color: hex,
+        roughness: 0.35,
+        metalness: 0.05
+      });
+    }
+
+    function makeCubeMatsFromSkin() {
+      // [ +X, -X, +Y, -Y, +Z, -Z ]
+      return [
+        makeFaceMat(skin.PX),
+        makeFaceMat(skin.NX),
+        makeFaceMat(skin.PY),
+        makeFaceMat(skin.NY),
+        makeFaceMat(skin.PZ),
+        makeFaceMat(skin.NZ),
+      ];
+    }
+
+    const cubeMeshes = [];
+
+    function makeCubeMesh() {
+      const geom = new THREE.BoxGeometry(1, 1, 1);
+      const mesh = new THREE.Mesh(geom, makeCubeMatsFromSkin());
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geom), edgeMat);
+      mesh.add(edges);
+      return mesh;
+    }
+
+    function clampRotInt(v) {
+      let n = Math.round(Number(v) || 0);
+      n = ((n % 4) + 4) % 4;
+      return n;
+    }
+
+    function rotToQuat(r) {
+      const qx = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), clampRotInt(r.x) * (Math.PI/2));
+      const qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), clampRotInt(r.y) * (Math.PI/2));
+      const qz = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1), clampRotInt(r.z) * (Math.PI/2));
+      const q = new THREE.Quaternion();
+      q.multiply(qx).multiply(qy).multiply(qz);
+      return q;
+    }
+
+    function clearOutline() {
+      if (outlineMesh && outlineMesh.parent) outlineMesh.parent.remove(outlineMesh);
+      if (outlineMesh?.geometry) outlineMesh.geometry.dispose();
+      outlineMesh = null;
+    }
+
+    function setOutlineOnSelected() {
+      clearOutline();
+      if (selectedIndex < 0) return;
+
+      const g = new THREE.BoxGeometry(1.06, 1.06, 1.06);
+      outlineMesh = new THREE.Mesh(g, outlineMat);
+      cubeMeshes[selectedIndex].add(outlineMesh);
+    }
+
+    function findIndexByX(x) {
+      return bridge.findIndex(b => b.x === x);
+    }
+
+    function rebuildBridgeMeshes() {
+      for (const m of cubeMeshes) bridgeGroup.remove(m);
+      cubeMeshes.length = 0;
+
+      for (let i = 0; i < bridge.length; i++) {
+        const m = makeCubeMesh();
+        m.userData.index = i;
+        bridgeGroup.add(m);
+        cubeMeshes.push(m);
+      }
+      syncMeshesFromData();
+      selectIndex(-1);
+    }
+
+    function syncMeshesFromData() {
+      for (let i = 0; i < bridge.length; i++) {
+        const d = bridge[i];
+        const m = cubeMeshes[i];
+
+        const isCenter = (d.x === 0);
+
+        // Raise center cube to make it visually distinct
+        const y = isCenter ? 1.6 : 0.5;
+
+        m.position.set(d.x, y, d.z);
+        m.quaternion.copy(rotToQuat(d.rot));
+      }
+    }
+
+
+    // =========================
+    // Selection + UI updates
+    // =========================
+    function updateUIForSelection() {
+      if (selectedIndex < 0) {
+        selEl.textContent = "Selected: none";
+        coordsEl.textContent = "x: -, z: -";
+        rotEl.textContent = "rot: -, -, -";
+        return;
+      }
+      const d = bridge[selectedIndex];
+      selEl.textContent = "Selected: Cube " + selectedIndex;
+      coordsEl.textContent = `x: ${d.x}, z: ${d.z}`;
+      rotEl.textContent = `rot: ${d.rot.x}, ${d.rot.y}, ${d.rot.z}`;
+      tileSel.value = d.tile;
+    }
+
+    function selectIndex(idx) {
+      selectedIndex = idx;
+      setOutlineOnSelected();
+      updateUIForSelection();
+      exportLevel();
+    }
+
+    // =========================
+    // Rotate selected cube (quarter turns)
+    // =========================
+    function applyRot(axis, delta) {
+      if (selectedIndex < 0) return;
+      const r = bridge[selectedIndex].rot;
+      r[axis] = clampRotInt(r[axis] + delta);
+      cubeMeshes[selectedIndex].quaternion.copy(rotToQuat(r));
+      rotEl.textContent = `rot: ${r.x}, ${r.y}, ${r.z}`;
+      exportLevel();
+    }
+
+    // =========================
+    // Drag-to-rotate (in place)
+    // =========================
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    function setMouseFromEvent(e) {
+      const r = canvas.getBoundingClientRect();
+      mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+      mouse.y = -(((e.clientY - r.top) / r.height) * 2 - 1);
+    }
+
+    function pickCubeIndex(e) {
+      setMouseFromEvent(e);
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects(cubeMeshes, true);
+      if (!hits.length) return -1;
+      let obj = hits[0].object;
+      while (obj && obj.parent && obj.userData.index == null) obj = obj.parent;
+      return obj?.userData?.index ?? -1;
+    }
+
+    function pointerDown(e) {
+      const ui = document.getElementById("ui");
+      if (ui && ui.contains(e.target)) return;
+
+      e.preventDefault();
+      activePointerId = e.pointerId;
+      canvas.setPointerCapture(activePointerId);
+
+      const idx = pickCubeIndex(e);
+      if (idx >= 0) selectIndex(idx);
+
+      if (selectedIndex >= 0) {
+        dragRotating = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        dragAccumX = 0;
+        dragAccumY = 0;
+      }
+    }
+
+    function pointerMove(e) {
+      if (!dragRotating || activePointerId !== e.pointerId || selectedIndex < 0) return;
+      e.preventDefault();
+
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+
+      dragAccumX += dx;
+      dragAccumY += dy;
+
+      // Horizontal drag -> Y rotation
+      while (dragAccumX >= DRAG_THRESHOLD_PX) {
+        applyRot("y", +1);
+        dragAccumX -= DRAG_THRESHOLD_PX;
+      }
+      while (dragAccumX <= -DRAG_THRESHOLD_PX) {
+        applyRot("y", -1);
+        dragAccumX += DRAG_THRESHOLD_PX;
+      }
+
+      // Vertical drag -> X rotation
+      while (dragAccumY >= DRAG_THRESHOLD_PX) {
+        applyRot("x", +1);
+        dragAccumY -= DRAG_THRESHOLD_PX;
+      }
+      while (dragAccumY <= -DRAG_THRESHOLD_PX) {
+        applyRot("x", -1);
+        dragAccumY += DRAG_THRESHOLD_PX;
+      }
+    }
+
+    function pointerUp(e) {
+      if (activePointerId !== e.pointerId) return;
+      e.preventDefault();
+      dragRotating = false;
+      activePointerId = null;
+      try { canvas.releasePointerCapture(e.pointerId); } catch {}
+    }
+
+    canvas.addEventListener("pointerdown", pointerDown, { passive:false });
+    canvas.addEventListener("pointermove", pointerMove, { passive:false });
+    canvas.addEventListener("pointerup", pointerUp, { passive:false });
+    canvas.addEventListener("pointercancel", pointerUp, { passive:false });
+    canvas.style.touchAction = "none";
+
+    // Keyboard rotate
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft")  { e.preventDefault(); applyRot("y", -1); }
+      if (e.key === "ArrowRight") { e.preventDefault(); applyRot("y", +1); }
+      if (e.key === "ArrowUp")    { e.preventDefault(); applyRot("x", -1); }
+      if (e.key === "ArrowDown")  { e.preventDefault(); applyRot("x", +1); }
+      if (e.key === "q" || e.key === "Q") { e.preventDefault(); applyRot("z", -1); }
+      if (e.key === "e" || e.key === "E") { e.preventDefault(); applyRot("z", +1); }
+      if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelected(); }
+    });
+
+    // =========================
+    // Tile and add/remove
+    // =========================
+    tileSel.addEventListener("change", () => {
+      if (selectedIndex < 0) return;
+      bridge[selectedIndex].tile = tileSel.value;
+      exportLevel();
+    });
+
+    function deleteSelected() {
+      if (selectedIndex < 0) return;
+
+      // Prevent deleting center cube (x=0) because it's the targetRot reference
+      if (bridge[selectedIndex].x === 0) return;
+
+      bridge.splice(selectedIndex, 1);
+      rebuildBridgeMeshes();
+      exportLevel();
+    }
+
+    function addLeft() {
+      const minX = Math.min(...bridge.map(b => b.x));
+      bridge.push({ x: minX - 1, z: 0, tile: "straight", rot: { x: 0, y: 1, z: 0 } });
+      bridge.sort((a,b) => a.x - b.x);
+      rebuildBridgeMeshes();
+      exportLevel();
+    }
+
+    function addRight() {
+      const maxX = Math.max(...bridge.map(b => b.x));
+      bridge.push({ x: maxX + 1, z: 0, tile: "straight", rot: { x: 0, y: 1, z: 0 } });
+      bridge.sort((a,b) => a.x - b.x);
+      rebuildBridgeMeshes();
+      exportLevel();
+    }
+
+    btnAddL.addEventListener("click", addLeft);
+    btnAddR.addEventListener("click", addRight);
+    btnDel.addEventListener("click", deleteSelected);
+
+    btnRecenter.addEventListener("click", () => {
+      camera.position.set(9, 7, 12);
+      camera.lookAt(0, 0.8, 0);
+    });
+
+    // =========================
+    // Export formatting EXACTLY as requested
+    // - one line per cube
+    // - 9 cubes exist (includes center x=0), but output excludes the center cube
+    // - center cube rot becomes targetRot
+    // =========================
+    function padX(x) {
+      // match spacing like: x:  1 (two spaces for positive single digit)
+      const s = String(x);
+      if (x >= 0 && s.length === 1) return " " + s; // one leading space
+      return s;
+    }
+
+    function cubeLine(c) {
+      return `      { x: ${padX(c.x)}, z: ${c.z}, tile: "${c.tile}", rot: { x: ${c.rot.x}, y: ${c.rot.y}, z: ${c.rot.z} } },`;
+    }
+
+    function exportLevel() {
+      // ensure sorted by x
+      const sorted = [...bridge].sort((a,b) => a.x - b.x);
+
+      const center = sorted.find(b => b.x === 0) || { rot: { x: 0, y: 0, z: 0 } };
+      const target = center.rot;
+
+      // output excludes the center cube (x=0), because it defines targetRot
+      const outBridge = sorted.filter(b => b.x !== 0);
+
+      const lines = [];
+      lines.push(`    bridge: [`);
+      for (const c of outBridge) lines.push(cubeLine(c));
+      lines.push(`    ],`);
+      lines.push(`targetRot: { x: ${target.x}, y: ${target.y}, z: ${target.z} },`);
+
+      outEl.value = lines.join("\n");
+    }
+
+    btnExport.addEventListener("click", exportLevel);
+
+    btnCopy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(outEl.value);
+      } catch {
+        outEl.select();
+        document.execCommand("copy");
+      }
+    });
+
+    // =========================
+    // Resize + loop
+    // =========================
+    function resize() {
+      const w = Math.max(1, innerWidth);
+      const h = Math.max(1, innerHeight);
+      renderer.setSize(w, h, true);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    addEventListener("resize", resize, { passive:true });
+
+    function loop() {
+      requestAnimationFrame(loop);
+      renderer.render(scene, camera);
+    }
+
+    // =========================
+    // Init
+    // =========================
+    function init() {
+      tileSel.value = "straight";
+      rebuildBridgeMeshes();
+      exportLevel();
+      resize();
+      loop();
+    }
+
+    init();
+  </script>
+</body>
+</html>
