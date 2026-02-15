@@ -108,7 +108,8 @@ export class Game{
 
       this.ui.showLevelUp(
         true,
-        `Stats:\n• Score: ${defeatedScore}\n• Streak: ${defeatedStreak}\n\n Slow down → ${speedLabel}\nHearts refilled to 3.`
+        `Stats:\n• Score: ${defeatedScore}\n• Streak: ${defeatedStreak}\n\n Slow down → ${speedLabel}\nHearts refilled to 3.`, 
+        'Sorry!'
       );
     };
 
@@ -342,7 +343,7 @@ export class Game{
 
     this.state = 'levelup';
     this.ui.lockChoices(true);
-    this.ui.showLevelUp(true, msg);
+    this.ui.showLevelUp(true, msg, 'Awesome!');
   }
 
   nextQuestion(){
