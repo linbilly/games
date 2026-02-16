@@ -57,6 +57,9 @@
     { title: 'Make 10, no labels', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 14, holes: 4 },
     // Level 4: Make 20, 5x4 holes 
     { title: 'Make 20 (No Labels)', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4 },
+      // Level 5: Mystery hole (Make 20) — shows text only, no graphic fill info
+    { title: 'Mystery Make 20', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4, mystery: true },
+
 
   ];
   let levelIndex = 0;
@@ -124,7 +127,19 @@
     const startTile = 16;
     for (let i=0;i<L.holes;i++){
       const xTile = startTile + i*L.spacingTiles;
-      const filled = Math.floor(rr(1, L.hole.target-1)); // 1..target-2
+      const isMystery = !!L.mystery;
+
+      // Normal levels: random filled 1..target-1 (as you had)
+      let filled = Math.floor(rr(1, L.hole.target - 1));
+
+      // Mystery: choose how many blocks are needed (1..target)
+      // and set filled so that missing == required
+      let required = null;
+      if (isMystery) {
+        required = 1 + Math.floor(Math.random() * L.hole.target); // 1..20
+        filled = L.hole.target - required;                        // so missing == required
+      }
+
       holes.push({
         id: `h${idx}_${i}`,
         xTile,
@@ -134,12 +149,17 @@
         target: L.hole.target,
         filled,
         solved: false,
-        // visual preview for wrong fit
+
+        // Mystery data
+        mystery: isMystery,
+        required, // 1..target
+
         previewN: 0,
         previewUntil: -999,
         previewBlinkStart: -999,
         lastResult: ''
       });
+
     }
 
     activeHole = null;
@@ -155,14 +175,15 @@
 
   // Build options for a hole: include correct + two distractors
   function optionsForHole(h){
-    const missing = h.target - h.filled;
-    let opts = new Set([missing]);
+    const correct = h.mystery ? h.required : (h.target - h.filled);
+    let opts = new Set([correct]);
+
 
     // Add distractors close-by, clamped
     const candidates = [];
     for (let d=-3; d<=3; d++){
-      const v = missing + d;
-      if (v>=1 && v<=h.target-1 && v!==missing) candidates.push(v);
+      const v = correct + d;
+      if (v>=1 && v<=h.target-1 && v!==correct) candidates.push(v);
     }
     while (opts.size < Math.min(3, h.target-1) && candidates.length){
       const pick = candidates.splice(Math.floor(Math.random()*candidates.length),1)[0];
@@ -269,7 +290,12 @@
     const hx = h.xTile * TILE;
     runner.x = hx - runner.w - 2;
     spawnDragBlocks(h);
-    statusEl.textContent = `Fill it: ${h.filled} + ? = ${h.target}`;
+    if (h.mystery) {
+      statusEl.textContent = `${h.required} blocks needed`;
+    } else {
+      statusEl.textContent = `Fill it: ${h.filled} + ? = ${h.target}`;
+    }
+
   }
 
   function resumeRunHappy(){
@@ -292,7 +318,7 @@
   }
 
   function tryPlaceBlock(h, block){
-    const missing = h.target - h.filled;
+    const needed = h.mystery ? h.required : (h.target - h.filled);
     const before = h.filled;
     const n = block.n;
 
@@ -303,14 +329,18 @@
     h.previewBlinkStart = nowS();
     h.previewUntil = nowS() + 2.0;
 
-    if (n === missing){
+    if (n === needed) {
       // correct
       h.filled = h.target;
       h.solved = true;
       h.previewN = 0;
       h.previewUntil = -999;
       h.lastResult = '';
-      setFeedback('correct', `${before} + ${n} = ${h.target}`, 0.9, 0.0, {before,n,target:h.target});
+      if (h.mystery) {
+        setFeedback('correct', `${n} blocks ✔`, 0.9, 0.0, { n, target: h.target });
+      } else {
+        setFeedback('correct', `${before} + ${n} = ${h.target}`, 0.9, 0.0, { before, n, target: h.target });
+      }
       dragBlocks = [];
       dragging = null;
       activeHole = null;
@@ -318,9 +348,14 @@
       return true;
     } else {
       // wrong
-      const too = (n > missing) ? 'Too big' : 'Too small';
+      const too = (n > needed) ? 'Too big' : 'Too small';
       h.lastResult = too.toUpperCase();
-      setFeedback('wrong', `${before} + ${n} ≠ ${h.target} (${too})`, 2.0, 2.0, {before,n,target:h.target});
+      if (h.mystery) {
+        setFeedback('wrong', `${n} blocks ✖ (${too})`, 3.0, 3.0, { n, target: h.target });
+      } else {
+        setFeedback('wrong', `${before} + ${n} ≠ ${h.target} (${too})`, 3.0, 3.0, { before, n, target: h.target });
+      }
+      
       sfx.wrong();
 
       // return the dragged block to home after a short delay
@@ -462,7 +497,42 @@
   }
 
   function drawHole(h){
+
     const r = holeScreenRect(h);
+
+    // Mystery hole: show a fully gray-filled pit + text only (no graphic info about what's missing)
+    if (h.mystery) {
+      const cols = h.wTile;
+      const totalTiles = h.target;
+
+      // Fill entire capacity with gray blocks
+      for (let i = 0; i < totalTiles; i++) {
+        const rowFromBottom = Math.floor(i / cols);
+        const col = i % cols;
+        const row = (h.hTile - 1) - rowFromBottom;
+        const x = r.x + col * TILE;
+        const y = r.y + row * TILE;
+
+        ctx.fillStyle = '#94a3b8'; // gray
+        ctx.fillRect(x, y, TILE, TILE);
+        ctx.strokeStyle = 'rgba(2,6,23,0.65)';
+        ctx.strokeRect(x, y, TILE, TILE);
+      }
+
+      // Big centered text label
+      ctx.fillStyle = 'rgba(2,6,23,0.85)';
+      ctx.font = '900 22px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${h.required} blocks needed`, r.x + r.w * 0.5, r.y + r.h * 0.5);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+
+      // Still allow preview feedback (wrong/correct cue) to show? If you want it, remove this return.
+      return;
+    }
+
+    
     // pit
     ctx.fillStyle = '#020617';
     ctx.fillRect(r.x, r.y, r.w, r.h);
