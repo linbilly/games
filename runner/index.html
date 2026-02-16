@@ -12,21 +12,44 @@
       <div id="title">Make 5 Runner</div>
       <div id="status">Drag the correct block into the hole.</div>
       <div id="levelInfo"></div>
+      <div id="hudBtns">
+        <button id="btnMenu" type="button" class="hudBtn">Menu</button>
+      </div>
+
     </div>
 
     <div id="gameArea">
       <canvas id="game" width="960" height="540"></canvas>
 
       <div id="modal" class="modal">
-        <div class="modalCard">
-          <h2>Make 5 / Make 10 Runner</h2>
-          <p>The runner runs automatically and stops at each hole.</p>
-          <ul>
-            <li><b>Drag</b> a block into the hole to fill it.</li>
-            <li>If it doesn't fit, you'll see why (too small / too big).</li>
-            <li>When it fits, the runner celebrates and keeps running.</li>
-          </ul>
-          <button id="btnStart" type="button" class="primary">OK</button>
+        <div class="menuCard">
+          <div class="menuTop">
+            <div class="menuTitle">Runner Math</div>
+            <div class="menuSubtitle">Drag blocks to fill holes. Run unlocks the next puzzle.</div>
+          </div>
+
+          <div class="menuGrid">
+            <div class="menuRow">
+              <label class="menuLabel" for="startLevel">Start level</label>
+              <select id="startLevel" class="menuSelect"></select>
+            </div>
+
+            <div class="menuRow">
+              <label class="menuLabel" for="toggleSound">Sound</label>
+              <button id="toggleSound" class="menuToggle" type="button" aria-pressed="true">ON</button>
+            </div>
+          </div>
+
+          <div class="menuActions">
+            <button id="btnResume" type="button" class="menuPrimary">RESUME</button>
+            <button id="btnStart" type="button" class="menuPrimary">START</button>
+            <button id="btnQuit" type="button" class="menuDanger">QUIT</button>
+          </div>
+
+
+          <div class="menuFooter">
+            Tip: Drag a block into the hole. Wrong fits show why for 3 seconds.
+          </div>
         </div>
       </div>
     </div>

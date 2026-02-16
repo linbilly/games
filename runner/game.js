@@ -21,10 +21,87 @@
   const statusEl = document.getElementById('status');
   const levelInfoEl = document.getElementById('levelInfo');
 
-  btnStart.addEventListener('click', () => {
-    modal.classList.add('hidden');
-    ensureAudio();
+  const startLevelSel = document.getElementById('startLevel');
+  const toggleSoundBtn = document.getElementById('toggleSound');
+  const toggleLabelsBtn = document.getElementById('toggleLabels');
+
+  const btnMenu = document.getElementById('btnMenu');
+  const btnResume = document.getElementById('btnResume');
+  const btnQuit = document.getElementById('btnQuit');
+
+
+
+
+
+
+  function openMenu(){
+    modal.classList.remove('hidden');
+
+    // Populate levels dropdown
+    startLevelSel.innerHTML = '';
+    levels.forEach((lv, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = `${i+1}. ${lv.title}`;
+      startLevelSel.appendChild(opt);
+    });
+    startLevelSel.value = String(levelIndex);
+
+    // Apply current toggles
+    toggleSoundBtn.textContent = soundEnabled ? 'ON' : 'OFF';
+    toggleSoundBtn.classList.toggle('on', soundEnabled);
+    toggleSoundBtn.classList.toggle('off', !soundEnabled);
+    toggleSoundBtn.setAttribute('aria-pressed', soundEnabled ? 'true' : 'false');
+
+    // If already mid-run: show RESUME, hide START.
+    // If not inGame: show START, hide RESUME.
+    btnResume.style.display = inGame ? '' : 'none';
+    btnStart.style.display  = inGame ? 'none' : '';
+
+  }
+
+  toggleSoundBtn.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    if (soundEnabled) ensureAudio();
+    openMenu();
   });
+
+  btnMenu.addEventListener('click', () => {
+    openMenu(); // opens modal overlay during gameplay
+  });
+
+  btnQuit.addEventListener('click', () => {
+    inGame = false;
+    levelIndex = 0;
+    buildLevel(levelIndex);
+    openMenu(); // stays on menu after resetting
+  });
+
+
+  btnResume.addEventListener('click', () => {
+    modal.classList.add('hidden');
+    if (soundEnabled) ensureAudio();
+  });
+
+
+
+  // toggleLabelsBtn.addEventListener('click', () => {
+  //   // cycle AUTO -> ON -> OFF -> AUTO
+  //   if (labelsOverride === null) labelsOverride = true;
+  //   else if (labelsOverride === true) labelsOverride = false;
+  //   else labelsOverride = null;
+  //   openMenu();
+  // });
+
+  btnStart.addEventListener('click', () => {
+    levelIndex = parseInt(startLevelSel.value, 10) || 0;
+    buildLevel(levelIndex);
+
+    inGame = true;
+    modal.classList.add('hidden');
+    if (soundEnabled) ensureAudio();
+  });
+
 
   // ---- World constants ----
   const TILE = 36;
@@ -101,6 +178,9 @@
 
   let currentLevel = null;
   let levelIndex = 0; //for progression, not labeling
+  let soundEnabled = true;
+
+  let inGame = false;
 
 
   // ---- Audio (simple oscillator beeps) ----
@@ -110,6 +190,7 @@
     try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch {}
   }
   function beep(freq=440, dur=0.09, type='sine', gain=0.06) {
+    if (!soundEnabled) return;
     if (!audioCtx) return;
     const t0 = audioCtx.currentTime;
     const o = audioCtx.createOscillator();
@@ -925,6 +1006,8 @@
   // Start
   resize();
   buildLevel(levelIndex);
+  inGame = false;
+  openMenu();
   requestAnimationFrame(tick);
 
   // Level advance

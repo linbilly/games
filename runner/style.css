@@ -94,3 +94,140 @@ button.primary:hover{ filter: brightness(1.02); }
   background: rgba(2,6,23,0.85);
   border-top: 1px solid rgba(148,163,184,0.2);
 }
+
+.menuCard{
+  width: min(680px, calc(100% - 28px));
+  background: rgba(15,23,42,0.96);
+  border: 1px solid rgba(148,163,184,0.25);
+  border-radius: 18px;
+  padding: 18px 18px 14px;
+  box-shadow: 0 18px 70px rgba(0,0,0,0.60);
+}
+
+.menuTop{ padding: 6px 6px 10px; }
+.menuTitle{
+  font-size: 34px;
+  font-weight: 1000;
+  letter-spacing: 0.6px;
+}
+.menuSubtitle{
+  margin-top: 6px;
+  color: rgba(226,232,240,0.85);
+}
+
+.menuGrid{
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(2,6,23,0.35);
+  border: 1px solid rgba(148,163,184,0.15);
+}
+
+.menuRow{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.menuLabel{
+  color: rgba(226,232,240,0.9);
+  font-weight: 800;
+}
+
+.menuSelect{
+  min-width: 260px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,0.25);
+  background: rgba(2,6,23,0.55);
+  color: rgba(226,232,240,0.95);
+  font-weight: 800;
+}
+
+.menuToggle{
+  min-width: 120px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,0.25);
+  background: rgba(2,6,23,0.55);
+  color: rgba(226,232,240,0.95);
+  font-weight: 900;
+  cursor: pointer;
+}
+.menuToggle.on{
+  background: rgba(34,197,94,0.18);
+  border-color: rgba(34,197,94,0.45);
+}
+.menuToggle.off{
+  background: rgba(251,113,133,0.12);
+  border-color: rgba(251,113,133,0.45);
+}
+
+.menuActions{
+  margin-top: 14px;
+  display:flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.menuDanger{
+  min-width: 180px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: rgba(251,113,133,0.14);
+  border: 1px solid rgba(251,113,133,0.55);
+  color: rgba(226,232,240,0.95);
+  font-weight: 1000;
+  font-size: 16px;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+}
+.menuDanger:hover{ filter: brightness(1.05); }
+
+
+.menuPrimary{
+  min-width: 240px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: #fbbf24;
+  color: #0b1220;
+  font-weight: 1000;
+  font-size: 18px;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+}
+.menuPrimary:hover{ filter: brightness(1.03); }
+
+.menuFooter{
+  margin-top: 10px;
+  text-align: center;
+  color: rgba(148,163,184,0.95);
+}
+
+#hudBtns{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+
+.hudBtn{
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148,163,184,0.25);
+  background: rgba(2,6,23,0.55);
+  color: rgba(226,232,240,0.95);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.hudBtn:hover{ filter: brightness(1.05); }
+
+.hudBtn.danger{
+  border-color: rgba(251,113,133,0.45);
+  background: rgba(251,113,133,0.12);
+}
+
