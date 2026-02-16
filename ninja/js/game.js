@@ -42,6 +42,9 @@ export class Game{
     this.sessionStats = {}; // { mode: { answered: n, correct: n } }
     this.levelStats = { answered: 0, correct: 0 }; // per-level only
 
+    this.perfectMedalUntil = 0;
+
+
 
 
     this.baseSpeed = 1.0;
@@ -328,6 +331,7 @@ export class Game{
 
 
 
+
     this.ui.showToast(`Level up!`);
     const info = MODE_INFO[this.settings.mode] || MODE_INFO.add20;
     const s=this.settings.speed||'normal';
@@ -343,7 +347,8 @@ export class Game{
 
     this.state = 'levelup';
     this.ui.lockChoices(true);
-    this.ui.showLevelUp(true, msg, 'Awesome!');
+    this.ui.showLevelUp(true, msg, title);
+    this.ui.showLevelMedal(pct === 100);
   }
 
   nextQuestion(){
@@ -555,7 +560,14 @@ export class Game{
     ctx.beginPath(); ctx.moveTo(330,90); ctx.lineTo(330,500); ctx.stroke();
     ctx.restore();
 
-    ctx.restore();
+
+    drawAccuracyRing(ctx, 58, 72, 20, this.levelStats.correct, this.levelStats.answered);
+
+    if(now() < this.perfectMedalUntil){
+      drawPerfectMedal(ctx, 480, 110);
+    }
+
+
   }
 
   initAudio(){
@@ -709,3 +721,63 @@ function roundRect(ctx,x,y,w,h,r){
   ctx.arcTo(x,y,x+w,y,r);
   ctx.closePath();
 }
+
+function drawAccuracyRing(ctx, x, y, r, correct, answered){
+  const pct = answered ? (correct / answered) : 1;
+  const start = -Math.PI / 2;
+  const end = start + Math.PI * 2 * pct;
+
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+
+  // track
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.stroke();
+
+  // progress
+  ctx.strokeStyle = 'rgba(110,231,255,0.55)';
+  ctx.beginPath(); ctx.arc(x, y, r, start, end); ctx.stroke();
+
+  // text
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
+  ctx.font = '900 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(Math.round(pct*100) + '%', x, y);
+
+  ctx.restore();
+}
+
+function drawPerfectMedal(ctx, cx, cy){
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.globalAlpha = 0.92;
+
+  // medal
+  ctx.fillStyle = 'rgba(255,215,110,0.92)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+  // star
+  ctx.fillStyle = 'rgba(0,0,0,0.20)';
+  ctx.beginPath();
+  for(let i=0;i<10;i++){
+    const ang = -Math.PI/2 + i*Math.PI/5;
+    const rr = (i%2===0)?10:5;
+    ctx.lineTo(Math.cos(ang)*rr, Math.sin(ang)*rr);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // label
+  ctx.fillStyle = 'rgba(255,255,255,0.90)';
+  ctx.font = '900 14px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText('PERFECT', 0, 26);
+
+  ctx.restore();
+}
+

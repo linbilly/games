@@ -402,3 +402,34 @@ kbd{
     -webkit-overflow-scrolling: touch;
   }
 }
+
+.medalWrap{
+  display:none;
+  margin: 10px 0 12px;
+  text-align:center;
+}
+.medalWrap[aria-hidden="false"]{ display:block; }
+
+.medal{
+  font-size: 44px;
+  line-height: 1;
+  animation: medalPop 420ms ease-out;
+}
+.medalText{
+  margin-top: 6px;
+  font-weight: 900;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.90);
+  animation: medalGlow 900ms ease-in-out infinite alternate;
+}
+
+@keyframes medalPop{
+  0%{ transform: scale(0.6); opacity: 0; }
+  100%{ transform: scale(1); opacity: 1; }
+}
+@keyframes medalGlow{
+  0%{ text-shadow: 0 0 0 rgba(255,215,110,0.0); }
+  100%{ text-shadow: 0 0 14px rgba(255,215,110,0.55); }
+}
+

@@ -51,6 +51,9 @@ export class UI{
 
     this._toastTimer = null;
     this.game = null;
+
+    this.levelUpMedal = document.getElementById('levelUpMedal');
+
   }
 
   bindGame(game){
@@ -204,6 +207,10 @@ export class UI{
     }
 
     if(text) this.levelUpText.innerHTML = text;
+
+    // default: hide medal unless game sets it
+    if(this.levelUpMedal) this.levelUpMedal.setAttribute('aria-hidden', 'true');
+
     this.updateHeaderButtons();
   }
 
@@ -289,5 +296,11 @@ export class UI{
       if(this.summaryBody) this.summaryBody.innerHTML = html;
     }
   }
+
+  showLevelMedal(show){
+    if(!this.levelUpMedal) return;
+    this.levelUpMedal.setAttribute('aria-hidden', show ? 'false' : 'true');
+  }
+
 
 }
