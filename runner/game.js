@@ -49,59 +49,46 @@
 
   // ---- Levels ----
   const levels = [
-      // Level 7: 2x5
-    { 
-      title: '2x5 Mystery',
-      hole: { w: 2, h: 5, target: 10 },
-      spacingTiles: 12,
-      holes: 4,
-      mystery: true,
-      mult: { base: 2, maxFactor: 5 } // 2×(1..10) => 2..20
-    },
+  // Level 1: Make 5 (labels ON)
+  { title: 'Make 5', hole: { w: 1, h: 5, target: 5 }, spacingTiles: 12, holes: 4, labels: true },
 
-    { 
-      title: '3x5 Mystery',
-      hole: { w: 3, h: 5, target: 15 },
-      spacingTiles: 12,
-      holes: 4,
-      mystery: true,
-      mult: { base: 3, maxFactor: 5 } // 2×(1..10) => 2..20
-    },
+  // Level 2: Make 10 (labels ON)
+  { title: 'Make 10', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 14, holes: 4, labels: true },
 
-    { 
-      title: '4x5 Mystery',
-      hole: { w: 4, h: 5, target: 20 },
-      spacingTiles: 12,
-      holes: 4,
-      mystery: true,
-      mult: { base: 4, maxFactor: 5 } // 2×(1..10) => 2..20
-    },
-    
-    // Level 1: make 5, vertical 1x5 holes
-    { title: 'Make 5', hole: { w: 1, h: 5, target: 5 }, spacingTiles: 12, holes: 4 },
-    // Level 2: make 10, 2x5 holes (area 10)
-    { title: 'Make 10', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 14, holes: 4 },
-    // Level 3: make 10, 2x5 holes (area 10)
-    { title: 'Make 10, no labels', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 14, holes: 4 },
-    // Level 4: Make 20, 5x4 holes 
-    { title: 'Make 20 (No Labels)', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4 },
-    // Level 5: Mystery hole (Make 10) — shows text only, no graphic fill info
-    { title: 'Mystery Make 10', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 12, holes: 4, mystery: true },
-    // Level 6: Mystery hole (Make 20) — shows text only, no graphic fill info
-    { title: 'Mystery Make 20', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4, mystery: true },
+  // Level 3: Make 10 (labels OFF)
+  { title: 'Make 10 (No Labels)', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 14, holes: 4, labels: false },
 
+  // Level 4: Make 20 (labels OFF)
+  { title: 'Make 20 (No Labels)', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4, labels: false },
 
+  // Level 5: Mystery Make 10 (labels OFF; text only + gray fill)
+  { title: 'Mystery Make 10', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 12, holes: 4, mystery: true, labels: false },
 
+  // Level 6: Mystery Make 20 (labels OFF; text only + gray fill)
+  { title: 'Mystery Make 20', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4, mystery: true, labels: false },
 
+  // ×2..×9, factor 1..5 (labels ON to show "NxM")
+  { title: '×2 Mystery', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 12, holes: 4, mystery: true, mult: { base: 2, maxFactor: 5 }, labels: true },
+  { title: '×3 Mystery', hole: { w: 3, h: 5, target: 15 }, spacingTiles: 12, holes: 4, mystery: true, mult: { base: 3, maxFactor: 5 }, labels: true },
+  { title: '×4 Mystery', hole: { w: 4, h: 5, target: 20 }, spacingTiles: 12, holes: 4, mystery: true, mult: { base: 4, maxFactor: 5 }, labels: true },
+  { title: '×5 Mystery', hole: { w: 5, h: 5, target: 25 }, spacingTiles: 12, holes: 4, mystery: true, mult: { base: 5, maxFactor: 5 }, labels: true },
+  { title: '×6 Mystery', hole: { w: 6, h: 5, target: 30 }, spacingTiles: 12, holes: 4, mystery: true, mult: { base: 6, maxFactor: 5 }, labels: true },
+  { title: '×7 Mystery', hole: { w: 7, h: 5, target: 35 }, spacingTiles: 12, holes: 4, mystery: true, mult: { base: 7, maxFactor: 5 }, labels: true },
+  { title: '×8 Mystery', hole: { w: 8, h: 5, target: 40 }, spacingTiles: 12, holes: 4, mystery: true, mult: { base: 8, maxFactor: 5 }, labels: true },
+  { title: '×9 Mystery', hole: { w: 9, h: 5, target: 45 }, spacingTiles: 12, holes: 4, mystery: true, mult: { base: 9, maxFactor: 5 }, labels: true },
 
+  // ×2..×9, factor 1..10 (labels ON to show "NxM")
+  { title: '×2 Mystery', hole: { w: 2, h: 10, target: 20 }, spacingTiles: 14, holes: 4, mystery: true, mult: { base: 2, maxFactor: 10 }, labels: true },
+  { title: '×3 Mystery', hole: { w: 3, h: 10, target: 30 }, spacingTiles: 14, holes: 4, mystery: true, mult: { base: 3, maxFactor: 10 }, labels: true },
+  { title: '×4 Mystery', hole: { w: 4, h: 10, target: 40 }, spacingTiles: 14, holes: 4, mystery: true, mult: { base: 4, maxFactor: 10 }, labels: true },
+  { title: '×5 Mystery', hole: { w: 5, h: 10, target: 50 }, spacingTiles: 14, holes: 4, mystery: true, mult: { base: 5, maxFactor: 10 }, labels: true },
+  { title: '×6 Mystery', hole: { w: 6, h: 10, target: 60 }, spacingTiles: 14, holes: 4, mystery: true, mult: { base: 6, maxFactor: 10 }, labels: true },
+  { title: '×7 Mystery', hole: { w: 7, h: 10, target: 70 }, spacingTiles: 14, holes: 4, mystery: true, mult: { base: 7, maxFactor: 10 }, labels: true },
+  { title: '×8 Mystery', hole: { w: 8, h: 10, target: 80 }, spacingTiles: 14, holes: 4, mystery: true, mult: { base: 8, maxFactor: 10 }, labels: true },
+  { title: '×9 Mystery', hole: { w: 9, h: 10, target: 90 }, spacingTiles: 14, holes: 4, mystery: true, mult: { base: 9, maxFactor: 10 }, labels: true },
+];
+  
 
-
-
-  ];
-  let levelIndex = 0;
-  function labelsEnabled() {
-    return levelIndex <= 1; // Level 1 + Level 2 ON, Level 3+ OFF
-  }
 
 
 
@@ -111,6 +98,10 @@
   let dragBlocks = [];      // draggable option blocks (screen-space UI)
   let dragging = null;      // {block, ox, oy}
   let feedback = null;      // {kind, text, until, blinkUntil, show:boolean, placedN, before, target, overflow}
+
+  let currentLevel = null;
+  let levelIndex = 0; //for progression, not labeling
+
 
   // ---- Audio (simple oscillator beeps) ----
   let audioCtx = null;
@@ -155,6 +146,7 @@
   // ---- Level build ----
   function buildLevel(idx){
     const L = levels[idx];
+    currentLevel = L;
 
     levelInfoEl.textContent = `Level ${idx+1}/${levels.length}`;
     statusEl.textContent = 'Drag the correct block into the hole.';
@@ -671,7 +663,7 @@
     }
 
     for (let i=0;i<baseFilled;i++){
-      drawTile(i, '#fbbf24', labelsEnabled() ? h.filled : null);
+      drawTile(i, '#fbbf24', currentLevel?.labels ? h.filled : null);
     }
 
     // preview wrong/cue
@@ -698,7 +690,7 @@
         ctx.strokeRect(x, y, TILE, TILE);
 
         // if overflow, y may be above pit; still draw
-        if (labelsEnabled()) {
+        if (currentLevel?.labels) {
           ctx.fillStyle = 'rgba(2,6,23,0.85)';
           ctx.font = '900 18px system-ui';
           ctx.fillText(String(h.previewN), x + 10, y + 24);
@@ -798,32 +790,33 @@
         ctx.strokeStyle = 'rgba(2,6,23,0.75)';
         ctx.strokeRect(x,y,TILE,TILE);
       }
-      // One centered label per dragblock (bigger, clearer)
-      let label;
-      if (b.base && b.factor) {
-        label = `${b.base}×${b.factor}`; // multiplication levels
-      } else {
-        label = String(b.n);            // make 5 / make 10 levels
+      // One centered label per dragblock (only if this level allows labels)
+      if (currentLevel?.labels) {
+            let label;
+            if (b.base && b.factor) {
+              label = `${b.base}×${b.factor}`; // multiplication levels
+            } else {
+              label = String(b.n);            // make 5 / make 10 levels
+            }
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(2,6,23,0.88)';
+            ctx.font = '900 34px system-ui';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // subtle backdrop for readability
+            ctx.globalAlpha = 0.85;
+            roundRect(b.x + 6, b.y + b.h * 0.5 - 22, b.w - 12, 44, 10);
+            ctx.fillStyle = 'rgba(248,250,252,0.70)';
+            ctx.fill();
+            ctx.globalAlpha = 1;
+
+            ctx.fillStyle = 'rgba(2,6,23,0.92)';
+            ctx.fillText(label, b.x + b.w * 0.5, b.y + b.h * 0.5);
+
+            ctx.restore();
       }
-
-      ctx.save();
-      ctx.fillStyle = 'rgba(2,6,23,0.88)';
-      ctx.font = '900 34px system-ui';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      // subtle backdrop for readability
-      ctx.globalAlpha = 0.85;
-      roundRect(b.x + 6, b.y + b.h * 0.5 - 22, b.w - 12, 44, 10);
-      ctx.fillStyle = 'rgba(248,250,252,0.70)';
-      ctx.fill();
-      ctx.globalAlpha = 1;
-
-      ctx.fillStyle = 'rgba(2,6,23,0.92)';
-      ctx.fillText(label, b.x + b.w * 0.5, b.y + b.h * 0.5);
-
-      ctx.restore();
-
     }
   }
 
