@@ -276,7 +276,23 @@
       const j = Math.floor(Math.random()*(i+1));
       [arr[i],arr[j]]=[arr[j],arr[i]];
     }
-    return arr;
+    // Convert numeric options into block descriptors
+    return arr.map(v => {
+      if (h.mult) {
+        const base = h.mult.base;
+        const factor = v / base;
+
+        return {
+          value: v,
+          base,
+          factor
+        };
+      }
+
+      // non-multiplication levels
+      return { value: v };
+    });
+
   }
 
   // Create draggable blocks in screen space (free floating)
@@ -298,7 +314,9 @@
     let curX = centerX - totalW * 0.5;
 
     for (let i = 0; i < opts.length; i++){
-      const n = opts[i];
+      const opt = opts[i];
+      const n = opt.value;
+
       const rows = Math.ceil(n / h.wTile);
       const w = blockW;
       const hPx = rows * TILE;
@@ -309,6 +327,8 @@
       dragBlocks.push({
         id: `b_${h.id}_${i}`,
         n,
+        base: opt.base ?? null,
+        factor: opt.factor ?? null,
         w,
         h: hPx,
         x, y,
@@ -316,6 +336,7 @@
         homeY: y,
         returning: false
       });
+
 
       curX += w + gapX;
     }
@@ -776,15 +797,33 @@
         ctx.fillRect(x,y,TILE,TILE);
         ctx.strokeStyle = 'rgba(2,6,23,0.75)';
         ctx.strokeRect(x,y,TILE,TILE);
-
-        // embedded number
-        if (labelsEnabled()) {
-          ctx.fillStyle = 'rgba(2,6,23,0.75)';
-          ctx.font = '900 18px system-ui';
-          ctx.fillText(String(n), x + 10, y + 24);
-        }
-
       }
+      // One centered label per dragblock (bigger, clearer)
+      let label;
+      if (b.base && b.factor) {
+        label = `${b.base}×${b.factor}`; // multiplication levels
+      } else {
+        label = String(b.n);            // make 5 / make 10 levels
+      }
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(2,6,23,0.88)';
+      ctx.font = '900 34px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // subtle backdrop for readability
+      ctx.globalAlpha = 0.85;
+      roundRect(b.x + 6, b.y + b.h * 0.5 - 22, b.w - 12, 44, 10);
+      ctx.fillStyle = 'rgba(248,250,252,0.70)';
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = 'rgba(2,6,23,0.92)';
+      ctx.fillText(label, b.x + b.w * 0.5, b.y + b.h * 0.5);
+
+      ctx.restore();
+
     }
   }
 
