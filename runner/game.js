@@ -53,8 +53,18 @@
     { title: 'Make 5', hole: { w: 1, h: 5, target: 5 }, spacingTiles: 12, holes: 4 },
     // Level 2: make 10, 2x5 holes (area 10)
     { title: 'Make 10', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 14, holes: 4 },
+    // Level 3: make 10, 2x5 holes (area 10)
+    { title: 'Make 10, no labels', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 14, holes: 4 },
+    // Level 4: Make 20, 5x4 holes 
+    { title: 'Make 20 (No Labels)', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4 },
+
   ];
   let levelIndex = 0;
+  function labelsEnabled() {
+    return levelIndex <= 1; // Level 1 + Level 2 ON, Level 3+ OFF
+  }
+
+
 
   // Current puzzle state
   let holes = [];
@@ -178,8 +188,8 @@
     const opts = optionsForHole(h);
 
     // Place them to the left side, spaced widely; bottoms aligned so same drag height looks tidy
-    const bottomY = 150;
-    const leftX = 300;
+    const bottomY = 300;
+    const leftX = 400;
     const gapX = 140;
 
     for (let i=0;i<opts.length;i++){
@@ -478,7 +488,7 @@
     }
 
     for (let i=0;i<baseFilled;i++){
-      drawTile(i, '#fbbf24', h.filled);
+      drawTile(i, '#fbbf24', labelsEnabled() ? h.filled : null);
     }
 
     // preview wrong/cue
@@ -505,9 +515,12 @@
         ctx.strokeRect(x, y, TILE, TILE);
 
         // if overflow, y may be above pit; still draw
-        ctx.fillStyle = 'rgba(2,6,23,0.85)';
-        ctx.font = '900 18px system-ui';
-        ctx.fillText(String(h.previewN), x + 10, y + 24);
+        if (labelsEnabled()) {
+          ctx.fillStyle = 'rgba(2,6,23,0.85)';
+          ctx.font = '900 18px system-ui';
+          ctx.fillText(String(h.previewN), x + 10, y + 24);
+        }
+
       }
 
       // too small cue: show empty gap at top (if desired < target)
@@ -603,9 +616,12 @@
         ctx.strokeRect(x,y,TILE,TILE);
 
         // embedded number
-        ctx.fillStyle = 'rgba(2,6,23,0.75)';
-        ctx.font = '900 18px system-ui';
-        ctx.fillText(String(n), x + 10, y + 24);
+        if (labelsEnabled()) {
+          ctx.fillStyle = 'rgba(2,6,23,0.75)';
+          ctx.font = '900 18px system-ui';
+          ctx.fillText(String(n), x + 10, y + 24);
+        }
+
       }
     }
   }
