@@ -187,30 +187,43 @@
     dragBlocks = [];
     const opts = optionsForHole(h);
 
-    // Place them to the left side, spaced widely; bottoms aligned so same drag height looks tidy
-    const bottomY = 300;
-    const leftX = 400;
-    const gapX = 140;
+    // Center blocks directly above the active hole, with spacing that scales to hole width.
+    const hr = holeScreenRect(h);
+    const centerX = hr.x + hr.w * 0.5;
 
-    for (let i=0;i<opts.length;i++){
+    // Visual tuning
+    const bottomY = 300; // bottoms aligned along this y
+    const blockW = h.wTile * TILE;
+    const gapX = Math.max(26, Math.floor(blockW * 0.22)); // wider holes => more spacing
+
+    // Measure total row width so we can center it
+    const totalW = opts.length * blockW + (opts.length - 1) * gapX;
+    let curX = centerX - totalW * 0.5;
+
+    for (let i = 0; i < opts.length; i++){
       const n = opts[i];
       const rows = Math.ceil(n / h.wTile);
-      const w = h.wTile * TILE;
+      const w = blockW;
       const hPx = rows * TILE;
+
+      const x = curX;
+      const y = bottomY - hPx;
 
       dragBlocks.push({
         id: `b_${h.id}_${i}`,
         n,
         w,
         h: hPx,
-        x: leftX + i*gapX,
-        y: bottomY - hPx,
-        homeX: leftX + i*gapX,
-        homeY: bottomY - hPx,
+        x, y,
+        homeX: x,
+        homeY: y,
         returning: false
       });
+
+      curX += w + gapX;
     }
   }
+
 
   // Convert world x to screen x
   function wxToSx(wx){ return wx - camX + canvas.getBoundingClientRect().width*0.5 - (runner.x + runner.w*0.5); }
