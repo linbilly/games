@@ -57,8 +57,11 @@
     { title: 'Make 10, no labels', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 14, holes: 4 },
     // Level 4: Make 20, 5x4 holes 
     { title: 'Make 20 (No Labels)', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4 },
-      // Level 5: Mystery hole (Make 20) — shows text only, no graphic fill info
+    // Level 5: Mystery hole (Make 10) — shows text only, no graphic fill info
+    { title: 'Mystery Make 10', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 12, holes: 4, mystery: true },
+  // Level 6: Mystery hole (Make 20) — shows text only, no graphic fill info
     { title: 'Mystery Make 20', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4, mystery: true },
+
 
 
   ];
