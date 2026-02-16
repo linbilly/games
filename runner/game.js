@@ -49,6 +49,34 @@
 
   // ---- Levels ----
   const levels = [
+      // Level 7: 2x5
+    { 
+      title: '2x5 Mystery',
+      hole: { w: 2, h: 5, target: 10 },
+      spacingTiles: 12,
+      holes: 4,
+      mystery: true,
+      mult: { base: 2, maxFactor: 5 } // 2×(1..10) => 2..20
+    },
+
+    { 
+      title: '3x5 Mystery',
+      hole: { w: 3, h: 5, target: 15 },
+      spacingTiles: 12,
+      holes: 4,
+      mystery: true,
+      mult: { base: 3, maxFactor: 5 } // 2×(1..10) => 2..20
+    },
+
+    { 
+      title: '4x5 Mystery',
+      hole: { w: 4, h: 5, target: 20 },
+      spacingTiles: 12,
+      holes: 4,
+      mystery: true,
+      mult: { base: 4, maxFactor: 5 } // 2×(1..10) => 2..20
+    },
+    
     // Level 1: make 5, vertical 1x5 holes
     { title: 'Make 5', hole: { w: 1, h: 5, target: 5 }, spacingTiles: 12, holes: 4 },
     // Level 2: make 10, 2x5 holes (area 10)
@@ -59,8 +87,13 @@
     { title: 'Make 20 (No Labels)', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4 },
     // Level 5: Mystery hole (Make 10) — shows text only, no graphic fill info
     { title: 'Mystery Make 10', hole: { w: 2, h: 5, target: 10 }, spacingTiles: 12, holes: 4, mystery: true },
-  // Level 6: Mystery hole (Make 20) — shows text only, no graphic fill info
+    // Level 6: Mystery hole (Make 20) — shows text only, no graphic fill info
     { title: 'Mystery Make 20', hole: { w: 5, h: 4, target: 20 }, spacingTiles: 18, holes: 4, mystery: true },
+
+
+
+
+
 
 
 
@@ -122,25 +155,52 @@
   // ---- Level build ----
   function buildLevel(idx){
     const L = levels[idx];
+
     levelInfoEl.textContent = `Level ${idx+1}/${levels.length}`;
     statusEl.textContent = 'Drag the correct block into the hole.';
     document.getElementById('title').textContent = `${L.title} Runner`;
 
     holes = [];
     const startTile = 16;
-    for (let i=0;i<L.holes;i++){
-      const xTile = startTile + i*L.spacingTiles;
-      const isMystery = !!L.mystery;
 
-      // Normal levels: random filled 1..target-1 (as you had)
+    for (let i = 0; i < L.holes; i++){
+      const xTile = startTile + i * L.spacingTiles;
+
+      const isMystery = !!L.mystery;
+      const isMult = !!L.mult; // multiplication mode if present
+
+      // Default (normal add levels): pick a starting fill 1..target-1
       let filled = Math.floor(rr(1, L.hole.target - 1));
 
-      // Mystery: choose how many blocks are needed (1..target)
-      // and set filled so that missing == required
+      // For mystery levels, we store "required" (the answer block),
+      // and we set filled so that (target - filled) === required.
       let required = null;
+      let mult = null; // { base, factor, answer } or null
+
       if (isMystery) {
-        required = 1 + Math.floor(Math.random() * L.hole.target); // 1..20
-        filled = L.hole.target - required;                        // so missing == required
+        if (isMult) {
+          // Choose base (single or mixed)
+          const bases = (L.mult.bases && L.mult.bases.length)
+            ? L.mult.bases
+            : [L.mult.base];
+
+          const base = bases[Math.floor(Math.random() * bases.length)];
+
+          // Choose factor range (defaults to max that fits target)
+          const maxFactor = L.mult.maxFactor ?? Math.floor(L.hole.target / base);
+          const factor = 1 + Math.floor(Math.random() * maxFactor);
+
+          const answer = base * factor;
+
+          mult = { base, factor, answer };
+          required = answer;
+        } else {
+          // Mystery-add: choose required blocks 1..target
+          required = 1 + Math.floor(Math.random() * L.hole.target);
+        }
+
+        // Set filled so missing == required (internal only; not shown in mystery)
+        filled = L.hole.target - required;
       }
 
       holes.push({
@@ -153,16 +213,16 @@
         filled,
         solved: false,
 
-        // Mystery data
+        // Mystery + multiplication data
         mystery: isMystery,
-        required, // 1..target
+        required, // null for normal levels; number for mystery/mult
+        mult,     // null unless L.mult is set for this level/hole
 
         previewN: 0,
         previewUntil: -999,
         previewBlinkStart: -999,
         lastResult: ''
       });
-
     }
 
     activeHole = null;
@@ -170,11 +230,12 @@
     dragging = null;
     feedback = null;
 
-    runner.x = 4*TILE;
+    runner.x = 4 * TILE;
     runner.y = GROUND_Y - runner.h;
     runner.vx = runner.runSpeed;
     runner.state = 'run';
   }
+
 
   // Build options for a hole: include correct + two distractors
   function optionsForHole(h){
@@ -184,10 +245,22 @@
 
     // Add distractors close-by, clamped
     const candidates = [];
-    for (let d=-3; d<=3; d++){
-      const v = correct + d;
-      if (v>=1 && v<=h.target-1 && v!==correct) candidates.push(v);
+
+    if (h.mult) {
+      // Keep choices in the same "times table": multiples of base
+      const base = h.mult.base;
+      for (let k = -4; k <= 4; k++) {
+        const v = correct + base * k;
+        if (v >= base && v <= h.target && v !== correct) candidates.push(v);
+      }
+    } else {
+      // normal add-to-target levels
+      for (let d = -3; d <= 3; d++) {
+        const v = correct + d;
+        if (v >= 1 && v <= h.target - 1 && v !== correct) candidates.push(v);
+      }
     }
+
     while (opts.size < Math.min(3, h.target-1) && candidates.length){
       const pick = candidates.splice(Math.floor(Math.random()*candidates.length),1)[0];
       opts.add(pick);
@@ -294,11 +367,14 @@
     runner.x = hx - runner.w - 2;
     spawnDragBlocks(h);
     if (h.mystery) {
-      statusEl.textContent = `${h.required} blocks needed`;
+      if (h.mult) {
+        statusEl.textContent = `${h.mult.base} × ${h.mult.factor} = ?`;
+      } else {
+        statusEl.textContent = `${h.required} blocks needed`;
+      }
     } else {
       statusEl.textContent = `Fill it: ${h.filled} + ? = ${h.target}`;
     }
-
   }
 
   function resumeRunHappy(){
@@ -531,7 +607,7 @@
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
 
-      // Still allow preview feedback (wrong/correct cue) to show? If you want it, remove this return.
+
       return;
     }
 
