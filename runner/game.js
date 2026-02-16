@@ -179,7 +179,7 @@
 
     // Place them to the left side, spaced widely; bottoms aligned so same drag height looks tidy
     const bottomY = 150;
-    const leftX = 90;
+    const leftX = 300;
     const gapX = 140;
 
     for (let i=0;i<opts.length;i++){
@@ -259,7 +259,7 @@
 
   function nowS(){ return performance.now() / 1000; }
 
-  function setFeedback(kind, text, duration=0.9, blink=0.55, meta=null){
+  function setFeedback(kind, text, duration, blink, meta=null){
     feedback = {
       kind, text,
       until: nowS() + duration,
@@ -278,7 +278,7 @@
     // Always show a placement preview in the hole (including overflow/underfill cues)
     h.previewN = n;
     h.previewBlinkStart = nowS();
-    h.previewUntil = nowS() + 0.65;
+    h.previewUntil = nowS() + 2.0;
 
     if (n === missing){
       // correct
@@ -297,7 +297,7 @@
       // wrong
       const too = (n > missing) ? 'Too big' : 'Too small';
       h.lastResult = too.toUpperCase();
-      setFeedback('wrong', `${before} + ${n} ≠ ${h.target} (${too})`, 1.1, 0.65, {before,n,target:h.target});
+      setFeedback('wrong', `${before} + ${n} ≠ ${h.target} (${too})`, 2.0, 2.0, {before,n,target:h.target});
       sfx.wrong();
 
       // return the dragged block to home after a short delay
@@ -478,7 +478,7 @@
     }
 
     for (let i=0;i<baseFilled;i++){
-      drawTile(i, '#fbbf24', null);
+      drawTile(i, '#fbbf24', h.filled);
     }
 
     // preview wrong/cue
@@ -486,7 +486,7 @@
     const isPreview = (h.previewUntil > 0 && t < h.previewUntil);
     if (isPreview && h.previewN>0){
       const desired = baseFilled + h.previewN;
-      const blinkOn = (Math.floor((t - h.previewBlinkStart)*6) % 2) === 0;
+      const blinkOn = (Math.floor((t - h.previewBlinkStart)*2) % 2) === 0;
 
       for (let i=baseFilled; i<desired; i++){
         if (!blinkOn) continue;
@@ -525,10 +525,10 @@
       }
     }
 
-    // label: "filled/target"
-    ctx.fillStyle = 'rgba(248,250,252,0.95)';
-    ctx.font = '900 22px system-ui';
-    ctx.fillText(`${baseFilled}/${h.target}`, r.x - 8, r.y - 16);
+    // // label: "filled/target"
+    // ctx.fillStyle = 'rgba(248,250,252,0.95)';
+    // ctx.font = '900 22px system-ui';
+    // ctx.fillText(`${baseFilled}/${h.target}`, r.x - 8, r.y - 16);
   }
 
   function drawRunner(){
