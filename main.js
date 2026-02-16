@@ -16,7 +16,7 @@ const GAMES = [
   { title: "Fix the Bridge", url: "./bridge/" },
   { title: "Math Ninja", url: "./ninja/" },
   { title: "Vanish 5", url: "./vanish/" },
-  { title: "Game 4", url: "./games/game4/" },
+  { title: "Holes in the Ground", url: "./runner/" },
   { title: "Game 5", url: "./games/game5/" },
   { title: "Game 6", url: "./games/game6/" },
   { title: "Game 7", url: "./games/game7/" },
