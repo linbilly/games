@@ -1,40 +1,58 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mirror Maze</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mirror Maze</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
-<header>
-  <div class="title">🪞 Mirror Maze</div>
-  <div class="stats">
-    ❤️ <span id="hearts">3</span>
-    &nbsp;&nbsp;
-    ⭐ <span id="score">0</span>
-    &nbsp;&nbsp;
-    🧩 Lv <span id="level">1</span>
-    &nbsp;&nbsp;
-    🏁 CP <span id="checkpoint">1</span>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">🪞</div>
+    <div>
+      <div class="title">Mirror Maze</div>
+      <div class="subtitle">Move with ↑ ↓ or drag. Click your ship to fire. <a href="editor.html">Level Editor</a></div>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="pill">❤️ <span id="hearts">3</span></div>
+    <div class="pill">⭐ <span id="score">0</span></div>
+    <div class="pill">🧩 Lv <span id="level">1</span>/<span id="levelMax">1</span></div>
+    <div class="pill">🏁 CP <span id="checkpoint">1</span></div>
   </div>
 </header>
 
-<main>
-  <div class="game-container">
-    <canvas id="game" width="980" height="640"></canvas>
-  </div>
+<main class="layout">
+  <aside class="panel">
+    <div class="panelTitle">Campaign</div>
+    <div class="hint">
+      Hit the alien to advance. Miss: alien fires back and you drop to the latest checkpoint.
+    </div>
+    <div class="row">
+      <button id="btnRestart" class="btn">Restart</button>
+      <button id="btnPrev" class="btn secondary">Prev</button>
+      <button id="btnNext" class="btn secondary">Next</button>
+    </div>
+    <div class="small" id="levelName">—</div>
+
+    <div class="divider"></div>
+    <div class="panelTitle">Notes</div>
+    <div class="hint">
+      Levels are static, human-authored maps in <code>levels.js</code>.
+      Alien is auto-placed onto a reachable right-exit row unless <code>alienRow</code> is reachable.
+    </div>
+  </aside>
+
+  <section class="stage">
+    <div class="canvasWrap">
+      <canvas id="game" width="980" height="640"></canvas>
+    </div>
+  </section>
 </main>
 
-<footer>
-  <button id="restartBtn">Restart</button>
-  <div class="instructions">
-    Move with ↑ ↓ or drag your ship. Click your ship to fire.
-    Hit = next level. Miss = alien fires back and you may drop a level (not below checkpoint).
-  </div>
-</footer>
-
-<script src="game.js"></script>
+<script type="module" src="game.js"></script>
 </body>
 </html>
