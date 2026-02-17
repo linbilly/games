@@ -16,6 +16,16 @@
   const nowMs = ()=>performance.now();
   const pct = (n,d)=> d<=0 ? 0 : Math.round((n/d)*100);
 
+  const ASSET_ROOT = 'assets/';
+
+  const Images = {
+    ready:false, bubble:null, background:null,
+    numbers:{}, upper:{}, lower:{},
+    bubbleNumbers:{}, bubbleUpper:{}, bubbleLower:{},
+    shapes:{}, bubbleShapes:{},
+  };
+
+
   // ---------- Data ----------
   const COLORS = [
     {name:'red',    fill:'#ff3b30'},
@@ -37,7 +47,7 @@
 
   const UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const LOWER = 'abcdefghijklmnopqrstuvwxyz'.split('');
-  const NUMBERS = Array.from({length:11}, (_,i)=>String(i));
+  const NUMBERS = Array.from({length:10}, (_,i)=>String(i));
 
   // Kid-friendly phonics approximations (for TTS)
   const PHONICS = {
@@ -71,6 +81,57 @@
     { mode:'pattern',      label:'Pattern' },
     { mode:'counting',     label:'Counting' },
   ];
+
+
+  function loadImage(src){
+    return new Promise((resolve,reject)=>{
+      const img=new Image();
+      img.onload=()=>resolve(img);
+      img.onerror=()=>reject(new Error('Failed to load '+src));
+      img.src=src;
+    });
+  }
+
+  async function loadAssets(){
+    const tasks=[];
+    tasks.push(loadImage(ASSET_ROOT+'bubble.png').then(img=>Images.bubble=img));
+    tasks.push(loadImage(ASSET_ROOT+'background.png').then(img=>Images.background=img));
+
+    for(let i=0;i<=9;i++){
+      tasks.push(loadImage(`${ASSET_ROOT}numbers/${i}.png`).then(img=>Images.numbers[String(i)]=img));
+    }
+    for(const ch of UPPER){
+      tasks.push(loadImage(`${ASSET_ROOT}letters_upper/${ch}.png`).then(img=>Images.upper[ch]=img));
+    }
+    for(const ch of LOWER){
+      tasks.push(loadImage(`${ASSET_ROOT}letters_lower/${ch}.png`).then(img=>Images.lower[ch]=img));
+    }
+
+    for (let i=0;i<=9;i++){
+      tasks.push(loadImage(`assets/bubble_numbers/${i}.png`)
+        .then(img=>Images.bubbleNumbers[String(i)]=img));
+    }
+    for (const ch of UPPER){
+      tasks.push(loadImage(`assets/bubble_letters_upper/${ch}.png`)
+        .then(img=>Images.bubbleUpper[ch]=img));
+    }
+    for (const ch of LOWER){
+      tasks.push(loadImage(`assets/bubble_letters_lower/${ch}.png`)
+        .then(img=>Images.bubbleLower[ch]=img));
+    }
+    // Predrawn shapes (and bubble+shape sprites)
+    for (const s of SHAPES){
+      tasks.push(loadImage(`${ASSET_ROOT}shapes/${s.name}.png`)
+        .then(img => Images.shapes[s.name] = img));
+      tasks.push(loadImage(`${ASSET_ROOT}bubble_shapes/${s.name}.png`)
+        .then(img => Images.bubbleShapes[s.name] = img));
+    }
+
+
+    await Promise.all(tasks);
+    Images.ready = true;
+  }
+
 
   // ---------- Canvas ----------
   const canvas = document.getElementById('game');
@@ -393,7 +454,7 @@
     if(kind==='number'){
       pool = NUMBERS.filter(x=>x!==targetValue);
       const t = Number(targetValue);
-      const near=[t-1,t+1,t-2,t+2].filter(n=>n>=0&&n<=10).map(String).filter(v=>v!==targetValue);
+      const near=[t-1,t+1,t-2,t+2].filter(n=>n>=0&&n<10).map(String).filter(v=>v!==targetValue);
       const picked=[];
       shuffle(near);
       while(picked.length < Math.min(near.length, Math.ceil(count/2))) picked.push(near.shift());
@@ -613,7 +674,16 @@
 
   // ---------- Drawing ----------
   function drawBackground(w,h){
+
     ctx.clearRect(0,0,w,h);
+    if(Images.ready && Images.background){
+      const img = Images.background;
+      const scale = Math.max(w/img.width, h/img.height);
+      const dw = img.width*scale, dh = img.height*scale;
+      ctx.drawImage(img, (w-dw)/2, (h-dh)/2, dw, dh);
+      return;
+    }
+
     const g = ctx.createLinearGradient(0,0,0,h);
     g.addColorStop(0,'#aee9ff');
     g.addColorStop(1,'#f7fcff');
@@ -645,6 +715,81 @@
     ctx.fillStyle=g;
     ctx.fillRect(0,h-gh,w,gh);
   }
+
+  function drawBubble(b){
+    if(b.popped) return;
+
+    const t = performance.now()/1000;
+    const wob = Math.sin(t*2 + b.wobblePhase) * 6;
+
+    ctx.save();
+    ctx.translate(b.x + wob, b.y);
+
+    // In color mode, the bubble's color IS the content, so add a soft tint behind the sprite.
+    if(activeMode() === 'colors'){
+      ctx.beginPath();
+      ctx.arc(0, 0, b.r*0.92, 0, Math.PI*2);
+      ctx.fillStyle = b.color.fill + '88'; // translucent tint
+      ctx.fill();
+    }
+
+    const s = b.r * 2.15; // draw size for bubble sprites
+
+    // Prefer pre-composed bubble+content sprites so bubbles are never "empty".
+    // (These are in: assets/bubble_numbers/, assets/bubble_letters_upper/, assets/bubble_letters_lower/, assets/bubble_shapes/)
+    if(Images.ready){
+      const p = b.payload;
+
+      // Numbers
+      if(p && p.kind === 'number' && Images.bubbleNumbers && Images.bubbleNumbers[String(p.value)]){
+        const img = Images.bubbleNumbers[String(p.value)];
+        ctx.drawImage(img, -s/2, -s/2, s, s);
+        ctx.restore();
+        return;
+      }
+
+      // Letters
+      if(p && p.kind === 'letter' && (Images.bubbleUpper || Images.bubbleLower)){
+        const ch = String(p.value);
+        const isUpper = (ch >= 'A' && ch <= 'Z');
+        const img = isUpper ? (Images.bubbleUpper && Images.bubbleUpper[ch]) : (Images.bubbleLower && Images.bubbleLower[ch]);
+        if(img){
+          ctx.drawImage(img, -s/2, -s/2, s, s);
+          ctx.restore();
+          return;
+        }
+      }
+
+      // Shapes (predrawn)
+      if(p && p.kind === 'shape' && Images.bubbleShapes && Images.bubbleShapes[p.value]){
+        const img = Images.bubbleShapes[p.value];
+        ctx.drawImage(img, -s/2, -s/2, s, s);
+        ctx.restore();
+        return;
+      }
+    }
+
+    // Fallback: plain bubble sprite + payload drawn on top (if composites not available yet)
+    if(Images.ready && Images.bubble){
+      ctx.drawImage(Images.bubble, -s/2, -s/2, s, s);
+    }else{
+      // ultra-fallback: simple circle
+      ctx.beginPath();
+      ctx.arc(0,0,b.r,0,Math.PI*2);
+      ctx.fillStyle = 'rgba(180,230,255,.7)';
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(255,255,255,.65)';
+      ctx.stroke();
+    }
+
+    // If we got here, we didn't use a precomposed sprite, so draw the payload normally.
+    drawPayload(b.payload, 0, 0, b.r);
+
+    ctx.restore();
+  }
+
+
 
   function roundRect(x,y,w,h,r,fill){
     ctx.beginPath();
@@ -735,58 +880,39 @@
     ctx.restore();
   }
 
-  function drawBubble(b){
-    if(b.popped) return;
-    const t=performance.now()/1000;
-    const wob=Math.sin(t*2+b.wobblePhase)*6;
-    ctx.save();
-    ctx.translate(b.x+wob,b.y);
-    ctx.beginPath();
-    ctx.arc(0,0,b.r,0,Math.PI*2);
-
-    const grad=ctx.createRadialGradient(-b.r*0.3,-b.r*0.35,b.r*0.2,0,0,b.r);
-    grad.addColorStop(0,'#ffffffcc');
-    grad.addColorStop(0.3,b.color.fill+'cc');
-    grad.addColorStop(1,b.color.fill+'66');
-    ctx.fillStyle=grad; ctx.fill();
-
-    ctx.lineWidth=4;
-    ctx.strokeStyle='rgba(255,255,255,.65)';
-    ctx.stroke();
-
-    if(b.highlight){
-      ctx.lineWidth=6;
-      ctx.strokeStyle='rgba(255,215,0,.85)';
-      ctx.stroke();
-    }
-
-    ctx.beginPath();
-    ctx.arc(-b.r*0.35,-b.r*0.25,b.r*0.23,0,Math.PI*2);
-    ctx.fillStyle='rgba(255,255,255,.55)';
-    ctx.fill();
-
-    drawPayload(b.payload,0,0,b.r);
-    ctx.restore();
-  }
 
   function drawPayload(payload,x,y,r){
     if(!payload) return;
-    if(payload.kind==='letter' || payload.kind==='number'){
-      const txt=String(payload.value);
-      ctx.textAlign='center';
-      ctx.textBaseline='middle';
-      ctx.font=`900 ${Math.floor(r*1.15)}px system-ui,-apple-system,Segoe UI,Roboto,Arial`;
-      ctx.lineWidth=7;
-      ctx.strokeStyle='rgba(255,255,255,.75)';
-      ctx.fillStyle='rgba(23,50,74,.95)';
-      ctx.strokeText(txt,x,y+2);
-      ctx.fillText(txt,x,y+2);
+    if(payload.kind==='number'){
+      const img = Images.numbers[String(payload.value)];
+      if(Images.ready && img){
+        const s = r*1.55;
+        ctx.drawImage(img, x-s/2, y-s/2, s, s);
+      }
+      return;
+    }
+
+    if(payload.kind==='letter'){
+      const ch = String(payload.value);
+      const isUpper = (ch>='A' && ch<='Z');
+      const img = isUpper ? Images.upper[ch] : Images.lower[ch];
+      if(Images.ready && img){
+        const s = r*1.55;
+        ctx.drawImage(img, x-s/2, y-s/2, s, s);
+      }
       return;
     }
     if(payload.kind==='shape'){
+      const img = Images.shapes[payload.value];
+      if(Images.ready && img){
+        const s = r*1.25;
+        ctx.drawImage(img, x - s/2, y - s/2, s, s);
+        return;
+      }
       drawShape(payload.value,x,y,r*0.75);
       return;
     }
+
     // color payload: empty
   }
 
@@ -969,7 +1095,7 @@
       <div>Score: <b>${summary.score}</b></div>
       <div style="margin-top:10px; padding:10px; border-radius:14px; background:#ffffffc8;">
         ${delta>0 ? '✅ Great job! Level passed.' :
-          (summary.sessionMode==='campaign' ? '🧡 In Campaign, stay on this level until you reach 90% accuracy.' : '👍 Keep going!')}
+          (summary.sessionMode==='campaign' ? '🧡 In Campaign, stay on this skill until all items reach 3 correct.' : '👍 Keep going!')}
         <div style="margin-top:6px; opacity:.85;">Bubble speed: <b>${(summary.speedMul*100).toFixed(0)}%</b></div>
         ${summary.sessionMode==='campaign' && summary.mastery ? `<div style="margin-top:6px; opacity:.9;">Mastery: <b>${summary.mastery.done}/${summary.mastery.total}</b> items at ${REQUIRED_CORRECT}+</div>` : ''}
       </div>
@@ -1227,8 +1353,12 @@
   requestAnimationFrame(loop);
 
   // ---------- Start state ----------
-  setPrompt('Tap Start!', 'Choose a mode.');
-  openMenu(false);
+  setPrompt('Loading…', 'Please wait');
+  loadAssets().catch(console.warn).finally(()=>{
+    setPrompt('Tap Start!', 'Choose a mode.');
+    openMenu(false);
+  });
+
 
   // keyboard escape toggles menu
   window.addEventListener('keydown', (e)=>{
