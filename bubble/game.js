@@ -37,7 +37,7 @@
 
   const UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const LOWER = 'abcdefghijklmnopqrstuvwxyz'.split('');
-  const DIGITS = '0123456789'.split('');
+  const NUMBERS = Array.from({length:11}, (_,i)=>String(i));
 
   // Kid-friendly phonics approximations (for TTS)
   const PHONICS = {
@@ -135,20 +135,42 @@
   }
 
   let audioCtx = null;
-  function beep(type='ok'){
+  function chimeOk(){
+    try{
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const t0 = audioCtx.currentTime;
+      const notes = [880, 1175, 1568]; // A5, D6-ish, G6-ish
+      notes.forEach((f,i)=>{
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'sine';
+        o.frequency.value = f;
+        g.gain.value = 0.0001;
+        o.connect(g); g.connect(audioCtx.destination);
+        const start = t0 + i*0.06;
+        o.start(start);
+        g.gain.exponentialRampToValueAtTime(0.16, start+0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, start+0.16);
+        o.stop(start+0.18);
+      });
+    }catch(_){}
+  }
+
+  function chimeBad(){
     try{
       if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const t0 = audioCtx.currentTime;
       const o = audioCtx.createOscillator();
       const g = audioCtx.createGain();
-      o.type = 'sine';
-      o.frequency.value = (type==='ok') ? 880 : 220;
+      o.type = 'triangle';
+      o.frequency.value = 220;
       g.gain.value = 0.0001;
       o.connect(g); g.connect(audioCtx.destination);
       o.start(t0);
-      g.gain.exponentialRampToValueAtTime(0.15, t0+0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0+0.18);
-      o.stop(t0+0.2);
+      g.gain.exponentialRampToValueAtTime(0.14, t0+0.01);
+      o.frequency.exponentialRampToValueAtTime(160, t0+0.18);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0+0.22);
+      o.stop(t0+0.24);
     }catch(_){}
   }
 
@@ -180,11 +202,18 @@
     // pattern
     patternSeq:[],
     patternAnswer:null,
+    patternType:null,
 
     // adaptive stats
     itemStats:new Map(), // key => {seen, correct}
     modeStats:new Map(), // mode => {seen, correct} (skill mode)
     history:[], // per-level summaries
+
+    // dynamic difficulty
+    speedMul: 1.0,
+
+    // visual feedback toasts
+    toasts: [],
   };
 
   function activeMode(){
@@ -218,12 +247,54 @@
     hudAcc.textContent = `Acc: ${pct(state.correct, state.attempts)}%`;
   }
 
-  function weakWeight(kind, value){
+
+  const REQUIRED_CORRECT = 3;
+
+  function masteryItemsForMode(mode){
+    // returns array of {kind, value} that must each reach REQUIRED_CORRECT correct to pass in Campaign
+    if(mode==='numbers') return NUMBERS.map(v=>({kind:'number', value:v}));
+    if(mode==='lettersUpper') return UPPER.map(v=>({kind:'letter', value:v}));
+    if(mode==='lettersLower') return LOWER.map(v=>({kind:'letter', value:v}));
+    if(mode==='phonics') return LOWER.map(v=>({kind:'letter', value:v}));
+    if(mode==='shapes') return SHAPES.map(s=>({kind:'shape', value:s.name}));
+    if(mode==='colors') return COLORS.map(c=>({kind:'color', value:c.name}));
+    if(mode==='counting') return ['2','3','4','5'].map(v=>({kind:'count', value:v}));
+    if(mode==='pattern') return ['ABAB','AABB','ABBA'].map(v=>({kind:'pattern', value:v}));
+    return [];
+  }
+
+  function masteryProgress(mode){
+    const items = masteryItemsForMode(mode);
+    if(items.length===0) return {done:0,total:0};
+    let done=0;
+    for(const it of items){
+      const k = keyForItem(it.kind, it.value);
+      const s = state.itemStats.get(k);
+      const c = s ? s.correct : 0;
+      if(c >= REQUIRED_CORRECT) done++;
+    }
+    return {done,total:items.length};
+  }
+
+  function masteryWeight(kind, value){
+    // Higher weight for items with low correct count, or never seen.
     const k = keyForItem(kind, value);
     const s = state.itemStats.get(k);
-    if(!s) return 1.25; // new items slightly boosted
+    const seen = s ? s.seen : 0;
+    const correct = s ? s.correct : 0;
+    const need = Math.max(0, REQUIRED_CORRECT - correct);
+    // Base emphasis on unmet mastery, plus boost never-seen items.
+    return 0.6 + need*1.3 + (seen===0 ? 1.2 : 0) + (correct===0 ? 0.5 : 0);
+  }
+
+  function weakWeight(kind, value){
+    // Backwards-compatible weight; now primarily driven by masteryWeight.
+    const k = keyForItem(kind, value);
+    const s = state.itemStats.get(k);
+    if(!s) return masteryWeight(kind, value);
     const acc = s.correct / Math.max(1, s.seen);
-    return clamp(2.8 - 2.2*acc + (s.seen<4 ? 0.4 : 0), 0.6, 3.0);
+    // Combine mastery need + accuracy
+    return clamp(masteryWeight(kind, value) + (1.2 - acc), 0.6, 4.0);
   }
 
   function weightedChoice(items, weightFn){
@@ -239,7 +310,7 @@
     return clamp(3 + Math.floor((state.level-1)/1.5), 3, 8);
   }
   function floatSpeedForLevel(){
-    return 36 + (state.level-1)*8;
+    return (36 + (state.level-1)*8) * state.speedMul;
   }
   function bubbleRadius(){
     return clamp(54 - (bubblesForLevel()-3)*3, 36, 54);
@@ -249,6 +320,40 @@
   function makeBubble({x,y,r,vy,vx,wobblePhase,color,payload,isTarget=false,highlight=false}){
     return {x,y,r,vy,vx,wobblePhase,color,payload,isTarget,popped:false,highlight,born:nowMs()};
   }
+  function addToast(text, x, y, kind='good'){
+    // kind: good | bad
+    state.toasts.push({
+      text,
+      x, y,
+      vy: (kind==='good') ? -42 : -32,
+      life: 900,
+      born: nowMs(),
+      kind
+    });
+  }
+
+  function drawToasts(){
+    const t = nowMs();
+    for(const s of state.toasts){
+      const age = t - s.born;
+      const a = clamp(1 - age / s.life, 0, 1);
+      const yy = s.y + (s.vy * (age/1000));
+      ctx.save();
+      ctx.globalAlpha = a;
+      ctx.font = '1000 28px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = 'rgba(255,255,255,.85)';
+      ctx.fillStyle = (s.kind==='good') ? 'rgba(0,0,0,.85)' : 'rgba(0,0,0,.75)';
+      ctx.strokeText(s.text, s.x, yy);
+      ctx.fillText(s.text, s.x, yy);
+      ctx.restore();
+    }
+    // cleanup
+    state.toasts = state.toasts.filter(s => (t - s.born) < s.life);
+  }
+
   function makeDrop({x,y,payload,color}){
     return {x,y,vy:0,payload,color,rot:rand(-0.3,0.3),vr:rand(-1.8,1.8),born:nowMs()};
   }
@@ -286,9 +391,9 @@
       return picked;
     }
     if(kind==='number'){
-      pool = DIGITS.filter(x=>x!==targetValue);
+      pool = NUMBERS.filter(x=>x!==targetValue);
       const t = Number(targetValue);
-      const near=[t-1,t+1,t-2,t+2].filter(n=>n>=0&&n<=9).map(String).filter(v=>v!==targetValue);
+      const near=[t-1,t+1,t-2,t+2].filter(n=>n>=0&&n<=10).map(String).filter(v=>v!==targetValue);
       const picked=[];
       shuffle(near);
       while(picked.length < Math.min(near.length, Math.ceil(count/2))) picked.push(near.shift());
@@ -319,7 +424,11 @@
     const speed = floatSpeedForLevel();
     const w = canvas.getBoundingClientRect().width;
     const h = canvas.getBoundingClientRect().height;
-    const y0 = h + r + 10;
+    // spawn bubbles already on screen
+    const topSpawn = r + 300;         // distance from top
+    const bottomSpawn = h - r - 140; // keep above ground
+    const y0 = rand(topSpawn, bottomSpawn);
+
 
     // reset counting UI
     state.countingActive = false;
@@ -333,7 +442,7 @@
 
     // Counting mode: keep bubbles consistent (numbers only), task is "pop N bubbles exactly"
     if(am==='counting'){
-      const targetCount = clamp(2 + ((state.level-1)%4), 2, 5);
+      const targetCount = Number(weightedChoice(['2','3','4','5'], v=>masteryWeight('count', v)));
       state.countingTarget = targetCount;
       state.countingSoFar = 0;
       state.countingActive = true;
@@ -348,9 +457,9 @@
 
       for(let i=0;i<nB;i++){
         const c=choice(COLORS);
-        const payload={kind:'number', value: choice(DIGITS)};
+        const payload={kind:'number', value: choice(NUMBERS)};
         state.bubbles.push(makeBubble({
-          x:xs[i], y:y0+rand(0,120), r,
+          x:xs[i], y:y0, r,
           vy:-speed*rand(0.85,1.15), vx:rand(-12,12),
           wobblePhase:rand(0,Math.PI*2),
           color:c, payload, isTarget:false
@@ -372,13 +481,14 @@
       }
 
       const patterns = [
-        {seq:[A,B,A,B], next:A},
-        {seq:[A,A,B,B], next:A},
-        {seq:[A,B,B,A], next:B},
+        {id:'ABAB', seq:[A,B,A,B], next:A},
+        {id:'AABB', seq:[A,A,B,B], next:A},
+        {id:'ABBA', seq:[A,B,B,A], next:B},
       ];
       const pat = choice(patterns);
       state.patternSeq = pat.seq.slice();
       state.patternAnswer = pat.next;
+      state.patternType = pat.id;
 
       const options=[state.patternAnswer];
       const pool = (kind==='color')
@@ -396,7 +506,7 @@
         const payload={kind, value:v};
         const c = (kind==='color') ? (COLORS.find(x=>x.name===v) || choice(COLORS)) : choice(COLORS);
         state.bubbles.push(makeBubble({
-          x:xs[i], y:y0+rand(0,110), r,
+          x:xs[i], y:y0, r,
           vy:-speed*rand(0.85,1.15), vx:rand(-12,12),
           wobblePhase:rand(0,Math.PI*2),
           color:c, payload,
@@ -407,7 +517,7 @@
       for(let i=options.length;i<nB;i++){
         const payload={kind:'shape', value: choice(SHAPES).name};
         state.bubbles.push(makeBubble({
-          x:xs[i], y:y0+rand(40,140), r,
+          x:xs[i], y:y0, r,
           vy:-speed*rand(0.85,1.15), vx:rand(-12,12),
           wobblePhase:rand(0,Math.PI*2),
           color:choice(COLORS), payload, isTarget:false
@@ -423,14 +533,14 @@
 
     const pickLetter = (lower)=> {
       const letters = lower ? LOWER : UPPER;
-      return weightedChoice(letters, (v)=>weakWeight('letter', v));
+      return weightedChoice(letters, (v)=>masteryWeight('letter', v));
     };
-    const pickDigit = ()=> weightedChoice(DIGITS, (v)=>weakWeight('number', v));
-    const pickShape = ()=> weightedChoice(SHAPES.map(s=>s.name), (v)=>weakWeight('shape', v));
-    const pickColor = ()=> weightedChoice(COLORS.map(c=>c.name), (v)=>weakWeight('color', v));
+    const pickNumber = ()=> weightedChoice(NUMBERS, (v)=>masteryWeight('number', v));
+    const pickShape = ()=> weightedChoice(SHAPES.map(s=>s.name), (v)=>masteryWeight('shape', v));
+    const pickColor = ()=> weightedChoice(COLORS.map(c=>c.name), (v)=>masteryWeight('color', v));
 
     if(am==='numbers'){
-      kind='number'; targetValue=pickDigit();
+      kind='number'; targetValue=pickNumber();
       setPrompt(`Where is the number ${targetValue}?`);
       speak(`Where is the number ${targetValue}?`);
     } else if(am==='lettersUpper'){
@@ -463,7 +573,7 @@
         setPrompt(`Where is the letter ${targetValue}?`);
         speak(`Where is the letter ${targetValue}?`);
       } else if(kind==='number'){
-        targetValue = pickDigit();
+        targetValue = pickNumber();
         setPrompt(`Where is the number ${targetValue}?`);
         speak(`Where is the number ${targetValue}?`);
       } else if(kind==='shape'){
@@ -492,7 +602,7 @@
         c = choice(COLORS);
       }
       state.bubbles.push(makeBubble({
-        x:xs[i], y:y0+rand(0,120), r,
+        x:xs[i], y:y0, r,
         vy:-speed*rand(0.85,1.15), vx:rand(-12,12),
         wobblePhase:rand(0,Math.PI*2),
         color:c, payload,
@@ -728,8 +838,9 @@
 
     if(am==='counting'){
       b.popped=true;
-      beep('ok');
+      chimeOk();
       state.score++; hudScore.textContent=`Score: ${state.score}`;
+      addToast('+1 point!', b.x, b.y-10, 'good');
       state.countingSoFar++;
       countSoFar.textContent=String(state.countingSoFar);
 
@@ -748,13 +859,17 @@
     b.popped=true;
 
     if(ok){
-      beep('ok');
+      chimeOk();
       state.score++; hudScore.textContent=`Score: ${state.score}`;
-      recordAttempt(payload.kind, payload.value, true);
+      addToast('+1 point!', b.x, b.y-10, 'good');
+      if(activeMode()==='pattern') recordAttempt('pattern', String(state.patternType||'pattern'), true);
+      else recordAttempt(payload.kind, payload.value, true);
       nextQuestionOrEndLevel();
     } else {
-      beep('bad');
-      recordAttempt(payload.kind, payload.value, false);
+      chimeBad();
+      if(activeMode()==='pattern') recordAttempt('pattern', String(state.patternType||'pattern'), false);
+      else recordAttempt(payload.kind, payload.value, false);
+      addToast('Oops!', b.x, b.y-10, 'bad');
       state.drops.push(makeDrop({x:b.x,y:b.y,payload,color:b.color}));
       if(optAssist.checked){
         for(const bb of state.bubbles){
@@ -853,9 +968,10 @@
       <div>Accuracy: <b>${pct(summary.correct, summary.attempts)}%</b> (${summary.correct}/${summary.attempts})</div>
       <div>Score: <b>${summary.score}</b></div>
       <div style="margin-top:10px; padding:10px; border-radius:14px; background:#ffffffc8;">
-        ${delta>0 ? '✅ Great job! Next level will be a bit harder.' :
-          delta<0 ? '🧡 We will make it a bit easier and practice more.' :
-          '👍 Keep going!'}
+        ${delta>0 ? '✅ Great job! Level passed.' :
+          (summary.sessionMode==='campaign' ? '🧡 In Campaign, stay on this level until you reach 90% accuracy.' : '👍 Keep going!')}
+        <div style="margin-top:6px; opacity:.85;">Bubble speed: <b>${(summary.speedMul*100).toFixed(0)}%</b></div>
+        ${summary.sessionMode==='campaign' && summary.mastery ? `<div style="margin-top:6px; opacity:.9;">Mastery: <b>${summary.mastery.done}/${summary.mastery.total}</b> items at ${REQUIRED_CORRECT}+</div>` : ''}
       </div>
       <div style="margin-top:10px;">
         <div style="font-weight:1000;">Practice focus (weak spots)</div>
@@ -881,16 +997,30 @@
       accuracy: levelAcc,
       score: state.score,
       when: new Date().toISOString(),
+      speedMul: state.speedMul,
+      mastery: masteryProgress(am),
     };
     state.history.push(summary);
 
-    // adaptive difficulty: up/down by level number
-    let delta=0;
-    if(levelAcc>=0.90) delta=+1;
-    else if(levelAcc<=0.60) delta=-1;
+    // Campaign progression:
+    // Stay on the same level until ALL mastery items for this skill have been answered correctly REQUIRED_CORRECT times.
+    // (Standalone modes still use accuracy-based level up/down.)
+    let delta = 0;
+    if(state.mode === 'campaign'){
+      const prog = masteryProgress(am);
+      delta = (prog.total>0 && prog.done === prog.total) ? 1 : 0;
+    } else {
+      if(levelAcc >= 0.90) delta = 1;
+      else if(levelAcc <= 0.60) delta = -1;
+    }
 
-    const prev=state.level;
+    const prev = state.level;
     state.level = clamp(state.level + delta, 1, 50);
+
+    // Bubble speed scaling per attempt (kept as requested):
+    // +10% if accuracy > 70%, -10% if <70% (clamped)
+    if(levelAcc > 0.70) state.speedMul = clamp(state.speedMul * 1.10, 0.60, 2.20);
+    else if(levelAcc < 0.70) state.speedMul = clamp(state.speedMul * 0.90, 0.60, 2.20);
 
     if(state.level>prev) showBanner('LEVEL UP!');
     else if(state.level<prev) showBanner('LEVEL DOWN');
@@ -901,6 +1031,10 @@
     // pause and show modal
     state.paused=true;
     showLevelReport(summary, delta);
+    if(state.mode==='campaign' && delta===0){
+      const p = masteryProgress(am);
+      addToast(`Keep going: ${p.done}/${p.total} mastered`, canvas.getBoundingClientRect().width/2, 120, 'bad');
+    }
 
     resetLevelStats();
   }
@@ -1019,7 +1153,7 @@
     // assist highlight after 3s (non-counting)
     if(optAssist.checked && !state.assistShown && activeMode()!=='counting'){
       const elapsed = nowMs() - state.questionStartMs;
-      if(elapsed > 3000){
+      if(elapsed > 10000){
         state.assistShown = true;
         for(const b of state.bubbles){
           if(b.isTarget && !b.popped) b.highlight=true;
@@ -1042,7 +1176,9 @@
         b.popped=true;
         // if target floats away, count as incorrect and advance question
         if(b.isTarget){
-          recordAttempt(b.payload.kind, b.payload.value, false);
+          if(activeMode()==='pattern') recordAttempt('pattern', String(state.patternType||'pattern'), false);
+          else recordAttempt(b.payload.kind, b.payload.value, false);
+          addToast('Too slow!', w/2, 150, 'bad');
           nextQuestionOrEndLevel();
         }
       }
@@ -1076,6 +1212,7 @@
 
     for(const d of state.drops) drawDrop(d,h);
     for(const b of state.bubbles) drawBubble(b);
+    drawToasts();
   }
 
   let last=nowMs();
