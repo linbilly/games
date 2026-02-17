@@ -21,6 +21,8 @@
     <div id="gameArea">
       <canvas id="game" width="960" height="540"></canvas>
 
+
+
       <div id="modal" class="modal">
         <div class="menuCard">
           <div class="menuTop">
@@ -52,6 +54,27 @@
           </div>
         </div>
       </div>
+
+
+      <div id="levelUpModal" class="modal hidden">
+        <div class="menuCard">
+          <div class="menuTop">
+            <div class="menuTitle">LEVEL UP!</div>
+            <div id="levelUpText" class="menuSubtitle"></div>
+          </div>
+
+          <div class="menuActions">
+            <button id="btnLevelContinue" type="button" class="menuPrimary">CONTINUE</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="endReport" class="menuGrid" style="display:none;">
+        <div class="menuLabel">End Game Report</div>
+        <div id="endReportBody" style="color: rgba(226,232,240,0.92); font-weight: 700;"></div>
+      </div>
+
+
     </div>
 
     <div id="footer">

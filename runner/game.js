@@ -29,6 +29,66 @@
   const btnResume = document.getElementById('btnResume');
   const btnQuit = document.getElementById('btnQuit');
 
+  const levelUpModal = document.getElementById('levelUpModal');
+  const levelUpText = document.getElementById('levelUpText');
+  const btnLevelContinue = document.getElementById('btnLevelContinue');
+
+  const endReport = document.getElementById('endReport');
+  const endReportBody = document.getElementById('endReportBody');
+
+
+
+  // ---- Stats ----
+  const stats = {
+    byLevel: new Map(), // key -> { title, attempts, correct }
+    order: []           // keep first-seen level order
+  };
+
+  let pendingNextLevelIndex = null;
+
+  function openLevelUp(nextIdx){
+    pendingNextLevelIndex = nextIdx;
+
+    const s = ensureLevelStat(levelIndex);
+    const p = pct(s.correct, s.attempts);
+    levelUpText.textContent = `${s.title} accuracy: ${p}% (${s.correct}/${s.attempts})`;
+
+    levelUpModal.classList.remove('hidden');
+  }
+
+  function closeLevelUpAndAdvance(){
+    levelUpModal.classList.add('hidden');
+
+    if (pendingNextLevelIndex != null) {
+      levelIndex = pendingNextLevelIndex;
+      buildLevel(levelIndex);
+      inGame = true;
+      pendingNextLevelIndex = null;
+    }
+  }
+
+  btnLevelContinue.addEventListener('click', closeLevelUpAndAdvance);
+
+
+  function levelKey(idx){ return `L${idx}:${levels[idx]?.title ?? 'Level'}`; }
+
+  function ensureLevelStat(idx){
+    const key = levelKey(idx);
+    if (!stats.byLevel.has(key)) {
+      stats.byLevel.set(key, { title: levels[idx]?.title ?? `Level ${idx+1}`, attempts: 0, correct: 0 });
+      stats.order.push(key);
+    }
+    return stats.byLevel.get(key);
+  }
+
+  function recordAttempt(isCorrect){
+    const s = ensureLevelStat(levelIndex);
+    s.attempts++;
+    if (isCorrect) s.correct++;
+  }
+
+  function pct(n,d){ return d ? Math.round((n/d)*100) : 0; }
+
 
 
 
@@ -72,6 +132,13 @@
 
   btnQuit.addEventListener('click', () => {
     inGame = false;
+
+    // Show report on the menu
+    renderEndReport();
+
+    stats.byLevel.clear();
+    stats.order.length = 0;
+
     levelIndex = 0;
     buildLevel(levelIndex);
     openMenu(); // stays on menu after resetting
@@ -504,6 +571,9 @@
 
     if (n === needed) {
       // correct
+
+      recordAttempt(true);
+
       h.filled = h.target;
       h.solved = true;
       h.previewN = 0;
@@ -521,6 +591,8 @@
       return true;
     } else {
       // wrong
+
+      recordAttempt(false);
       const too = (n > needed) ? 'Too big' : 'Too small';
       h.lastResult = too.toUpperCase();
       if (h.mystery) {
@@ -1012,12 +1084,25 @@
 
   // Level advance
   function maybeAdvanceLevel(){
-    if (holes.every(h=>h.solved)){
-      levelIndex = (levelIndex + 1) % levels.length;
-      buildLevel(levelIndex);
-      modal.classList.add('hidden');
-    }
+    if (!holes.every(h => h.solved)) return;
+
+    const nextIdx = (levelIndex + 1) % levels.length;
+    openLevelUp(nextIdx); // show accuracy, then continue builds next
   }
+
+  function renderEndReport(){
+    const rows = stats.order.map(key => {
+      const s = stats.byLevel.get(key);
+      const p = pct(s.correct, s.attempts);
+      return `• ${s.title}: ${p}% (${s.correct}/${s.attempts})`;
+    });
+
+    endReportBody.textContent = rows.length ? rows.join('\n') : 'No attempts recorded.';
+    endReportBody.style.whiteSpace = 'pre-line';
+    endReport.style.display = '';
+  }
+
+
 
   // Hook: when a hole becomes solved, check for level completion
   const _resumeRunHappy = resumeRunHappy;
