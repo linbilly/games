@@ -725,15 +725,30 @@
     ctx.save();
     ctx.translate(b.x + wob, b.y);
 
-    // In color mode, the bubble's color IS the content, so add a soft tint behind the sprite.
-    if(activeMode() === 'colors'){
-      ctx.beginPath();
-      ctx.arc(0, 0, b.r*0.92, 0, Math.PI*2);
-      ctx.fillStyle = b.color.fill + '88'; // translucent tint
-      ctx.fill();
-    }
+
+
 
     const s = b.r * 2.15; // draw size for bubble sprites
+
+    // In color mode, tint the bubble sprite so the color is visible
+    if(activeMode() === 'colors'){
+      // draw the bubble first
+      if(Images.ready && Images.bubble){
+        ctx.drawImage(Images.bubble, -s/2, -s/2, s, s);
+
+        // tint only where the bubble pixels exist
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = b.color.fill + 'CC'; // stronger tint
+        ctx.beginPath();
+        ctx.arc(0, 0, b.r*0.95, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.restore();
+        return; // done (no payload)
+      }
+    }
 
     // Prefer pre-composed bubble+content sprites so bubbles are never "empty".
     // (These are in: assets/bubble_numbers/, assets/bubble_letters_upper/, assets/bubble_letters_lower/, assets/bubble_shapes/)
