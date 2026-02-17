@@ -1,10 +1,34 @@
 import { CAMPAIGN_LEVELS, clamp, normalizeLevelObject } from "./levels.js";
+import { EduAudioEngine } from "../lib/EduAudioEngine.js";
+
+export const audio = new EduAudioEngine({
+  baseUrl: "../lib/",     // where /audio/ lives relative to the game page
+  volume: 0.8,
+  sfxVolume: 1.0
+});
+
 
 (() => {
   "use strict";
 
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
+
+  // --- Sprites (SVG) ---
+  function loadSprite(url){
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+  const sprites = { player:null, alien:null };
+  (async () => {
+    sprites.player = await loadSprite("./assets/player-ship.png");
+    sprites.alien  = await loadSprite("./assets/alien.png");
+  })();
+
 
   const elHearts = document.getElementById("hearts");
   const elScore = document.getElementById("score");
@@ -24,8 +48,55 @@ import { CAMPAIGN_LEVELS, clamp, normalizeLevelObject } from "./levels.js";
     { dx: 0, dy: -1 }
   ];
 
+  // Unlock + preload on first user gesture:
+window.addEventListener("pointerdown", async () => {
+  await audio.init();
+  await audio.preloadAll();
+}, { once: true });
+
+
   function choice(arr){ return arr[(Math.random()*arr.length)|0]; }
-  function now(){ return performance.now(); }
+  
+  function realNow(){ return performance.now(); }
+
+  // Game-time clock that freezes during hit-stop
+  function now(){
+    const t = state.time;
+    const r = realNow();
+
+    // still in hit-stop: freeze game time
+    if(r < t.hitStopEnd){
+      return t.frozenGameTime;
+    }
+
+    // if hit-stop just ended and not applied, remove that duration from game time
+    if(!t.applied){
+      t.offset += (t.hitStopEnd - t.hitStopStartReal);
+      t.applied = true;
+      t.hitStopEnd = 0;
+    }
+
+    return r - t.offset;
+  }
+
+  function requestHitStop(ms){
+    const t = state.time;
+    const r = realNow();
+    const end = r + ms;
+
+    if(r < t.hitStopEnd){
+      // extend existing hit-stop
+      if(end > t.hitStopEnd) t.hitStopEnd = end;
+      return;
+    }
+
+    // start new hit-stop
+    t.hitStopStartReal = r;
+    t.hitStopEnd = end;
+    t.frozenGameTime = r - t.offset;
+    t.applied = false;
+  }
+
 
   const state = {
     campaignIndex: 0,
@@ -44,12 +115,189 @@ import { CAMPAIGN_LEVELS, clamp, normalizeLevelObject } from "./levels.js";
     dragOffsetY: 0,
 
     laser: null,
-    banner: null
+    banner: null,
+    explosions: [],
+    // arcade feel
+    time: { offset: 0, hitStopEnd: 0, hitStopStartReal: 0, frozenGameTime: 0, applied: true },
+    shake: { t0: 0, dur: 0, mag: 0 },
+    debris: [],
+
+
   };
 
   function setBanner(text){
     state.banner = { text, t0: now(), dur: 900 };
   }
+
+  // --- Explosion particles ---
+  function spawnExplosion(x, y, colorA, colorB){
+    const t0 = now();
+    const parts = [];
+    const n = 18;
+
+    for(let i=0;i<n;i++){
+      const ang = (Math.PI*2) * (i/n) + (Math.random()*0.35);
+      const spd = 140 + Math.random()*220;
+
+      parts.push({
+        vx: Math.cos(ang)*spd,
+        vy: Math.sin(ang)*spd,
+        r: 2 + Math.random()*4,
+        c: (Math.random()<0.55 ? colorA : colorB),
+        drag: 2.6 + Math.random()*1.6
+      });
+    }
+
+    state.explosions.push({
+      x, y,
+      t0,
+      dur: 520,
+      parts
+    });
+  }
+
+  function drawExplosions(){
+    if(!state.explosions.length) return;
+
+    const t = now();
+
+    for(let i=state.explosions.length-1; i>=0; i--){
+      const ex = state.explosions[i];
+      const u = (t - ex.t0) / ex.dur;
+
+      if(u >= 1){
+        state.explosions.splice(i,1);
+        continue;
+      }
+
+      const ease = x => 1 - Math.pow(1-x,3);
+      const k = ease(Math.max(0, Math.min(1, u)));
+      const alpha = 1 - k;
+
+      // flash ring
+      ctx.save();
+      ctx.globalAlpha = 0.35 * alpha;
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(ex.x, ex.y, 8 + 28*k, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+
+      // particles
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, 0.95*alpha);
+
+      for(const p of ex.parts){
+        const dd = Math.exp(-p.drag * k);
+        const px = ex.x + (p.vx * k * 0.18) * dd;
+        const py = ex.y + (p.vy * k * 0.18) * dd;
+        const rr = Math.max(0.5, p.r * (1 - 0.65*k));
+
+        ctx.fillStyle = p.c;
+        ctx.beginPath();
+        ctx.arc(px, py, rr, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  // --- Screen shake ---
+  function addShake(mag, dur){
+    state.shake.t0 = now();
+    state.shake.mag = Math.max(state.shake.mag, mag);
+    state.shake.dur = Math.max(state.shake.dur, dur);
+  }
+
+  function getShakeOffset(){
+    const s = state.shake;
+    if(!s.dur) return {x:0,y:0};
+
+    const u = (now() - s.t0) / s.dur;
+    if(u >= 1){ s.dur = 0; s.mag = 0; return {x:0,y:0}; }
+
+    const falloff = 1 - u;
+    const m = s.mag * falloff;
+    return {
+      x: (Math.random()*2 - 1) * m,
+      y: (Math.random()*2 - 1) * m
+    };
+  }
+
+  // --- Debris ---
+  function spawnDebris(x, y, colorA, colorB){
+    const t0 = now();
+    const pieces = [];
+    const n = 12;
+
+    for(let i=0;i<n;i++){
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 120 + Math.random()*260;
+
+      pieces.push({
+        x, y,
+        vx: Math.cos(ang)*spd,
+        vy: Math.sin(ang)*spd,
+        w: 3 + Math.random()*6,
+        h: 2 + Math.random()*5,
+        rot: Math.random()*Math.PI*2,
+        vr: (Math.random()*2 - 1) * 8,
+        c: (Math.random()<0.5 ? colorA : colorB),
+        drag: 2.3 + Math.random()*2.2
+      });
+    }
+
+    state.debris.push({ t0, dur: 650, pieces });
+  }
+
+  function drawDebris(){
+    if(!state.debris.length) return;
+
+    const t = now();
+    for(let i=state.debris.length-1;i>=0;i--){
+      const D = state.debris[i];
+      const u = (t - D.t0) / D.dur;
+      if(u >= 1){ state.debris.splice(i,1); continue; }
+
+      const k = 1 - Math.pow(1-u, 3); // ease out
+      const alpha = 1 - k;
+
+      ctx.save();
+      ctx.globalAlpha = 0.9 * alpha;
+
+      for(const p of D.pieces){
+        const dd = Math.exp(-p.drag * k);
+        const px = p.x + (p.vx * k * 0.18) * dd;
+        const py = p.y + (p.vy * k * 0.18) * dd + (18*k*k); // slight gravity feel
+        const rot = p.rot + p.vr * k;
+
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(rot);
+        ctx.fillStyle = p.c;
+        ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  window.MirrorMazeSFX = {
+    enabled: true,
+    play: (name) => audio.play(name)
+  };
+
+
+  function playSfx(name){
+    const s = window.MirrorMazeSFX;
+    if(!s || !s.enabled || typeof s.play !== "function") return;
+    s.play(name);
+  }
+
+
 
   function geom(){
     const w = canvas.width, h = canvas.height;
@@ -223,6 +471,8 @@ import { CAMPAIGN_LEVELS, clamp, normalizeLevelObject } from "./levels.js";
   }
 
   function nextLevel(){
+    playSfx("level_up");
+
     if(state.campaignIndex >= CAMPAIGN_LEVELS.length-1){
       setBanner("CAMPAIGN CLEAR!");
       return;
@@ -247,6 +497,8 @@ import { CAMPAIGN_LEVELS, clamp, normalizeLevelObject } from "./levels.js";
   }
 
   function firePlayer(){
+    playSfx("shoot_player");
+
     if(state.turn !== "player") return;
 
     state.turn = "anim";
@@ -255,12 +507,25 @@ import { CAMPAIGN_LEVELS, clamp, normalizeLevelObject } from "./levels.js";
 
       const hit = (exit.side === "right" && exit.row === state.alienRow);
       if(hit){
+        const g = geom();
+        spawnExplosion(g.shipXRight, rowCenterY(state.alienRow),
+          "rgba(255,85,119,0.95)", "rgba(255,204,77,0.95)"
+        );
+        spawnDebris(g.shipXRight, rowCenterY(state.alienRow),
+          "rgba(255,85,119,0.95)", "rgba(255,255,255,0.85)"
+        );
+        addShake(10, 180);
+        requestHitStop(90);
+        playSfx("hit_alien");
+
         state.score += 1;
         syncHUD();
         nextLevel();
         state.turn = "player";
         return;
       }
+
+
 
       if(exit.side === "right") state.alienRow = clamp(exit.row, 0, state.size-1);
 
@@ -270,6 +535,8 @@ import { CAMPAIGN_LEVELS, clamp, normalizeLevelObject } from "./levels.js";
   }
 
   function fireAlien(){
+    playSfx("shoot_alien");
+
     if(state.turn !== "alien") return;
 
     state.turn = "anim";
@@ -278,9 +545,22 @@ import { CAMPAIGN_LEVELS, clamp, normalizeLevelObject } from "./levels.js";
 
       const hit = (exit.side === "left" && exit.row === state.playerRow);
       if(hit){
+        const g = geom();
+        spawnExplosion(g.shipXLeft, rowCenterY(state.playerRow),
+          "rgba(0,255,208,0.95)", "rgba(124,77,255,0.95)"
+        );
+        spawnDebris(g.shipXLeft, rowCenterY(state.playerRow),
+          "rgba(0,255,208,0.95)", "rgba(255,255,255,0.85)"
+        );
+        addShake(14, 220);
+        requestHitStop(110);
+        playSfx("hit_player");
+
         state.hearts = Math.max(0, state.hearts - 1);
         syncHUD();
       }
+
+
       dropToCheckpoint();
       state.turn = "player";
     });
@@ -422,25 +702,41 @@ import { CAMPAIGN_LEVELS, clamp, normalizeLevelObject } from "./levels.js";
     ctx.restore();
   }
 
-  function drawShip(x, row, label, accent){
+  function drawShip(x, row, label, accent, img){
     const g = geom();
     const y = rowCenterY(row);
-    const w = g.cell*0.74;
-    const h = g.cell*0.38;
+    const w = g.cell*0.88;
+    const h = g.cell*0.88;
 
+    // If sprite loaded, draw it
+    if(img){
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(img, -w/2, -h/2, w, h);
+      // small label
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = `900 ${Math.max(12, Math.floor(g.cell*0.18))}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.fillText(label, 0, -h/2 - 10);
+      ctx.restore();
+      return;
+    }
+
+    // Fallback vector ship
     ctx.save();
     ctx.translate(x, y);
 
     ctx.fillStyle = "rgba(255,255,255,0.14)";
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.lineWidth = 2;
-    roundRect(ctx, -w/2, -h/2, w, h, 12);
+    roundRect(ctx, -w/2, -h/2, w, h*0.55, 12);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = accent;
     ctx.beginPath();
-    ctx.ellipse(0, 0, w*0.18, h*0.35, 0, 0, Math.PI*2);
+    ctx.ellipse(0, 0, w*0.18, h*0.22, 0, 0, Math.PI*2);
     ctx.fill();
 
     ctx.fillStyle = "rgba(255,255,255,0.80)";
@@ -543,15 +839,24 @@ import { CAMPAIGN_LEVELS, clamp, normalizeLevelObject } from "./levels.js";
 
   function render(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
+    const sh = getShakeOffset();
+    ctx.save();
+    ctx.translate(sh.x, sh.y);
+
     drawStars();
     drawGrid();
 
     const g = geom();
-    drawShip(g.shipXLeft, state.playerRow, "YOU", "rgba(0,255,208,0.35)");
-    drawShip(g.shipXRight, state.alienRow, "ALIEN", "rgba(255,85,119,0.35)");
+    drawShip(g.shipXLeft, state.playerRow, "YOU", "rgba(0,255,208,0.35)", sprites.player);
+    drawShip(g.shipXRight, state.alienRow, "ALIEN", "rgba(255,85,119,0.35)", sprites.alien);
 
     drawLaser();
+    drawDebris();
+    drawExplosions();
     drawBanner();
+
+
+    ctx.restore();
 
     requestAnimationFrame(render);
   }
