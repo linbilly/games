@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <title>Bubble Pop! Pre-K</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div id="app">
+    <canvas id="game" aria-label="Bubble Pop game"></canvas>
+
+    <div id="hud" class="hud">
+      <button id="btnMenu" class="hudBtn" title="Menu">☰</button>
+      <div class="hudRow">
+        <div class="pill" id="hudMode">Mode: —</div>
+        <div class="pill" id="hudLevel">Level: 1</div>
+        <div class="pill" id="hudQ">Q: 1/10</div>
+        <div class="pill" id="hudScore">Score: 0</div>
+        <div class="pill" id="hudAcc">Acc: 0%</div>
+      </div>
+      <div class="prompt" id="promptText">Tap Start!</div>
+      <div class="subprompt" id="subpromptText"></div>
+
+      <div class="counter" id="countingUI" hidden>
+        <div class="counterLabel">Pop</div>
+        <div class="counterValue"><span id="countTarget">3</span></div>
+        <div class="counterLabel">Bubbles</div>
+        <div class="counterMini"><span id="countSoFar">0</span>/<span id="countNeed">3</span></div>
+      </div>
+    </div>
+
+    <div id="overlay" class="overlay hidden" role="dialog" aria-modal="true">
+      <div class="panel">
+        <div class="title">Bubble Pop! 🎈</div>
+
+        <div class="section">
+          <div class="sectionTitle">Choose mode</div>
+          <div class="grid" id="modeGrid"></div>
+        </div>
+
+        <div class="section">
+          <div class="sectionTitle">Options</div>
+          <div class="row">
+            <label class="toggle"><input id="optTTS" type="checkbox" checked> <span>Voice prompts (TTS)</span></label>
+            <label class="toggle"><input id="optShowText" type="checkbox" checked> <span>Show prompt text</span></label>
+          </div>
+          <div class="row">
+            <label class="toggle"><input id="optAssist" type="checkbox" checked> <span>Assist (highlight target after 3s)</span></label>
+          </div>
+        </div>
+
+        <div class="row gap">
+          <button id="btnStart" class="primary">Start</button>
+          <button id="btnResume" class="secondary" hidden>Resume</button>
+          <button id="btnReport" class="secondary">View Report</button>
+          <button id="btnQuit" class="danger">Quit</button>
+        </div>
+
+        <div class="tiny">Tip: Use mouse click or tap bubbles (iPad friendly).</div>
+      </div>
+    </div>
+
+    <div id="modal" class="overlay hidden" role="dialog" aria-modal="true">
+      <div class="panel">
+        <div class="title" id="modalTitle">Report</div>
+        <div id="modalBody" class="modalBody"></div>
+        <div class="row gap">
+          <button id="modalClose" class="primary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="banner" class="banner hidden">LEVEL UP!</div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
