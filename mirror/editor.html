@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mirror Maze - Level Editor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">🪞</div>
+    <div>
+      <div class="title">Mirror Maze - Level Editor</div>
+      <div class="subtitle">
+        Click a cell to cycle: empty → / → \ → empty. Drag to paint.
+        Set alien row by clicking the right-side markers.
+        <a href="index.html">Back to Play</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="pill">Grid <span id="hudSize">8×8</span></div>
+    <div class="pill">Alien row <span id="hudAlien">4</span></div>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="panel">
+    <div class="panelTitle">Editor</div>
+
+    <div class="field">
+      <label>Level name</label>
+      <input id="edName" class="input" placeholder="e.g., Intro 03" maxlength="40" />
+    </div>
+
+    <div class="row">
+      <div class="field grow">
+        <label>Grid size</label>
+        <select id="edSize" class="input">
+          <option value="8">8×8</option>
+          <option value="10">10×10</option>
+          <option value="12">12×12</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Checkpoint</label>
+        <select id="edCheckpoint" class="input">
+          <option value="false">No</option>
+          <option value="true">Yes</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="edClear" class="btn secondary">Clear</button>
+      <button id="edTest" class="btn secondary">Test solvable</button>
+      <button id="edSaveLocal" class="btn secondary">Save (local)</button>
+      <button id="edLoadLocal" class="btn secondary">Load (local)</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="panelTitle">Export</div>
+    <div class="hint">
+      <b>Export JSON</b> for archiving, or <b>Export JS Snippet</b> to paste directly into <code>CAMPAIGN_LEVELS</code> in <code>levels.js</code>.
+    </div>
+
+    <div class="row">
+      <button id="edExportJson" class="btn">Export JSON</button>
+      <button id="edExportJs" class="btn">Export JS Snippet</button>
+    </div>
+
+    <textarea id="edOut" class="textarea" spellcheck="false" placeholder="Exports will appear here..."></textarea>
+    <div class="small" id="edStatus">—</div>
+
+    <div class="divider"></div>
+
+    <div class="panelTitle">Import</div>
+    <div class="hint">
+      Paste a previously exported JSON object here and click Import.
+    </div>
+    <textarea id="edIn" class="textarea" spellcheck="false" placeholder='{"name":"Intro 03","size":8,"checkpoint":false,"alienRow":4,"grid":["........", "..."]}'></textarea>
+    <div class="row">
+      <button id="edImport" class="btn secondary">Import JSON</button>
+    </div>
+  </aside>
+
+  <section class="stage">
+    <div class="canvasWrap">
+      <canvas id="editorCanvas" width="980" height="640"></canvas>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="editor.js"></script>
+</body>
+</html>

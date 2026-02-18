@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="hull" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1c2d52"/>
+      <stop offset="1" stop-color="#070a14"/>
+    </linearGradient>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#00ffd0"/>
+      <stop offset="1" stop-color="#7c4dff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3.2" result="b"/>
+      <feColorMatrix in="b" type="matrix"
+        values="1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 0.9 0" result="c"/>
+      <feMerge>
+        <feMergeNode in="c"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#glow)">
+    <!-- Wing plates -->
+    <path d="M56 128 L120 88 L114 128 L120 168 Z" fill="rgba(124,77,255,0.18)" stroke="#7c4dff" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M120 88 L168 70 L150 108 Z" fill="rgba(0,255,208,0.12)" stroke="#00ffd0" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M120 168 L150 148 L168 186 Z" fill="rgba(0,255,208,0.12)" stroke="#00ffd0" stroke-width="4" stroke-linejoin="round"/>
+
+    <!-- Main spear hull -->
+    <path d="M38 128 L166 78 L224 128 L166 178 Z"
+          fill="url(#hull)" stroke="url(#neon)" stroke-width="7" stroke-linejoin="round"/>
+
+    <!-- Cockpit canopy -->
+    <path d="M94 128 L160 98 L192 128 L160 158 Z"
+          fill="rgba(0,255,208,0.16)" stroke="#00ffd0" stroke-width="3.5" stroke-linejoin="round"/>
+
+    <!-- Laser cannons (underslung) -->
+    <g>
+      <rect x="146" y="144" width="46" height="10" rx="5" fill="#0b1020" stroke="#00ffd0" stroke-width="3"/>
+      <circle cx="194" cy="149" r="5" fill="#00ffd0"/>
+      <rect x="146" y="102" width="46" height="10" rx="5" fill="#0b1020" stroke="#7c4dff" stroke-width="3"/>
+      <circle cx="194" cy="107" r="5" fill="#7c4dff"/>
+    </g>
+
+    <!-- Thruster -->
+    <path d="M18 128 L48 112 L48 144 Z" fill="#00ffd0" opacity="0.92"/>
+    <path d="M8 128 L28 116 L28 140 Z" fill="#7c4dff" opacity="0.92"/>
+
+    <!-- Detail lines -->
+    <path d="M64 128 L160 88" stroke="rgba(0,255,208,0.55)" stroke-width="2.5" />
+    <path d="M64 128 L160 168" stroke="rgba(0,255,208,0.55)" stroke-width="2.5" />
+    <circle cx="126" cy="128" r="4" fill="#00ffd0"/>
+    <circle cx="152" cy="128" r="3" fill="#7c4dff"/>
+  </g>
+</svg>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="ufo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b2f42"/>
+      <stop offset="1" stop-color="#0b1020"/>
+    </linearGradient>
+    <filter id="menace" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="1.8" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#menace)">
+    <!-- UFO saucer -->
+    <ellipse cx="128" cy="184" rx="92" ry="28" fill="url(#ufo)" stroke="rgba(255,85,119,0.9)" stroke-width="6"/>
+    <ellipse cx="128" cy="178" rx="70" ry="18" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)" stroke-width="3"/>
+    <!-- Lights -->
+    <g>
+      <circle cx="70" cy="188" r="7" fill="#ffcc4d" stroke="#8a6a18" stroke-width="4"/>
+      <circle cx="98" cy="198" r="7" fill="#00ffd0" stroke="#0a6a58" stroke-width="4"/>
+      <circle cx="128" cy="202" r="7" fill="#ff5577" stroke="#7a1025" stroke-width="4"/>
+      <circle cx="158" cy="198" r="7" fill="#00ffd0" stroke="#0a6a58" stroke-width="4"/>
+      <circle cx="186" cy="188" r="7" fill="#ffcc4d" stroke="#8a6a18" stroke-width="4"/>
+    </g>
+
+    <!-- Glass dome -->
+    <path d="M72 168
+             C82 114, 100 82, 128 82
+             C156 82, 174 114, 184 168"
+          fill="rgba(0,255,208,0.10)" stroke="rgba(0,255,208,0.55)" stroke-width="5" stroke-linecap="round"/>
+
+    <!-- Alien (scarier) -->
+    <!-- Head -->
+    <path d="M78 144
+             C66 96, 92 58, 128 58
+             C164 58, 190 96, 178 144
+             C170 176, 152 194, 128 194
+             C104 194, 86 176, 78 144 Z"
+          fill="#39c56a" stroke="#0e5c2c" stroke-width="7" stroke-linejoin="round"/>
+
+    <!-- Horn nubs -->
+    <path d="M98 64 L88 44 L104 52 Z" fill="#0e5c2c"/>
+    <path d="M158 64 L152 52 L168 44 Z" fill="#0e5c2c"/>
+
+    <!-- Angry eyes -->
+    <path d="M88 118 C104 104, 118 104, 132 114" fill="none" stroke="#0e5c2c" stroke-width="12" stroke-linecap="round"/>
+    <path d="M168 118 C152 104, 138 104, 124 114" fill="none" stroke="#0e5c2c" stroke-width="12" stroke-linecap="round"/>
+
+    <ellipse cx="104" cy="132" rx="22" ry="18" fill="#ffffff" stroke="#0e5c2c" stroke-width="5"/>
+    <ellipse cx="152" cy="132" rx="22" ry="18" fill="#ffffff" stroke="#0e5c2c" stroke-width="5"/>
+    <circle cx="112" cy="136" r="8" fill="#0b1020"/>
+    <circle cx="160" cy="136" r="8" fill="#0b1020"/>
+    <circle cx="115" cy="133" r="3" fill="#ffffff" opacity="0.9"/>
+    <circle cx="163" cy="133" r="3" fill="#ffffff" opacity="0.9"/>
+
+    <!-- Mouth with teeth -->
+    <path d="M102 168 C116 154, 140 154, 154 168" fill="none" stroke="#a8243a" stroke-width="12" stroke-linecap="round"/>
+    <path d="M110 168 L114 178 L118 168" fill="#ffffff" stroke="#7a1025" stroke-width="2"/>
+    <path d="M124 168 L128 178 L132 168" fill="#ffffff" stroke="#7a1025" stroke-width="2"/>
+    <path d="M138 168 L142 178 L146 168" fill="#ffffff" stroke="#7a1025" stroke-width="2"/>
+
+    <!-- Small control panel -->
+    <rect x="98" y="188" width="60" height="14" rx="7" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.18)" stroke-width="3"/>
+
+    <!-- Blush removed; add shadow under head -->
+    <ellipse cx="128" cy="176" rx="48" ry="10" fill="rgba(0,0,0,0.18)"/>
+  </g>
+</svg>
