@@ -40,6 +40,15 @@ let level = LEVELS[0];
 let target = level.target;
 let crop = level.crop;
 
+// --- Move garden state ---
+let movingGarden = false;
+let moveOffset = { dx: 0, dy: 0 };
+let moveGhostRect = null;
+let moveGardenIndex = -1; 
+
+let SFX_ON = true;
+let audioCtx = null;
+
 // Drag state
 let dragging = false;
 let dragStart = null;
@@ -148,6 +157,17 @@ function cellsInside(r){
   return out;
 }
 
+function pointInRect(gx, gy, r){
+  return gx >= r.x0 && gx < r.x0 + r.w && gy >= r.y0 && gy < r.y0 + r.h;
+}
+
+function clampRectToBoard(r){
+  const x0 = clamp(r.x0, 0, GRID_W - r.w);
+  const y0 = clamp(r.y0, 0, GRID_H - r.h);
+  return { ...r, x0, y0 };
+}
+
+
 function buildHoldingMap(){
   holdSlots = [];
   holdUsed = Array(target).fill(false);
@@ -165,10 +185,13 @@ function clearTransient(){
   flying = [];
   ghostRect = null;
   dragging = false;
+  dragStart = null;   // ✅ add
+  dragNow = null;     // ✅ add
   awaitingOk = false;
   nextOnOk = false;
   setHUD(null);
 }
+
 
 function clearBoard(){
   plowed = new Uint8Array(GRID_W * GRID_H);
@@ -437,20 +460,20 @@ function showModal(text, {goNext}){
 function hideModal(){
   modal.classList.add("hidden");
   awaitingOk = false;
-  // nextOnOk = false;
 }
 
 modalOk.addEventListener("click", () => {
+  const goNext = nextOnOk;          // ✅ capture decision FIRST
+  const prevIndex = levelIndex;     // ✅ level that just finished
+
   hideModal();
+  nextOnOk = false;                // ✅ consume + clear here (one place only)
 
-  if (nextOnOk) {
-    // Compute preserve from the level that just finished (refresh=true => clear after finishing)
-    const preserve = !LEVELS[levelIndex].refresh;
+  if (goNext) {
+    const preserve = !LEVELS[prevIndex].refresh;
+    const nextIndex = (prevIndex + 1) % LEVELS.length;
 
-    // Advance (with wrap-around)
-    levelIndex = (levelIndex + 1) % LEVELS.length;
-
-    loadLevel(levelIndex, { preserveBoard: preserve });
+    loadLevel(nextIndex, { preserveBoard: preserve });
     return;
   }
 
@@ -459,9 +482,51 @@ modalOk.addEventListener("click", () => {
   flying = [];
   ghostRect = null;
   dragging = false;
+  movingGarden = false;
+  moveGhostRect = null;
+  moveGardenIndex = -1;
   setHUD(null);
   setMessage("Try again: drag a rectangle to make a field.", "muted");
 });
+
+
+
+
+function findGardenAtGrid(gx, gy){
+  for(let i=gardens.length-1; i>=0; i--){
+    if(pointInRect(gx, gy, gardens[i].rect)) return i;
+  }
+  return -1;
+}
+
+function rectOverlapsGardens(r, ignoreIndex = -1){
+  for(let i=0;i<gardens.length;i++){
+    if(i === ignoreIndex) continue;
+    const a = gardens[i].rect;
+    const overlap = !(r.x0 + r.w <= a.x0 || a.x0 + a.w <= r.x0 || r.y0 + r.h <= a.y0 || a.y0 + a.h <= r.y0);
+    if(overlap) return true;
+  }
+  return false;
+}
+
+// Rebuild plowed/planted/cropTypeMap from gardens after any move
+function rebuildBoardFromGardens(){
+  plowed = new Uint8Array(GRID_W * GRID_H);
+  planted = new Uint8Array(GRID_W * GRID_H);
+  cropTypeMap = new Array(GRID_W * GRID_H).fill(null);
+
+  for(const g of gardens){
+    const r = g.rect;
+    for(let y=r.y0; y<r.y0+r.h; y++){
+      for(let x=r.x0; x<r.x0+r.w; x++){
+        const k = idx(x,y);
+        plowed[k] = 1;
+        planted[k] = 1;
+        cropTypeMap[k] = g.crop;
+      }
+    }
+  }
+}
 
 
 // ----------------- Update & Draw Loop -----------------
@@ -485,6 +550,7 @@ function update(){
       p.y = lerp(p.y0, p.ty, e);
 
       if(tt >= 1){
+        // sfx("land");
         p.done = true;
         const k = idx(p.cell.x, p.cell.y);
         planted[k] = 1;
@@ -524,6 +590,26 @@ function draw(){
       }
     }
   }
+
+  // moving preview
+  if (movingGarden && moveGhostRect) {
+    const px = ORIGIN.x + moveGhostRect.x0 * TILE;
+    const py = ORIGIN.y + moveGhostRect.y0 * TILE;
+    const pw = moveGhostRect.w * TILE;
+    const ph = moveGhostRect.h * TILE;
+
+    const overlap = rectOverlapsGardens(moveGhostRect, moveGardenIndex);
+
+    ctx.fillStyle = overlap ? "rgba(251,113,133,0.10)" : "rgba(54,211,153,0.10)";
+    ctx.fillRect(px, py, pw, ph);
+
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = overlap ? "rgba(251,113,133,0.95)" : "rgba(54,211,153,0.95)";
+    ctx.strokeRect(px + 1, py + 1, pw - 2, ph - 2);
+    ctx.lineWidth = 1;
+  }
+
+
 
   // fences
   for(const g of gardens){
@@ -582,29 +668,71 @@ function draw(){
 
 // ----------------- Input -----------------
 function onDown(e){
-  if(awaitingOk) return;
-  if(flying.length) return;
-
+  if(flying.length) return;        // don't move while carrots are flying
+  if(awaitingOk) return;           // if you have modal gating
+  // allow move ONLY if a garden exists
   const r = canvas.getBoundingClientRect();
   const mx = e.clientX - r.left;
   const my = e.clientY - r.top;
   const g = gridFromMouse(mx, my);
+
+  // If click inside an existing garden, start moving it
+  const gi = findGardenAtGrid(g.gx, g.gy);
+  if(gi >= 0){
+    movingGarden = true;
+    moveGardenIndex = gi;
+
+    const gr = gardens[gi].rect;
+    moveOffset.dx = g.gx - gr.x0;
+    moveOffset.dy = g.gy - gr.y0;
+    moveGhostRect = { ...gr };
+
+    sfx("pick");
+    return;
+  }
+
+
+  // Otherwise: start drawing a new rectangle (your existing logic)
+  // if(gardens.length) return; // keep your “only 1 garden allowed” rule
+
 
   dragging = true;
   dragStart = g;
   dragNow = g;
   ghostRect = rectFromTwoPoints(dragStart, dragNow);
   setHUD(ghostRect);
+  sfx("drag"); // optional
 }
 
 function onMove(e){
-  if(!dragging) return;
   if(awaitingOk) return;
   if(flying.length) return;
+    // ✅ IMPORTANT: do nothing unless user is actively dragging OR moving a field
+  if(!dragging && !movingGarden) return;
 
   const r = canvas.getBoundingClientRect();
   const mx = e.clientX - r.left;
   const my = e.clientY - r.top;
+  const g = gridFromMouse(mx, my);
+
+  if(movingGarden){
+    const base = gardens[moveGardenIndex].rect;
+
+    let candidate = {
+      x0: g.gx - moveOffset.dx,
+      y0: g.gy - moveOffset.dy,
+      w: base.w,
+      h: base.h
+    };
+    candidate = clampRectToBoard(candidate);
+    moveGhostRect = candidate;
+
+    const overlap = rectOverlapsGardens(candidate, moveGardenIndex);
+    setHUD(candidate);
+    setMessage(overlap ? "Can’t move here: overlaps another field." : "Release to place the field.", overlap ? "bad" : "ok");
+    return;
+  }
+
 
   dragNow = gridFromMouse(mx, my);
   ghostRect = rectFromTwoPoints(dragStart, dragNow);
@@ -613,15 +741,45 @@ function onMove(e){
   const a = rectArea(ghostRect);
   const overlap = rectOverlapsExisting(ghostRect);
 
-  if(a === target && !overlap) setMessage("Perfect size! Release to create the garden.", "ok");
+  if(a === target && !overlap) {
+    setMessage("Perfect size! Release to create the garden.", "ok");
+  }
   else if(overlap) setMessage("That overlaps an existing garden. Try a different spot.", "bad");
   else setMessage(`Make a field that holds ${target}. (Currently ${a})`, "muted");
 }
 
 function onUp(){
-  if(!dragging) return;
   if(awaitingOk) return;
   if(flying.length) return;
+
+  // Handle moving fields FIRST (even though dragging=false)
+  if(movingGarden){
+    const candidate = moveGhostRect;
+    const overlap = rectOverlapsGardens(candidate, moveGardenIndex);
+
+    if(!overlap){
+      gardens[moveGardenIndex].rect = { ...candidate };
+      rebuildBoardFromGardens();
+      sfx("drop");
+      setMessage("Field moved.", "ok");
+    } else {
+      sfx("error");
+      setMessage("Can’t place there (overlap).", "bad");
+    }
+
+    movingGarden = false;
+    moveGardenIndex = -1;
+    moveGhostRect = null;
+    dragStart = null;   // ✅ add
+    dragNow = null;     // ✅ add
+
+    setHUD(null);
+    return;
+  }
+
+  // Existing draw-to-create logic continues here...
+  if(!dragging) return;
+
   dragging = false;
 
   if(!ghostRect) return;
@@ -629,9 +787,11 @@ function onUp(){
   const overlap = rectOverlapsExisting(ghostRect);
 
   if(a === target && !overlap){
+    sfx("success");
     setMessage("✅ Garden created! Planting…", "ok");
     startPlantingAnimation(ghostRect);
   } else {
+    sfx("error");
     if(overlap){
       showModal(`Sorry! ${ghostRect.h} × ${ghostRect.w} = ${a}, but it overlaps an existing garden.`, { goNext: false });
     } else {
@@ -642,6 +802,52 @@ function onUp(){
   ghostRect = null;
   setHUD(null);
 }
+
+
+function ensureAudio(){
+  if(!SFX_ON) return null;
+  if(!audioCtx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AC();
+  }
+  if(audioCtx.state === "suspended") audioCtx.resume().catch(()=>{});
+  return audioCtx;
+}
+
+function sfx(type){
+  const ac = ensureAudio();
+  if(!ac) return;
+
+  const presets = {
+    pick:   { f: 520, dur: 0.06, wave: "square",   gain: 0.05 },
+    drop:   { f: 420, dur: 0.08, wave: "square",   gain: 0.05 },
+    drag:   { f: 240, dur: 0.03, wave: "sine",     gain: 0.02 },
+    land:   { f: 740, dur: 0.03, wave: "sine",     gain: 0.02 },
+    success:{ f: 660, dur: 0.12, wave: "triangle", gain: 0.06 },
+    error:  { f: 180, dur: 0.18, wave: "sawtooth", gain: 0.05 },
+  };
+  const p = presets[type] || presets.drag;
+
+  const t0 = ac.currentTime;
+  const o = ac.createOscillator();
+  const g = ac.createGain();
+  o.type = p.wave;
+  o.frequency.setValueAtTime(p.f, t0);
+
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(p.gain, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + p.dur);
+
+  o.connect(g);
+  g.connect(ac.destination);
+  o.start(t0);
+  o.stop(t0 + p.dur + 0.02);
+}
+
+// Press M to mute/unmute
+window.addEventListener("keydown", (e)=>{
+  if(e.key && e.key.toLowerCase() === "m") SFX_ON = !SFX_ON;
+});
 
 // Buttons
 btnReset.addEventListener("click", () => {
@@ -661,7 +867,7 @@ canvas.addEventListener("touchstart", (e)=>{
 },{passive:false});
 
 window.addEventListener("touchmove", (e)=>{
-  if(!dragging) return;
+  if(!dragging && !movingGarden) return;
   const t = e.touches[0];
   onMove({ clientX:t.clientX, clientY:t.clientY });
   e.preventDefault();
