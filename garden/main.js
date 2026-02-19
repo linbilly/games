@@ -34,6 +34,10 @@ const HOLD_ORIGIN = { x: ORIGIN.x + 140, y: ORIGIN.y - 52 };
 let holdSlots = [];
 let holdUsed = [];
 
+// Disallow repeating exact same rectangle dimensions (order-sensitive)
+// 2x3 and 3x2 are different, but 2x3 twice is not allowed.
+const usedShapes = new Set(); // keys like "2x3"
+
 // Level state
 let levelIndex = 0;
 let level = LEVELS[0];
@@ -198,6 +202,8 @@ function clearBoard(){
   planted = new Uint8Array(GRID_W * GRID_H);
   cropTypeMap = new Array(GRID_W * GRID_H).fill(null);
   gardens = [];
+  usedShapes.clear();
+
 }
 
 function loadLevel(i, {preserveBoard} = {preserveBoard:true}){
@@ -509,6 +515,15 @@ function rectOverlapsGardens(r, ignoreIndex = -1){
   return false;
 }
 
+function shapeKey(r){
+  return `${r.h}x${r.w}`; // order-sensitive by design
+}
+
+function isShapeUsed(r){
+  return usedShapes.has(shapeKey(r));
+}
+
+
 // Rebuild plowed/planted/cropTypeMap from gardens after any move
 function rebuildBoardFromGardens(){
   plowed = new Uint8Array(GRID_W * GRID_H);
@@ -787,10 +802,18 @@ function onUp(){
   const overlap = rectOverlapsExisting(ghostRect);
 
   if(a === target && !overlap){
-    sfx("success");
-    setMessage("✅ Garden created! Planting…", "ok");
-    startPlantingAnimation(ghostRect);
-  } else {
+    if(isShapeUsed(ghostRect)){
+      sfx("error");
+      showModal("Try again with a different shape.", { goNext: false });
+    } else {
+      // record this shape as used
+      usedShapes.add(shapeKey(ghostRect));
+      sfx("success");
+      setMessage("✅ Garden created! Planting…", "ok");
+      startPlantingAnimation(ghostRect);
+    }
+  } 
+  else {
     sfx("error");
     if(overlap){
       showModal(`Sorry! ${ghostRect.h} × ${ghostRect.w} = ${a}, but it overlaps an existing garden.`, { goNext: false });
