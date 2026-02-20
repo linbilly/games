@@ -31,6 +31,7 @@ import { clamp, normalizeLevelObject, levelToExportPayload, payloadToJSSnippet }
     { dx: 0, dy: -1 }
   ];
 
+  
   function choice(arr){ return arr[(Math.random()*arr.length)|0]; }
 
   const state = {
@@ -167,8 +168,12 @@ import { clamp, normalizeLevelObject, levelToExportPayload, payloadToJSSnippet }
   function cycleCellValue(cur){
     if(cur === ".") return "/";
     if(cur === "/") return "\\";
+    if(cur === "\\") return "R";   // rotatable (slash)
+    if(cur === "R") return "r";    // rotatable (backslash)
     return ".";
   }
+
+
 
   function toCanvasXY(e){
     const rect = canvas.getBoundingClientRect();
@@ -403,21 +408,44 @@ import { clamp, normalizeLevelObject, levelToExportPayload, payloadToJSSnippet }
       ctx.stroke();
     }
 
-    ctx.strokeStyle = "rgba(0,255,208,0.75)";
     ctx.lineWidth = Math.max(2, Math.floor(g.cell*0.10));
     ctx.lineCap = "round";
 
     for(let y=0;y<state.size;y++){
       for(let x=0;x<state.size;x++){
-        const m = getCell(x,y);
-        if(m !== "/" && m !== "\\") continue;
+        const raw = getCell(x,y);
+
+        // Decide what to draw
+        let mirrorType = null; // "/" or "\\"
+        let isRot = false;
+
+        if(raw === "/" || raw === "\\"){
+          mirrorType = raw;
+        } else if(raw === "R" || raw === "r"){
+          // Editor stores rotatable mirror as char:
+          // "R" = slash orientation, "r" = backslash orientation
+          mirrorType = (raw === "R") ? "/" : "\\";
+          isRot = true;
+        } else {
+          continue;
+        }
+
+        // Style per type
+        if(isRot){
+          ctx.strokeStyle = "rgba(255,40,80,0.95)"; // neon red
+          ctx.shadowColor = "rgba(255,40,80,0.9)";
+          ctx.shadowBlur = 12;
+        } else {
+          ctx.strokeStyle = "rgba(0,255,208,0.75)";
+          ctx.shadowBlur = 0;
+        }
 
         const x0 = g.gridX + x*g.cell;
         const y0 = g.gridY + y*g.cell;
         const inset = g.cell*0.18;
 
         ctx.beginPath();
-        if(m === "/"){
+        if(mirrorType === "/"){
           ctx.moveTo(x0 + inset, y0 + g.cell - inset);
           ctx.lineTo(x0 + g.cell - inset, y0 + inset);
         } else {
@@ -427,6 +455,7 @@ import { clamp, normalizeLevelObject, levelToExportPayload, payloadToJSSnippet }
         ctx.stroke();
       }
     }
+
 
     ctx.fillStyle = "rgba(255,255,255,0.10)";
     ctx.strokeStyle = "rgba(255,255,255,0.16)";

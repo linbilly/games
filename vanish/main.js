@@ -20,29 +20,26 @@ const boardSelect = $("boardSelect");
 const aiSelect = $("aiSelect");
 const aiControl = $("aiControl");
 const vanishSelect = $("vanishSelect");
+const ruleSelect = $("ruleSelect");
 
 const turnPill = $("turnPill");
 const goalPill = $("goalPill");
 const modePill = $("modePill");
 
 const newGameBtn = $("newGameBtn");
-const resumeBtn = $("resumeBtn");
-
-const turnPiece = $("turnPiece");
-
-
 const audioBtn = $("audioBtn");
 const muteToggle = $("muteToggle");
 const p2Label = $("p2Label");
 const p2Sub = $("p2Sub");
+const turnPiece = $("turnPiece");
+const mistakeMeterEl = $("mistakeMeter");
+
+const resumeBtn = $("resumeBtn");
 
 // ---------- Audio (WebAudio, no files needed) ----------
 let audioCtx = null;
 let audioEnabled = false;
 let muted = false;
-
-let mistakeResumeArmed = false; // board revealed after mistake; next click auto-resumes
-
 
 function ensureAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -105,32 +102,62 @@ let goal = 5;
 let vanishMs = 3000;
 
 let state = [];          // 0 empty, 1 P1, 2 P2
-let pieceEls = [];       // DOM references for the "piece" div in each cell
+let pieceEls = [];
+let placedAt = [];       // ms timestamps of placement (for AI memory model)
+let lastRevealAt = 0;    // ms timestamp of last full reveal       // DOM references for the "piece" div in each cell
 let currentPlayer = P1;
 let gameOver = false;
 
 let mode = "pvp";        // "pvp" | "ai"
 let aiLevel = "medium";
+let ruleMode = (ruleSelect && ruleSelect.value) ? ruleSelect.value : "nolimit"; // nolimit | renju | swap2 (if UI present)
 let aiPlaysAs = P2;      // AI is player 2
 let inputLocked = false;
+let mistakeResumeArmed = false; // board revealed after mistake; next click auto-resumes
+
+// Penalty system
+let meterPos = 0; // -3 .. +3 (0 is center). P1 mistakes move left (negative), P2 mistakes move right (positive).
+let skipNext = { [P1]: false, [P2]: false };
 
 function idx(r,c){ return r*size + c; }
 function inBounds(r,c){ return r>=0 && c>=0 && r<size && c<size; }
 
 function setPills(){
-
+  turnPill.textContent = `Turn: ${currentPlayer === P1 ? "P1" : (mode==="ai" ? "AI" : "P2")}`;
+  goalPill.textContent = `Goal: Connect ${goal}`;
+  modePill.textContent = `Mode: ${mode === "ai" ? "Single Player" : "PvP"}`;
+  p2Label.textContent = (mode==="ai") ? "AI Opponent" : "Player 2";
+  p2Sub.textContent = (mode==="ai") ? `Difficulty: ${aiLevel}` : "Red";
   // Side turn indicator piece
   if (turnPiece){
     turnPiece.classList.toggle("p1", currentPlayer === P1);
     turnPiece.classList.toggle("p2", currentPlayer !== P1);
   }
 
-  turnPill.textContent = `Turn: ${currentPlayer === P1 ? "P1" : (mode==="ai" ? "AI" : "P2")}`;
-  goalPill.textContent = `Goal: Connect ${goal}`;
-  modePill.textContent = `Mode: ${mode === "ai" ? "Single Player" : "PvP"}`;
-  p2Label.textContent = (mode==="ai") ? "AI Opponent" : "Player 2";
-  p2Sub.textContent = (mode==="ai") ? `Difficulty: ${aiLevel}` : "Red";
+  updateMistakeMeter();
+
 }
+
+function initMistakeMeter(){
+  if (!mistakeMeterEl) return;
+  mistakeMeterEl.innerHTML = ""; 
+  for (let i=0;i<7;i++){
+    const d=document.createElement('div');
+    d.className='meter-slot' + ((i===0||i===6)?' endcap':'');
+    mistakeMeterEl.appendChild(d);
+  }
+  updateMistakeMeter();
+}
+
+function updateMistakeMeter(){
+  if (!mistakeMeterEl) return;
+  const slots = mistakeMeterEl.querySelectorAll('.meter-slot');
+  slots.forEach(s=>s.classList.remove('marker'));
+  const clamped = Math.max(-3, Math.min(3, meterPos));
+  const idxSlot = 3 + clamped;
+  if (slots[idxSlot]) slots[idxSlot].classList.add('marker');
+}
+
 
 function showOverlay(title, body, btnText="Continue"){
   overlayTitle.textContent = title;
@@ -146,6 +173,8 @@ function buildBoard(){
   boardEl.innerHTML = "";
   state = new Array(size*size).fill(0);
   pieceEls = new Array(size*size).fill(null);
+  placedAt = new Array(size*size).fill(0);
+  lastRevealAt = 0;
   gameOver = false;
   currentPlayer = P1;
   inputLocked = false;
@@ -174,6 +203,8 @@ function buildBoard(){
 
   clearWinHighlights();
   setPills();
+  initMistakeMeter();
+  updateMistakeMeter();
 }
 
 function clearWinHighlights(){
@@ -184,65 +215,74 @@ function clearWinHighlights(){
 function renderPieceVisible(r,c,player){
   const k = idx(r,c);
   const piece = pieceEls[k];
-
-  piece.style.opacity = "0";
-  piece.style.transform = "scale(.6)";
+  piece.style.opacity = "";
+  piece.style.transform = "";
   piece.className = `piece ${player === P1 ? "p1" : "p2"} pop-in`;
 
-  // ✅ 60 minutes = effectively always visible
-  if (vanishMs >= 3600000){
-    setTimeout(() => {
-      piece.classList.remove("pop-in");
-      piece.style.opacity = "1";
-      piece.style.transform = "scale(1)";
-    }, 170);
-    return;
-  }
-
-  // ✅ fade duration scales with vanish time
-  const fadeDur = Math.max(450, Math.min(1300, Math.floor(vanishMs * 0.35)));
-  piece.style.transition = `opacity ${fadeDur}ms ease, transform ${fadeDur}ms ease`;
-
-  setTimeout(() => {
-    if (boardEl.classList.contains("reveal")) return;
-    piece.classList.remove("pop-in");
-    piece.style.opacity = "1";
-    piece.style.transform = "scale(1)";
-  }, 170);
-
-  const startFadeAt = Math.max(0, vanishMs - fadeDur);
+  // schedule vanish animation
   window.setTimeout(() => {
     if (boardEl.classList.contains("reveal")) return;
+    piece.classList.remove("pop-in");
+    piece.classList.add("fade-out");
+  }, Math.max(0, vanishMs - 800));
+
+  window.setTimeout(() => {
+    if (boardEl.classList.contains("reveal")) return;
+    piece.classList.remove("fade-out");
     piece.style.opacity = "0";
-    piece.style.transform = "scale(.98)";
-  }, startFadeAt);
+  }, vanishMs);
 }
 
-
-function setAllPiecesVisible(forceVisible){
-  // ✅ If vanish time is 'stay revealed', never hide pieces.
-  if (!forceVisible && vanishMs >= 3600000){
-    forceVisible = true;
+function setAllPiecesVisible(forceVisible) {
+  if (forceVisible) {
     boardEl.classList.add("reveal");
+    lastRevealAt = performance.now();
+  } else {
+    boardEl.classList.remove("reveal");
   }
 
-  if (forceVisible) boardEl.classList.add("reveal");
-  else boardEl.classList.remove("reveal");
+  const now = performance.now();
 
-  for (let r=0; r<size; r++){
-    for (let c=0; c<size; c++){
-      const k = idx(r,c);
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      const k = idx(r, c);
       const v = state[k];
       const piece = pieceEls[k];
 
-      if (v === 0){
+      if (v === 0) {
         piece.className = "piece";
         piece.style.opacity = "0";
+        continue;
+      }
+
+      piece.className = `piece ${v === P1 ? "p1" : "p2"}`;
+
+      if (forceVisible) {
+        piece.style.opacity = "1";
+        piece.style.transform = "scale(1)";
+        // Remove any active fade-out classes while board is revealed
+        piece.classList.remove("fade-out");
       } else {
-        piece.className = `piece ${v===P1?"p1":"p2"}`;
-        if (forceVisible){
+        // RESUME LOGIC: Check if this piece should still be visible
+        const age = now - placedAt[k];
+        const remaining = vanishMs - age;
+
+        // If vanishMs is 60 mins (3600000ms), it effectively never vanishes.
+        if (remaining > 0) {
           piece.style.opacity = "1";
           piece.style.transform = "scale(1)";
+          
+          // Re-trigger the vanish timer for the remaining duration
+          window.setTimeout(() => {
+            if (boardEl.classList.contains("reveal")) return;
+            piece.classList.add("fade-out");
+          }, Math.max(0, remaining - 800));
+
+          window.setTimeout(() => {
+            if (boardEl.classList.contains("reveal")) return;
+            piece.classList.remove("fade-out");
+            piece.style.opacity = "0";
+          }, remaining);
         } else {
           piece.style.opacity = "0";
         }
@@ -251,9 +291,28 @@ function setAllPiecesVisible(forceVisible){
   }
 }
 
+function applySkipIfNeeded(){
+  if (skipNext[currentPlayer]){
+    skipNext[currentPlayer] = false;
+    // Keep board hidden when skipping
+    setAllPiecesVisible(false);
+    showOverlay(
+      "Penalty",
+      `${currentPlayer===P1?"Player 1":"Player 2"} forfeits this move (meter hit the end).`,
+      "OK"
+    );
+    // After acknowledging, pass turn
+    overlayBtn.onclick = () => { overlayBtn.onclick = null; hideOverlay(); switchTurn(); };
+    return true;
+  }
+  return false;
+}
+
 function switchTurn(){
   currentPlayer = (currentPlayer === P1) ? P2 : P1;
   setPills();
+  // If the next player must skip, apply immediately.
+  applySkipIfNeeded();
 }
 
 function isOccupied(r,c){
@@ -266,16 +325,30 @@ function onCellClick(r,c){
   // If the board is revealed from a mistake, the next player's first click auto-resumes.
   if (mistakeResumeArmed){
     mistakeResumeArmed = false;
-    setAllPiecesVisible(false);           // vanish
-    resumeBtn.classList.add("hidden");    // hide the Resume button if you have it
+    setAllPiecesVisible(false);
+    if (resumeBtn) if (resumeBtn) resumeBtn && resumeBtn.classList.add("hidden");
   }
-
   if (mode === "ai" && currentPlayer === aiPlaysAs) return;
+
 
   if (isOccupied(r,c)){
     handleMistake();
     return;
   }
+
+  // --- RENJU INTEGRATION START ---
+
+  if (ruleMode === "renju" && currentPlayer === P1) {
+      state[idx(r,c)] = P1; 
+      const result = window.violatesRenju(r,c);
+      state[idx(r,c)] = 0; 
+
+      if (!result.isValid) {
+          handleMistake(result.reason); // Pass the specific rule name
+          return;
+      }
+  }
+  // --- RENJU INTEGRATION END ---
 
   placePiece(r,c,currentPlayer, {animate:true, sfx:true});
   const win = checkWinFrom(r,c,currentPlayer);
@@ -297,7 +370,9 @@ function onCellClick(r,c){
 }
 
 function placePiece(r,c,player,{animate=false,sfx=false}={}){
-  state[idx(r,c)] = player;
+  const _k = idx(r,c);
+  state[_k] = player;
+  placedAt[_k] = performance.now();
   if (sfx) sfxPlace();
   if (animate) renderPieceVisible(r,c,player);
   else {
@@ -308,66 +383,71 @@ function placePiece(r,c,player,{animate=false,sfx=false}={}){
   }
 }
 
-function handleMistake(){
+/* main.js - Fixed handleMistake */
+function handleMistake(customMsg) {
   sfxMistake();
   inputLocked = true;
 
-  // Reveal board
   setAllPiecesVisible(true);
   sfxReveal();
 
-  // Show Resume button
-  resumeBtn.classList.remove("hidden");
+  if (currentPlayer === P1) meterPos--;
+  else meterPos++;
 
-  showOverlay(
-    "Uh oh!",
-    "You lose your turn. Opponent's turn next.",
-    "OK"
-  );
+  meterPos = Math.max(-3, Math.min(3, meterPos));
+  updateMistakeMeter();
 
-  // Lose turn immediately
-  switchTurn();
+  const hitEnd = (meterPos === -3) || (meterPos === 3);
+  const bodyMessage = customMsg ? `${customMsg}.` : "Occupied square.";
+
+  const title = hitEnd ? "Penalty!" : "Mistake";
+  const msg = hitEnd
+    ? `Third mistake reached the end of the meter. ${bodyMessage} You forfeit this move.`
+    : `${bodyMessage} The board is revealed for review. Close this message, then click the board or press Resume to continue.`;
+
+  showOverlay(title, msg, "Close");
+
+  const resumeGame = () => {
+    if (hitEnd) return;
+    setAllPiecesVisible(false);
+    if (resumeBtn) resumeBtn.classList.add("hidden");
+    mistakeResumeArmed = false;
+    inputLocked = false;
+    if (mode === "ai" && currentPlayer === aiPlaysAs && !gameOver) {
+      aiMoveSoon();
+    }
+  };
 
   overlayBtn.onclick = () => {
     overlayBtn.onclick = null;
     hideOverlay();
-    // Keep board revealed until Resume is clicked
 
-    // Allow next player to continue while board is still revealed.
+    if (hitEnd) {
+      meterPos = 0; 
+      updateMistakeMeter();
+      setAllPiecesVisible(false);
+      inputLocked = false;
+      switchTurn();
+      if (mode === "ai" && currentPlayer === aiPlaysAs && !gameOver) {
+        aiMoveSoon();
+      }
+      return;
+    }
+
     inputLocked = false;
     mistakeResumeArmed = true;
+    if (resumeBtn) resumeBtn.classList.remove("hidden");
 
-    if (mode === "ai" && currentPlayer === aiPlaysAs && !gameOver){
-      setAllPiecesVisible(false);
-      resumeBtn.classList.add("hidden");
-      mistakeResumeArmed = false;
-      aiMoveSoon();
+    if (mode === "ai" && currentPlayer === aiPlaysAs && !gameOver) {
+      resumeGame();
     }
-
-
   };
 
-  const resumeGame = () => {
-    // Hide board again (vanish)
-    setAllPiecesVisible(false);
-
-    // Hide Resume button
-    resumeBtn.classList.add("hidden");
-
-    inputLocked = false;
-
-    // If AI's turn, proceed
-    if (mode === "ai" && currentPlayer === aiPlaysAs && !gameOver){
-      aiMoveSoon();
-    }
-
-    resumeBtn.removeEventListener("click", resumeGame);
-  };
-
-  resumeBtn.addEventListener("click", resumeGame);
+  // Fixed Button Logic: Use onclick to avoid parentNode null errors
+  if (!hitEnd && resumeBtn) {
+    resumeBtn.onclick = resumeGame; 
+  }
 }
-
-
 
 overlayBtn.addEventListener("click", hideOverlay);
 
@@ -437,6 +517,9 @@ function endGame(winObj, isDraw=false){
   overlayBtn.onclick = () => { overlayBtn.onclick = null; hideOverlay(); };
 }
 
+
+
+
 // ---------- AI ----------
 function aiMoveSoon(){
   inputLocked = true;
@@ -462,15 +545,15 @@ function aiMoveSoon(){
   }, 420);
 }
 
+
 function chooseAiMove(){
-  if (aiLevel === "easy"){
-    return randomEmptyMove();
-  }
-  if (size === 3){
-    return minimaxBestMove(aiPlaysAs);
-  }
-  return heuristicBestMove(aiLevel);
+  // AI engine is in ai.js (window.aiChooseMove). No legacy heuristic fallbacks.
+  if (aiLevel === "easy") aiLevel = "medium"; // just in case old settings existed
+  if (window.aiChooseMove) return window.aiChooseMove();
+  // Fallback: pick first empty (should never happen if ai.js loaded)
+  return randomEmptyMove();
 }
+
 
 function randomEmptyMove(){
   const empties = [];
@@ -540,94 +623,6 @@ function minimaxBestMove(player){
   return bestMove || randomEmptyMove();
 }
 
-// ----- Heuristic for larger boards -----
-function heuristicBestMove(level){
-  const me = aiPlaysAs;
-  const opp = (me===P1)?P2:P1;
-
-  const noise = (level === "medium") ? 0.35 : 0.08;
-
-  let best = {score:-Infinity, r:0, c:0};
-
-  for (let r=0; r<size; r++){
-    for (let c=0; c<size; c++){
-      const k = idx(r,c);
-      if (state[k] !== 0) continue;
-
-      const s = scoreCell(r,c,me) + 0.85*scoreCell(r,c,opp);
-      const jitter = (Math.random()*2-1) * noise;
-      const total = s + jitter;
-
-      if (total > best.score){
-        best = {score: total, r, c};
-      }
-    }
-  }
-
-  return best.score === -Infinity ? null : {r:best.r, c:best.c};
-}
-
-function scoreCell(r,c,player){
-  const dirs = [
-    {dr:0, dc:1},
-    {dr:1, dc:0},
-    {dr:1, dc:1},
-    {dr:1, dc:-1},
-  ];
-
-  let total = 0;
-  const k0 = idx(r,c);
-  state[k0] = player;
-
-  for (const {dr,dc} of dirs){
-    const run = countRun(r,c,dr,dc,player);
-    const openEnds = countOpenEnds(r,c,dr,dc,player);
-
-    if (run >= goal) total += 1e6;
-    total += Math.pow(run, 3) * 25;
-    total += openEnds * 18;
-
-    const center = (size-1)/2;
-    const dist = Math.abs(r-center) + Math.abs(c-center);
-    total += (size*0.8 - dist) * 0.8;
-  }
-
-  state[k0] = 0;
-  return total;
-}
-
-function countRun(r,c,dr,dc,player){
-  let count = 1;
-
-  let rr=r+dr, cc=c+dc;
-  while (inBounds(rr,cc) && state[idx(rr,cc)]===player){
-    count++; rr+=dr; cc+=dc;
-  }
-  rr=r-dr; cc=c-dc;
-  while (inBounds(rr,cc) && state[idx(rr,cc)]===player){
-    count++; rr-=dr; cc-=dc;
-  }
-  return count;
-}
-
-function countOpenEnds(r,c,dr,dc,player){
-  let open = 0;
-
-  let rr=r, cc=c;
-  while (inBounds(rr+dr,cc+dc) && state[idx(rr+dr,cc+dc)]===player){
-    rr+=dr; cc+=dc;
-  }
-  if (inBounds(rr+dr,cc+dc) && state[idx(rr+dr,cc+dc)]===0) open++;
-
-  rr=r; cc=c;
-  while (inBounds(rr-dr,cc-dc) && state[idx(rr-dr,cc-dc)]===player){
-    rr-=dr; cc-=dc;
-  }
-  if (inBounds(rr-dr,cc-dc) && state[idx(rr-dr,cc-dc)]===0) open++;
-
-  return open;
-}
-
 // ---------- Setup / UI ----------
 function applySettingsFromUI(){
   mode = modeSelect.value;
@@ -641,19 +636,31 @@ function applySettingsFromUI(){
   setPills();
 }
 
-function newGame(){
-  resumeBtn.classList.add("hidden");
+function newGame() {
+  meterPos = 0; 
+  skipNext[P1] = false;
+  skipNext[P2] = false;
+  
+  ruleMode = (ruleSelect && ruleSelect.value) ? ruleSelect.value : "nolimit";
   applySettingsFromUI();
+  
+  initMistakeMeter(); 
+  updateMistakeMeter(); 
+  
   buildBoard();
   hideOverlay();
   setPills();
+  
   inputLocked = false;
-
-  if (vanishMs >= 3600000){
+  
+  // If vanishMs is 60 minutes, start the board in reveal mode
+  if (vanishMs >= 3600000) {
     setAllPiecesVisible(true);
   } else {
     setAllPiecesVisible(false);
   }
+
+  if (resumeBtn) resumeBtn.classList.add("hidden");
 }
 
 newGameBtn.addEventListener("click", newGame);

@@ -19,6 +19,10 @@
 
 export const CAMPAIGN_LEVELS = [
 
+
+
+  
+
   {
     "name": "Intro 01",
     "size": 8,
@@ -188,6 +192,135 @@ export const CAMPAIGN_LEVELS = [
     "/\\.../\\/.."
   ]
 },
+{
+  "name": "Crossfire Corridor",
+  "size": 10,
+  "checkpoint": true,
+  "alienRow": 7,
+  "grid": [
+    "..........",
+    "..../.....",
+    "...\\......",
+    "...../....",
+    "..\\.......",
+    "....../...",
+    "......\\...",
+    "...\\......",
+    ".....\\....",
+    ".........."
+  ]
+}, 
+
+{
+  "name": "Reflection Trap",
+  "size": 10,
+  "checkpoint": false,
+  "alienRow": 1,
+  "grid": [
+    ".../......",
+    "..\\....../",
+    "...../....",
+    "...\\......",
+    "....../...",
+    "..\\....../",
+    ".....\\....",
+    ".../......",
+    "......../.",
+    ".........."
+  ]
+}, 
+
+{
+  "name": "Double Bounce Gauntlet",
+  "size": 12,
+  "checkpoint": false,
+  "alienRow": 8,
+  "grid": [
+    "..../....\\..",
+    "......\\..../",
+    "...\\..../...",
+    "...../..\\...",
+    "..\\.../.....",
+    "..../..\\....",
+    "...\\....../.",
+    ".../....\\...",
+    "..../....\\..",
+    "...\\..../...",
+    "....../...\\.",
+    "............"
+  ]
+},
+{
+  "name": "Brutal Mirror Labyrinth",
+  "size": 12,
+  "checkpoint": true,
+  "alienRow": 2,
+  "grid": [
+    "/\\.\\.\\/\\/\\.\\",
+    "./\\./...\\/\\\\",
+    ".\\/...\\../\\.",
+    "\\/.\\\\..\\.\\..",
+    "//../\\.\\..//",
+    "/.//.\\.\\///\\",
+    "\\/\\.//..\\\\\\/",
+    "\\.///\\\\\\.//\\",
+    ".\\\\\\../\\.\\//",
+    "/\\/\\./\\/../.",
+    "./\\\\/.../..\\",
+    ".\\//./\\\\/..\\"
+  ]
+},
+
+{
+  "name": "Red Mirror",
+  "size": 8,
+  "checkpoint": false,
+  "alienRow": 4,
+  "grid": [
+    "........",
+    ".../....",
+    ".../....",
+    ".../....",
+    "...r....",
+    ".../....",
+    "........",
+    "........"
+  ]
+},
+
+{
+  "name": "X marks the spot",
+  "size": 8,
+  "checkpoint": false,
+  "alienRow": 3,
+  "grid": [
+    "........",
+    ".../\\...",
+    ".../\\...",
+    "...rR...",
+    "...Rr...",
+    "...\\/...",
+    "...\\/...",
+    "........"
+  ]
+}, 
+
+{
+  "name": "Red Goalies",
+  "size": 8,
+  "checkpoint": false,
+  "alienRow": 4,
+  "grid": [
+    "../\\./..",
+    ".///\\\\\\.",
+    ".\\....R.",
+    "../...R.",
+    "..\\...r.",
+    "./....r.",
+    ".\\\\\\///.",
+    "..\\/.\\.."
+  ]
+}, 
 
 
   
@@ -197,23 +330,45 @@ export function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
 
 export function normalizeLevelObject(obj){
   const size = Number(obj.size);
-  if(!(size===8||size===10||size===12)) throw new Error("size must be 8, 10, or 12");
+  if(!(size===8||size===10||size===12)){
+    throw new Error("size must be 8, 10, or 12");
+  }
 
   const gridStrings = obj.grid;
-  if(!Array.isArray(gridStrings) || gridStrings.length !== size) {
+  if(!Array.isArray(gridStrings) || gridStrings.length !== size){
     throw new Error("grid must be an array of length == size");
   }
 
   const grid = [];
-  for(let y=0;y<size;y++){
+
+  for(let y=0; y<size; y++){
     const s = String(gridStrings[y]);
-    if(s.length !== size) throw new Error(`grid row ${y} must have length ${size}`);
-    const row = [];
-    for(let x=0;x<size;x++){
-      const ch = s[x];
-      if(ch === "." || ch === "/" || ch === "\\") row.push(ch);
-      else throw new Error(`invalid char '${ch}' at (${x},${y}) — use '.', '/', '\\\\'`);
+
+    if(s.length !== size){
+      throw new Error(`grid row ${y} must have length ${size}`);
     }
+
+    const row = [];
+
+    for(let x=0; x<size; x++){
+      const ch = s[x];
+
+      if(
+        ch === "." ||
+        ch === "/" ||
+        ch === "\\" ||
+        ch === "R" ||   // rotatable slash
+        ch === "r"      // rotatable backslash
+      ){
+        row.push(ch);
+      }
+      else {
+        throw new Error(
+          `invalid char '${ch}' at (${x},${y}) — use '.', '/', '\\\\', 'R', or 'r'`
+        );
+      }
+    }
+
     grid.push(row);
   }
 
@@ -221,10 +376,15 @@ export function normalizeLevelObject(obj){
     name: String(obj.name || "Untitled").slice(0, 60),
     size,
     checkpoint: !!obj.checkpoint,
-    alienRow: (Number.isFinite(obj.alienRow) ? clamp(obj.alienRow|0, 0, size-1) : null),
+    alienRow: (
+      Number.isFinite(obj.alienRow)
+        ? clamp(obj.alienRow|0, 0, size-1)
+        : null
+    ),
     grid
   };
 }
+
 
 export function levelToExportPayload(level){
   return {

@@ -327,8 +327,15 @@ window.addEventListener("pointerdown", async () => {
 
   function getCell(x,y){
     if(y<0||y>=state.size||x<0||x>=state.size) return ".";
-    return state.grid[y][x];
+    const cell = state.grid[y][x];
+
+    if(cell === "R") return "/";
+    if(cell === "r") return "\\";
+
+    return cell;
   }
+
+
 
   function reflect(dir, mirror){
     if(mirror === "/"){
@@ -425,8 +432,14 @@ window.addEventListener("pointerdown", async () => {
     state.grid = L.grid;
     state.playerRow = clamp(state.playerRow|0, 0, state.size-1);
 
-    const placed = ensureAlienRowSolvable(L.alienRow);
-    state.alienRow = (placed == null) ? Math.floor(state.size/2) : placed;
+    // Respect author-set alienRow if provided; otherwise pick a reachable one.
+    if(typeof L.alienRow === "number"){
+      state.alienRow = clamp(L.alienRow, 0, state.size-1);
+    } else {
+      const placed = ensureAlienRowSolvable(null);
+      state.alienRow = (placed == null) ? Math.floor(state.size/2) : placed;
+    }
+
 
     if(bannerText) setBanner(bannerText);
   }
@@ -655,10 +668,12 @@ window.addEventListener("pointerdown", async () => {
     const g = geom();
     ctx.save();
 
+    // frame
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 2;
     ctx.strokeRect(g.gridX, g.gridY, g.realW, g.realH);
 
+    // cell lines
     ctx.lineWidth = 1;
     ctx.strokeStyle = "rgba(255,255,255,0.08)";
     for(let y=0;y<=state.size;y++){
@@ -674,24 +689,46 @@ window.addEventListener("pointerdown", async () => {
       ctx.stroke();
     }
 
-    ctx.strokeStyle = "rgba(0,255,208,0.75)";
+    // mirrors
     ctx.lineWidth = Math.max(2, Math.floor(g.cell*0.10));
     ctx.lineCap = "round";
 
     for(let y=0;y<state.size;y++){
       for(let x=0;x<state.size;x++){
-        const m = getCell(x,y);
-        if(m !== "/" && m !== "\\") continue;
+        const raw = state.grid[y][x];
+
+        // Determine mirror type to draw (or skip)
+        let mirrorType = null; // "/" or "\\"
+        let isRot = false;
+
+        if(raw === "/" || raw === "\\"){
+          mirrorType = raw;
+        } else if(raw === "R" || raw === "r"){
+          mirrorType = (raw === "R") ? "/" : "\\";
+          isRot = true;
+        }else {
+          continue; // empty or unknown
+        }
+
+        // style per type
+        if(isRot){
+          ctx.strokeStyle = "rgba(255,40,80,0.95)"; // neon red
+          ctx.shadowColor = "rgba(255,40,80,0.9)";
+          ctx.shadowBlur = 12;
+        } else {
+          ctx.strokeStyle = "rgba(0,255,208,0.75)"; // neon cyan
+          ctx.shadowBlur = 0;
+        }
 
         const x0 = g.gridX + x*g.cell;
         const y0 = g.gridY + y*g.cell;
         const inset = g.cell*0.18;
 
         ctx.beginPath();
-        if(m === "/"){
+        if(mirrorType === "/"){
           ctx.moveTo(x0 + inset, y0 + g.cell - inset);
           ctx.lineTo(x0 + g.cell - inset, y0 + inset);
-        } else {
+        } else { // "\\"
           ctx.moveTo(x0 + inset, y0 + inset);
           ctx.lineTo(x0 + g.cell - inset, y0 + g.cell - inset);
         }
@@ -701,6 +738,7 @@ window.addEventListener("pointerdown", async () => {
 
     ctx.restore();
   }
+
 
   function drawShip(x, row, label, accent, img){
     const g = geom();
@@ -864,6 +902,46 @@ window.addEventListener("pointerdown", async () => {
   btnRestart.addEventListener("click", startCampaign);
   btnPrev.addEventListener("click", () => goToLevel(state.campaignIndex - 1, "LEVEL"));
   btnNext.addEventListener("click", () => goToLevel(state.campaignIndex + 1, "LEVEL"));
+
+  function mouseToCell(mx,my){
+    const g = geom();
+    if(mx < g.gridX || mx >= g.gridX + g.realW) return null;
+    if(my < g.gridY || my >= g.gridY + g.realH) return null;
+
+    const x = Math.floor((mx - g.gridX) / g.cell);
+    const y = Math.floor((my - g.gridY) / g.cell);
+
+    if(x<0||y<0||x>=state.size||y>=state.size) return null;
+    return {x,y};
+  }
+
+  canvas.addEventListener("click", (e) => {
+    if(state.turn !== "player") return;
+
+    const { mx, my } = toCanvasXY(e);
+    const cell = mouseToCell(mx, my);
+    if(!cell) return;
+
+    const raw = state.grid[cell.y][cell.x];
+
+    if(raw === "R"){
+      state.grid[cell.y][cell.x] = "r";
+      playSfx("ui_click");
+      return;
+    }
+
+    if(raw === "r"){
+      state.grid[cell.y][cell.x] = "R";
+      playSfx("ui_click");
+      return;
+    }
+  });
+
+
+
+
+
+
 
   elLevelMax.textContent = String(CAMPAIGN_LEVELS.length);
   state.playerRow = 0;

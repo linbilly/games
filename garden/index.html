@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Old MacDonald's Garden (Area = Multiplication)</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="title">🌾 Old MacDonald's Garden — Area Builder</div>
+
+    <div class="hud">
+      <div class="pill">Level: <b id="levelTitle">Carrot Field</b></div>
+      <div class="pill">Target: <b id="target">12</b></div>
+      <div class="pill">Rows: <b id="rows">-</b></div>
+      <div class="pill">Cols: <b id="cols">-</b></div>
+      <div class="pill">Area: <b id="area">-</b></div>
+      <div class="pill">Equation: <b id="eq">-</b></div>
+
+      <label class="toggle">
+        <input id="showGrid" type="checkbox" checked />
+        <span>Show grid</span>
+      </label>
+
+      <button id="reset" class="btn btn-ghost">Reset</button>
+    </div>
+
+    <div id="prompt" class="prompt"></div>
+    <div id="msg" class="msg">Drag a rectangle to make a field.</div>
+  </header>
+
+  <main class="stage">
+    <div class="wrapper">
+      <canvas id="c" width="720" height="720"></canvas>
+    </div>
+  </main>
+
+  <!-- Feedback Modal -->
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalText">
+    <div class="modal-card">
+      <div id="modalText" class="modal-text">Correct!</div>
+      <div class="modal-actions">
+        <button id="modalOk" class="btn">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

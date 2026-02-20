@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Vanish 5</title>
+  <title>Vanish</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,8 +11,8 @@
     <div class="brand">
       <div class="logo">V</div>
       <div>
-        <div class="title">Vanish 5</div>
-        <div class="subtitle">Memory Connect 5 (pieces fade out!)</div>
+        <div class="title">Vanish</div>
+        <div class="subtitle">Memory Connect (pieces fade after 3 seconds)</div>
       </div>
     </div>
 
@@ -34,10 +34,19 @@
         </select>
       </div>
 
+      <div class="control">
+        <label>Rules</label>
+        <select id="ruleSelect">
+          <option value="nolimit" selected>No limit</option>
+          <option value="renju">Renju Mode</option>
+          <option value="swap2">Swap2 Opening</option>
+        </select>
+      </div>
+
+
       <div class="control" id="aiControl">
         <label>AI</label>
         <select id="aiSelect">
-          <option value="easy">Easy</option>
           <option value="medium" selected>Medium</option>
           <option value="hard">Hard</option>
         </select>
@@ -46,17 +55,22 @@
       <div class="control">
         <label>Vanish</label>
         <select id="vanishSelect">
-          <option value="3000">3s (Hardcore)</option>
-          <option value="5000">5s</option>
-          <option value="10000" selected>10s</option>
-          <option value="20000">20s</option>
-          <option value="3600000">Off</option>
+          <option value="1000">1.0s</option>
+          <option value="2000">2.0s</option>
+          <option value="3000" selected>3.0s</option>
+          <option value="4000">4.0s</option>
+          <option value="5000">5.0s</option>
+          <option value="6000">6.0s</option>
+          <option value="7000">7.0s</option>
+          <option value="8000">8.0s</option>
+          <option value="9000">9.0s</option>
+          <option value="10000">10.0s</option>
+          <option value="3600000">60 minutes (stay revealed)</option>
         </select>
       </div>
 
       <button id="resumeBtn" class="btn ghost hidden">Resume</button>
       <button id="newGameBtn" class="btn">New Game</button>
-
     </div>
   </header>
 
@@ -81,12 +95,30 @@
 
       <div class="hint">
         Click a square to place. Pieces vanish visually, but remain on the board.<br/>
-        Misclick an occupied cell → board reveals briefly and you lose your turn.
+        Misclick an occupied cell → board reveals for review and the mistake meter shifts.
       </div>
     </section>
 
     <aside class="side">
       <div class="legend">
+        <div class="turn-box">
+          <div class="turn-label">Turn</div>
+          <div id="turnPiece" class="turn-piece p1" aria-label="Current turn piece"></div>
+        </div>
+
+        <div class="meter-box">
+          <div class="meter-title">Mistake Meter</div>
+          <div class="meter-row">
+            <div class="meter-label p1">P1</div>
+            <div id="mistakeMeter" class="meter" aria-label="Mistake meter"></div>
+            <div class="meter-label p2">P2</div>
+          </div>
+          <div class="meter-note">
+            P1 mistake moves the marker left. P2 mistake moves it right.
+            Reaching an end (3 steps) means that player forfeits their <b>current</b> move.
+          </div>
+        </div>
+
         <div class="legend-row">
           <div class="chip p1"></div>
           <div>
@@ -94,6 +126,7 @@
             <div class="legend-sub">Blue</div>
           </div>
         </div>
+
         <div class="legend-row">
           <div class="chip p2"></div>
           <div>
@@ -103,12 +136,6 @@
         </div>
       </div>
 
-      <div class="turn-box">
-        <div class="turn-label">Turn</div>
-        <div id="turnPiece" class="turn-piece p1" aria-label="Current turn piece"></div>
-      </div>
-
-
       <div class="mini">
         <div class="mini-title">Rules</div>
         <ul>
@@ -117,7 +144,8 @@
           <li>Trying to place on an occupied cell is a mistake:
             <ul>
               <li>Board reveals for review</li>
-              <li>You lose your turn</li>
+              <li>Mistake meter shifts toward that player</li>
+              <li>If the meter hits an end, that player forfeits their current move</li>
             </ul>
           </li>
           <li>First to connect the goal length wins.</li>
@@ -139,9 +167,11 @@
   </main>
 
   <footer class="footer">
-    Tip: In Single Player, AI can be unfair (perfect memory). Use Easy/Medium for a more human feel.
+    Tip: In Single Player, AI can be unfair (perfect memory). Use Medium/Hard for a more human feel.
   </footer>
 
+  <script src="rules.js"></script>
+  <script src="ai.js"></script>
   <script src="main.js"></script>
 </body>
 </html>
