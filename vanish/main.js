@@ -671,7 +671,9 @@ function applySettingsFromUI(){
   vanishMs = parseInt(vanishSelect.value, 10);
   aiLevel = aiSelect.value;
   
-  ruleMode = (ruleSelect && ruleSelect.value) ? ruleSelect.value : "nolimit";
+  window.aiLevel = aiLevel; // ✅ syncs difficulty for ai.js engine
+  
+  ruleMode = (ruleSelect && ruleSelect.value) ? ruleSelect.value : "nolimit"; // ✅ keeps rules working
 
   goal = (size === 3) ? 3 : 5;
 
