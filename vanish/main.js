@@ -117,7 +117,6 @@ let openingStones = [];
 
 // Penalty system
 let meterPos = 0; 
-let skipNext = { [P1]: false, [P2]: false };
 
 function idx(r,c){ return r*size + c; }
 function inBounds(r,c){ return r>=0 && c>=0 && r<size && c<size; }
@@ -222,16 +221,11 @@ function buildBoard(){
     }
   }
 
-  clearWinHighlights();
   setPills();
   initMistakeMeter();
   updateMistakeMeter();
 }
 
-function clearWinHighlights(){
-  const cells = boardEl.querySelectorAll(".cell");
-  cells.forEach(c => c.classList.remove("win-line"));
-}
 
 function renderPieceVisible(r,c,player){
   const k = idx(r,c);
@@ -311,25 +305,11 @@ function setAllPiecesVisible(forceVisible) {
   }
 }
 
-function applySkipIfNeeded(){
-  if (skipNext[currentPlayer]){
-    skipNext[currentPlayer] = false;
-    setAllPiecesVisible(false);
-    showOverlay(
-      "Penalty",
-      `${currentPlayer===P1?"Player 1":"Player 2"} forfeits this move (meter hit the end).`,
-      "OK"
-    );
-    overlayBtn.onclick = () => { overlayBtn.onclick = null; hideOverlay(); switchTurn(); };
-    return true;
-  }
-  return false;
-}
+
 
 function switchTurn(){
   currentPlayer = (currentPlayer === P1) ? P2 : P1;
   setPills();
-  applySkipIfNeeded();
 }
 
 function isOccupied(r,c){
@@ -635,35 +615,32 @@ function endGame(winObj, isDraw=false){
 }
 
 // ---------- AI ----------
-function aiMoveSoon(){
-  inputLocked = true;
-  
-  const tMs = window.getAIParams ? window.getAIParams().timeMs : 400;
-  const thinkingTime = tMs * (0.8 + Math.random() * 0.4);
+function aiMoveSoon() {
+  if (gameOver || !inputLocked) {
+    inputLocked = true;
+  }
 
   setTimeout(() => {
-    if (gameOver) return;
+    const move = window.chooseAiMove();
     
-    // Call the AI engine directly from ai.js
-    const move = window.chooseAiMove ? window.chooseAiMove() : randomEmptyMove();
-    
-    if (!move){
-      endGame({player:0,line:[]}, true);
-      return;
+    if (move) {
+      placePiece(move.r, move.c, currentPlayer, { animate: true, sfx: true });
+      
+      const win = checkWinFrom(move.r, move.c, currentPlayer);
+      if (win){
+        endGame(win);
+        return;
+      }
+      
+      if (!state.includes(0)){
+        endGame({player:0, line:[]}, true);
+        return;
+      }
+      
+      switchTurn();
+      inputLocked = false; // CRITICAL FIX: Unlock the board for the human!
     }
-    placePiece(move.r, move.c, aiPlaysAs, {animate:true, sfx:true});
-    const win = checkWinFrom(move.r, move.c, aiPlaysAs);
-    if (win){
-      endGame(win);
-      return;
-    }
-    if (!state.includes(0)){
-      endGame({player:0,line:[]}, true);
-      return;
-    }
-    switchTurn();
-    inputLocked = false;
-  }, thinkingTime);
+  }, 600);
 }
 
 // ---------- Setup / UI ----------
@@ -708,8 +685,6 @@ function finalizeRoles(winnerOfOpening) {
 
 function newGame() {
   meterPos = 0; 
-  skipNext[P1] = false;
-  skipNext[P2] = false;
   openingStones = [];
   
   applySettingsFromUI();
@@ -782,7 +757,6 @@ muteToggle.addEventListener("change", (e) => {
 
 // Final assignments
 window.handleSwap2Move = handleSwap2Move;
-window.setSwap2Phase = function(phase) { swap2Phase = phase; }; 
 window.showOverlay = showOverlay;
 window.overlayBtn = overlayBtn;
 window.finalizeRoles = finalizeRoles;

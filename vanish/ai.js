@@ -1,4 +1,9 @@
 /* Vanish - AI Engine */
+
+
+  
+
+
 (() => {
   'use strict';
 
@@ -13,9 +18,55 @@
     return AI_CONFIGS[window.aiLevel || "medium"] || AI_CONFIGS["medium"];
   }
 
-  function chooseAiMove(){
-    if (size === 3) return minimaxBestMove(aiPlaysAs);
-    return alphaBetaBestMove(getAIParams());
+  function chooseAiMove() {
+    // 1. Swap2 Opening Phase 2 (Removed 'window.' prefix)
+    if (ruleMode === "renju" && swap2Phase === 2) {
+      return aiSwap2Choice();
+    }
+    
+    // Calculate roles dynamically (Removed 'window.' prefix)
+    const me = aiPlaysAs;
+    const opp = (me === P1) ? P2 : P1;
+
+    // 2. Standard Tactic (Win/Block)
+    const tactic = findImmediateTactic(state, me, opp);
+    if (tactic) return tactic;
+
+    // 3. Minimax Search
+    const best = alphaBetaBestMove(getAIParams());
+    return best || randomEmptyMove();
+  }
+
+  function aiSwap2Choice() {
+    const currentScore = evaluatePosition(state, P1); 
+    
+    if (currentScore > 1200) {
+      finalizeRoles(P1); 
+      return null; 
+    } else if (currentScore < -1200) {
+      finalizeRoles(P2); 
+      return null;
+    }
+
+    // Set the globals directly without 'window.'
+    swap2Phase = 3;
+    inputLocked = true;
+
+    const bestPair = findBestSwap2Pair();
+    
+    if (bestPair) {
+      setTimeout(() => {
+        handleSwap2Move(bestPair.white.r, bestPair.white.c);
+        setTimeout(() => {
+          handleSwap2Move(bestPair.black.r, bestPair.black.c);
+        }, 600);
+      }, 600);
+    } else {
+      // Defensive fallback if AI generator fails
+      finalizeRoles(P2);
+    }
+    
+    return null; 
   }
 
   function getAiPerceivedState(forgetBase){
@@ -310,41 +361,6 @@
     return false;
   }
 
-  // --- SWAP2 AI LOGIC ---
-  function aiSwap2Choice() {
-    const currentScore = evaluatePosition(state, P1); 
-    
-    // Threshold increased significantly to prevent AI from stealing Black prematurely
-    if (currentScore > 4000) {
-      if (window.showOverlay) {
-          window.showOverlay("AI Swap2 Choice", "The AI evaluated your opening as heavily favored and chose to Swap to Black. You are now playing as White. It is your turn.", "Play as White");
-          window.overlayBtn.onclick = () => { window.overlayBtn.onclick = null; window.finalizeRoles(P1); };
-      } else {
-          window.finalizeRoles(P1); 
-      }
-      return;
-    } else if (currentScore < -500) {
-      if (window.showOverlay) {
-          window.showOverlay("AI Swap2 Choice", "The AI evaluated your opening as weak and chose to Stay White. You are Black. The AI will now make its move.", "Continue");
-          window.overlayBtn.onclick = () => { window.overlayBtn.onclick = null; window.finalizeRoles(P2); };
-      } else {
-          window.finalizeRoles(P2);
-      }
-      return;
-    }
-
-    const bestPair = findBestSwap2Pair();
-    if(bestPair) {
-      if (window.setSwap2Phase) window.setSwap2Phase(3); 
-      
-      setTimeout(() => {
-        window.handleSwap2Move(bestPair.white.r, bestPair.white.c);
-        setTimeout(() => window.handleSwap2Move(bestPair.black.r, bestPair.black.c), 600);
-      }, 600);
-    } else {
-      window.finalizeRoles(P2); 
-    }
-  }
 
   function findBestSwap2Pair() {
     const params = getAIParams();
