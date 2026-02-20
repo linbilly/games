@@ -56,9 +56,25 @@ select { background: rgba(255,255,255,.06); color: var(--text); border: 1px soli
 
 .pop-in { animation: stonePop .2s ease-out forwards; }
 @keyframes stonePop { 0% { transform: scale(1.25); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-.fade-out { animation: fadeOut .8s ease forwards; }
-@keyframes fadeOut { to { opacity: 0; transform: scale(0.95); } }
-.reveal .piece { opacity: 1 !important; transform: scale(1) !important; animation: none !important; }
+
+/* --- Slow Fade Out --- */
+.fade-out { 
+  animation: fadeOut 2s ease forwards !important; 
+}
+
+@keyframes fadeOut { 
+  /* Explicitly tell it to start at full visibility so it doesn't drop instantly */
+  0% { opacity: 1; transform: scale(1); } 
+  100% { opacity: 0; transform: scale(0.95); } 
+}
+
+/* Only reveal pieces that actually belong to a player */
+.reveal .piece.p1,
+.reveal .piece.p2 {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+  animation: none !important;
+}
 
 .win-line { z-index: 10; }
 .win-line::before, .win-line::after { background: #ffcf40 !important; box-shadow: 0 0 12px #ffcf40; height: 2.5px !important; width: 2.5px !important; }

@@ -236,8 +236,10 @@ function clearWinHighlights(){
 function renderPieceVisible(r,c,player){
   const k = idx(r,c);
   const piece = pieceEls[k];
-  piece.style.opacity = "";
-  piece.style.transform = "";
+  
+  // Set these to explicitly be visible before the animation classes take over
+  piece.style.opacity = "1"; 
+  piece.style.transform = "scale(1)";
   piece.className = `piece ${player === P1 ? "p1" : "p2"} pop-in`;
 
   if (ruleMode === "swap2" && swap2Phase > 0) return; // Keep visible during Swap2
@@ -246,7 +248,7 @@ function renderPieceVisible(r,c,player){
     if (boardEl.classList.contains("reveal") || (ruleMode === "swap2" && swap2Phase > 0)) return;
     piece.classList.remove("pop-in");
     piece.classList.add("fade-out");
-  }, Math.max(0, vanishMs - 800));
+  }, Math.max(0, vanishMs - 2000));
 
   window.setTimeout(() => {
     if (boardEl.classList.contains("reveal") || (ruleMode === "swap2" && swap2Phase > 0)) return;
@@ -294,7 +296,7 @@ function setAllPiecesVisible(forceVisible) {
           window.setTimeout(() => {
             if (boardEl.classList.contains("reveal") || (ruleMode === "swap2" && swap2Phase > 0)) return;
             piece.classList.add("fade-out");
-          }, Math.max(0, remaining - 800));
+          }, Math.max(0, remaining - 2000));
 
           window.setTimeout(() => {
             if (boardEl.classList.contains("reveal") || (ruleMode === "swap2" && swap2Phase > 0)) return;
