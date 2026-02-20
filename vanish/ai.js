@@ -6,12 +6,12 @@
 
 (() => {
   'use strict';
-
-  /* Replace the AI_CONFIGS at the top of ai.js */
   const AI_CONFIGS = {
     "easy":   { depth: 2, candidates: 2,  timeMs: 400,  forgetBase: 0.30 }, // High forgetfulness, narrow vision
     "medium": { depth: 4, candidates: 6,  timeMs: 800,  forgetBase: 0.12 },
-    "hard":   { depth: 6, candidates: 12, timeMs: 2500, forgetBase: 0.04 }
+    "hard":   { depth: 6, candidates: 12, timeMs: 2500, forgetBase: 0.04 },
+        // Expert: Massive depth, wide candidate net, hard capped at 3000ms. 0 forgetfulness.
+    "expert": { depth: 12, candidates: 16, timeMs: 3000, forgetBase: 0.00 }
   };
 
   function getAIParams() {
@@ -332,34 +332,51 @@
   }
 
   function calculateRenjuTraps(s) {
-    // Easy AI doesn't understand or look for Renju traps
-    if (window.aiLevel === "easy") return 0; 
+    // Easy and Medium don't understand how to weaponize Renju fouls
+    if (window.aiLevel === "easy" || window.aiLevel === "medium") return 0; 
 
     let trapBonus = 0;
-    const difficultyMultiplier = window.aiLevel === "hard" ? 1.5 : 1.0;
+    // The Expert AI applies a massive multiplier to trap hunting
+    const mult = window.aiLevel === "expert" ? 2.5 : 1.0; 
     
+    // In Renju, only Black (P1) has forbidden moves. White (P2) uses them as weapons.
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size; c++) {
         if (s[idx(r, c)] !== 0) continue;
         
-        if (isNearWhiteThreat(r, c, s)) {
-            const res = window.violatesRenju(r, c, 1, s);
-            if (!res.isValid) {
-                trapBonus += 1000 * difficultyMultiplier; 
+        // 1. Is this empty square a forbidden foul for Black?
+        const res = window.violatesRenju(r, c, P1, s);
+        if (!res.isValid) {
+            
+            // 2. It is forbidden! Let's see if White is attacking this exact square.
+            const dirs = [{dr:0, dc:1}, {dr:1, dc:0}, {dr:1, dc:1}, {dr:1, dc:-1}];
+            for (const {dr, dc} of dirs) {
+              
+              // lineInfo returns count = 1 (the empty square) + actual adjacent White stones
+              const {count} = lineInfo(s, r, c, dr, dc, P2);
+              
+              if (count >= 5) {
+                  // LETHAL TRAP: White has 4 stones. Black MUST block here, 
+                  // but it's a foul! This is an unblockable instant win for White.
+                  trapBonus += 500000 * mult; 
+              } 
+              else if (count === 4) {
+                  // DEADLY: White has 3 stones aiming at a foul point. 
+                  // White is one move away from creating the lethal trap above.
+                  trapBonus += 25000 * mult;
+              }
+              else if (count === 3) {
+                  // TACTICAL: White has 2 stones aiming at the foul point.
+                  // The AI will actively build its lines in this direction.
+                  trapBonus += 3000 * mult;
+              }
             }
         }
       }
     }
     return trapBonus;
   }
-
-  function isNearWhiteThreat(r, c, s) {
-    const dirs = [{dr:0, dc:1}, {dr:1, dc:0}, {dr:1, dc:1}, {dr:1, dc:-1}];
-    for (const {dr, dc} of dirs) {
-      if (lineInfo(s, r, c, dr, dc, P2).count >= 3) return true;
-    }
-    return false;
-  }
+  
 
 
   function findBestSwap2Pair() {

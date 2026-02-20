@@ -620,6 +620,14 @@ function aiMoveSoon() {
     inputLocked = true;
   }
 
+  // UX Fix: Tell the user the AI is crunching numbers before locking the thread
+  if (turnPill) {
+    turnPill.textContent = "Turn: AI (Thinking...)";
+    turnPill.style.color = "#ffcf40"; // Give it a gold highlight while thinking
+  }
+
+  // Use a short 50ms timeout. This gives the browser exactly enough time 
+  // to paint the "Thinking..." text to the screen before the AI locks the thread.
   setTimeout(() => {
     const move = window.chooseAiMove();
     
@@ -638,9 +646,12 @@ function aiMoveSoon() {
       }
       
       switchTurn();
-      inputLocked = false; // CRITICAL FIX: Unlock the board for the human!
+      inputLocked = false; 
+      
+      // Reset the turn pill color back to normal for the human
+      if (turnPill) turnPill.style.color = ""; 
     }
-  }, 600);
+  }, 50);
 }
 
 // ---------- Setup / UI ----------
