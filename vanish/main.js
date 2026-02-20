@@ -36,7 +36,7 @@ const mistakeMeterEl = $("mistakeMeter");
 
 const resumeBtn = $("resumeBtn");
 
-// ---------- Audio (WebAudio, no files needed) ----------
+// ---------- Audio ----------
 let audioCtx = null;
 let audioEnabled = false;
 let muted = false;
@@ -81,11 +81,7 @@ function sfxReveal() {
   tone({freq: 420, type:"sine", gain:0.05, dur:0.09, slideTo: 760});
 }
 function sfxWin() {
-  const seq = [
-    {f:520, d:0.08},
-    {f:660, d:0.08},
-    {f:880, d:0.10},
-  ];
+  const seq = [{f:520, d:0.08}, {f:660, d:0.08}, {f:880, d:0.10}];
   let t = 0;
   for (const s of seq) {
     setTimeout(() => tone({freq:s.f, type:"triangle", gain:0.08, dur:s.d}), t);
@@ -101,41 +97,44 @@ let size = 9;
 let goal = 5;
 let vanishMs = 3000;
 
-let state = [];          // 0 empty, 1 P1, 2 P2
+let state = [];          
 let pieceEls = [];
-let placedAt = [];       // ms timestamps of placement (for AI memory model)
-let lastRevealAt = 0;    // ms timestamp of last full reveal       // DOM references for the "piece" div in each cell
+let placedAt = [];       
+let lastRevealAt = 0;    
 let currentPlayer = P1;
 let gameOver = false;
 
-let mode = "pvp";        // "pvp" | "ai"
+let mode = "pvp";        
 let aiLevel = "medium";
-let ruleMode = (ruleSelect && ruleSelect.value) ? ruleSelect.value : "nolimit"; // nolimit | renju | swap2 (if UI present)
-let aiPlaysAs = P2;      // AI is player 2
+let ruleMode = (ruleSelect && ruleSelect.value) ? ruleSelect.value : "nolimit"; 
+let aiPlaysAs = P2;      
 let inputLocked = false;
-let mistakeResumeArmed = false; // board revealed after mistake; next click auto-resumes
+let mistakeResumeArmed = false; 
+
+// Swap2 Logic Variables
+let swap2Phase = 0; 
+let openingStones = [];
 
 // Penalty system
-let meterPos = 0; // -3 .. +3 (0 is center). P1 mistakes move left (negative), P2 mistakes move right (positive).
+let meterPos = 0; 
 let skipNext = { [P1]: false, [P2]: false };
 
 function idx(r,c){ return r*size + c; }
 function inBounds(r,c){ return r>=0 && c>=0 && r<size && c<size; }
 
 function setPills(){
-  turnPill.textContent = `Turn: ${currentPlayer === P1 ? "P1" : (mode==="ai" ? "AI" : "P2")}`;
+  turnPill.textContent = `Turn: ${currentPlayer === P1 ? "Black" : (mode==="ai" ? "AI" : "White")}`;
   goalPill.textContent = `Goal: Connect ${goal}`;
   modePill.textContent = `Mode: ${mode === "ai" ? "Single Player" : "PvP"}`;
   p2Label.textContent = (mode==="ai") ? "AI Opponent" : "Player 2";
-  p2Sub.textContent = (mode==="ai") ? `Difficulty: ${aiLevel}` : "Red";
-  // Side turn indicator piece
+  p2Sub.textContent = (mode==="ai") ? `Difficulty: ${aiLevel}` : "White";
+  
   if (turnPiece){
     turnPiece.classList.toggle("p1", currentPlayer === P1);
     turnPiece.classList.toggle("p2", currentPlayer !== P1);
   }
 
   updateMistakeMeter();
-
 }
 
 function initMistakeMeter(){
@@ -157,7 +156,6 @@ function updateMistakeMeter(){
   const idxSlot = 3 + clamped;
   if (slots[idxSlot]) slots[idxSlot].classList.add('marker');
 }
-
 
 function showOverlay(title, body, btnText="Continue"){
   overlayTitle.textContent = title;
@@ -182,10 +180,33 @@ function buildBoard(){
   boardEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
   boardEl.style.gridTemplateRows = `repeat(${size}, 1fr)`;
 
+  if (size === 3) {
+    boardEl.classList.add("tictactoe");
+    boardEl.parentElement.classList.add("no-border");
+  } else {
+    boardEl.classList.remove("tictactoe");
+    boardEl.parentElement.classList.remove("no-border");
+  }
+
   for (let r=0; r<size; r++){
     for (let c=0; c<size; c++){
       const cell = document.createElement("div");
       cell.className = "cell";
+      
+      if (size > 3) {
+        if (r === 0) cell.classList.add("edge-top");
+        if (r === size - 1) cell.classList.add("edge-bottom");
+        if (c === 0) cell.classList.add("edge-left");
+        if (c === size - 1) cell.classList.add("edge-right");
+        
+        if (size === 15) {
+          const hoshiCoords = [3, 7, 11]; 
+          if (hoshiCoords.includes(r) && hoshiCoords.includes(c)) {
+            cell.classList.add("hoshi");
+          }
+        }
+      }
+
       cell.dataset.r = r;
       cell.dataset.c = c;
 
@@ -219,15 +240,16 @@ function renderPieceVisible(r,c,player){
   piece.style.transform = "";
   piece.className = `piece ${player === P1 ? "p1" : "p2"} pop-in`;
 
-  // schedule vanish animation
+  if (ruleMode === "swap2" && swap2Phase > 0) return; // Keep visible during Swap2
+
   window.setTimeout(() => {
-    if (boardEl.classList.contains("reveal")) return;
+    if (boardEl.classList.contains("reveal") || (ruleMode === "swap2" && swap2Phase > 0)) return;
     piece.classList.remove("pop-in");
     piece.classList.add("fade-out");
   }, Math.max(0, vanishMs - 800));
 
   window.setTimeout(() => {
-    if (boardEl.classList.contains("reveal")) return;
+    if (boardEl.classList.contains("reveal") || (ruleMode === "swap2" && swap2Phase > 0)) return;
     piece.classList.remove("fade-out");
     piece.style.opacity = "0";
   }, vanishMs);
@@ -260,26 +282,22 @@ function setAllPiecesVisible(forceVisible) {
       if (forceVisible) {
         piece.style.opacity = "1";
         piece.style.transform = "scale(1)";
-        // Remove any active fade-out classes while board is revealed
         piece.classList.remove("fade-out");
       } else {
-        // RESUME LOGIC: Check if this piece should still be visible
         const age = now - placedAt[k];
         const remaining = vanishMs - age;
 
-        // If vanishMs is 60 mins (3600000ms), it effectively never vanishes.
         if (remaining > 0) {
           piece.style.opacity = "1";
           piece.style.transform = "scale(1)";
           
-          // Re-trigger the vanish timer for the remaining duration
           window.setTimeout(() => {
-            if (boardEl.classList.contains("reveal")) return;
+            if (boardEl.classList.contains("reveal") || (ruleMode === "swap2" && swap2Phase > 0)) return;
             piece.classList.add("fade-out");
           }, Math.max(0, remaining - 800));
 
           window.setTimeout(() => {
-            if (boardEl.classList.contains("reveal")) return;
+            if (boardEl.classList.contains("reveal") || (ruleMode === "swap2" && swap2Phase > 0)) return;
             piece.classList.remove("fade-out");
             piece.style.opacity = "0";
           }, remaining);
@@ -294,14 +312,12 @@ function setAllPiecesVisible(forceVisible) {
 function applySkipIfNeeded(){
   if (skipNext[currentPlayer]){
     skipNext[currentPlayer] = false;
-    // Keep board hidden when skipping
     setAllPiecesVisible(false);
     showOverlay(
       "Penalty",
       `${currentPlayer===P1?"Player 1":"Player 2"} forfeits this move (meter hit the end).`,
       "OK"
     );
-    // After acknowledging, pass turn
     overlayBtn.onclick = () => { overlayBtn.onclick = null; hideOverlay(); switchTurn(); };
     return true;
   }
@@ -311,7 +327,6 @@ function applySkipIfNeeded(){
 function switchTurn(){
   currentPlayer = (currentPlayer === P1) ? P2 : P1;
   setPills();
-  // If the next player must skip, apply immediately.
   applySkipIfNeeded();
 }
 
@@ -319,36 +334,141 @@ function isOccupied(r,c){
   return state[idx(r,c)] !== 0;
 }
 
+// --- Swap2 Logic ---
+function handleSwap2Move(r, c) {
+  if (isOccupied(r, c)) return;
+
+  if (swap2Phase === 1) {
+    const color = (openingStones.length === 1) ? P2 : P1; 
+    placePiece(r, c, color, { animate: true, sfx: true });
+    openingStones.push({ r, c, color });
+
+    if (openingStones.length === 3) {
+      swap2Phase = 2;
+      inputLocked = true; // Lock while choosing!
+      if (mode === "ai" && aiPlaysAs === P2) {
+        setTimeout(() => { if (window.aiSwap2Choice) window.aiSwap2Choice(); }, 500);
+      } else {
+        showSwap2ChoiceOverlay();
+      }
+    }
+  } else if (swap2Phase === 3) {
+    const color = (openingStones.length === 3) ? P2 : P1;
+    placePiece(r, c, color, { animate: true, sfx: true });
+    openingStones.push({ r, c, color });
+
+    if (openingStones.length === 5) {
+      swap2Phase = 4;
+      inputLocked = true; // Lock while deciding!
+      if (mode === "ai" && aiPlaysAs === P1) {
+         const currentScore = window.evaluatePosition ? window.evaluatePosition(state, P1) : 0;
+         setTimeout(() => finalizeRoles(currentScore > 0 ? P1 : P2), 1000);
+      } else {
+        showP1FinalChoice();
+      }
+    }
+  }
+}
+
+function clearOverlayButtons() {
+    const card = document.querySelector('.overlay-card');
+    const old = card.querySelector('.choice-container');
+    if (old) old.remove();
+}
+
+function showSwap2ChoiceOverlay() {
+  inputLocked = true;
+  showOverlay("Swap2: Choice", "Choose your path as Player 2:", "Stay White");
+
+  const card = document.querySelector('.overlay-card');
+  clearOverlayButtons();
+
+  const btnContainer = document.createElement('div');
+  btnContainer.className = "choice-container";
+
+  const swapBtn = document.createElement('button');
+  swapBtn.className = "btn ghost";
+  swapBtn.textContent = "Swap to Black";
+  swapBtn.onclick = () => { overlayBtn.onclick = null; finalizeRoles(P1); };
+
+  const plus2Btn = document.createElement('button');
+  plus2Btn.className = "btn ghost";
+  plus2Btn.textContent = "Place 2 More";
+  plus2Btn.onclick = () => { 
+    overlayBtn.onclick = null; 
+    swap2Phase = 3; 
+    inputLocked = false; 
+    hideOverlay(); 
+  };
+
+  btnContainer.append(swapBtn, plus2Btn);
+  card.insertBefore(btnContainer, overlayBtn);
+
+  overlayBtn.onclick = () => { overlayBtn.onclick = null; finalizeRoles(P2); };
+}
+
+function showP1FinalChoice() {
+  inputLocked = true;
+  const currentScore = window.evaluatePosition ? window.evaluatePosition(state, P1) : 0;
+  const suggestion = currentScore > 0 ? "Black" : "White";
+
+  showOverlay(
+    "Swap2: Final Choice", 
+    `Player 2 has added two stones. Now, Player 1 (You) must choose your final color. (AI suggests: ${suggestion})`, 
+    "Play as Black"
+  );
+
+  const card = document.querySelector('.overlay-card');
+  clearOverlayButtons();
+
+  const btnContainer = document.createElement('div');
+  btnContainer.className = "choice-container";
+
+  const whiteBtn = document.createElement('button');
+  whiteBtn.className = "btn ghost";
+  whiteBtn.textContent = "Play as White";
+  whiteBtn.onclick = () => { overlayBtn.onclick = null; finalizeRoles(P2); };
+
+  btnContainer.appendChild(whiteBtn);
+  card.insertBefore(btnContainer, overlayBtn);
+
+  overlayBtn.onclick = () => { overlayBtn.onclick = null; finalizeRoles(P1); };
+}
+
+// ------------------------------------
+
 function onCellClick(r,c){
   if (gameOver || inputLocked) return;
 
-  // If the board is revealed from a mistake, the next player's first click auto-resumes.
   if (mistakeResumeArmed){
     mistakeResumeArmed = false;
     setAllPiecesVisible(false);
-    if (resumeBtn) if (resumeBtn) resumeBtn && resumeBtn.classList.add("hidden");
+    if (resumeBtn) resumeBtn.classList.add("hidden");
   }
-  if (mode === "ai" && currentPlayer === aiPlaysAs) return;
+  
+  if (mode === "ai" && currentPlayer === aiPlaysAs && swap2Phase === 0) return;
 
+  if (ruleMode === "swap2" && swap2Phase > 0) {
+    handleSwap2Move(r, c);
+    return;
+  }
 
   if (isOccupied(r,c)){
     handleMistake();
     return;
   }
 
-  // --- RENJU INTEGRATION START ---
-
-  if (ruleMode === "renju" && currentPlayer === P1) {
+  const isRenju = (ruleMode === "renju" || ruleMode === "swap2");
+  if (isRenju && currentPlayer === P1) {
       state[idx(r,c)] = P1; 
-      const result = window.violatesRenju(r,c);
+      const result = window.violatesRenju(r, c, 1, state);
       state[idx(r,c)] = 0; 
 
       if (!result.isValid) {
-          handleMistake(result.reason); // Pass the specific rule name
+          handleMistake(result.reason); 
           return;
       }
   }
-  // --- RENJU INTEGRATION END ---
 
   placePiece(r,c,currentPlayer, {animate:true, sfx:true});
   const win = checkWinFrom(r,c,currentPlayer);
@@ -383,7 +503,6 @@ function placePiece(r,c,player,{animate=false,sfx=false}={}){
   }
 }
 
-/* main.js - Fixed handleMistake */
 function handleMistake(customMsg) {
   sfxMistake();
   inputLocked = true;
@@ -443,7 +562,6 @@ function handleMistake(customMsg) {
     }
   };
 
-  // Fixed Button Logic: Use onclick to avoid parentNode null errors
   if (!hitEnd && resumeBtn) {
     resumeBtn.onclick = resumeGame; 
   }
@@ -493,12 +611,10 @@ function endGame(winObj, isDraw=false){
   gameOver = true;
   inputLocked = true;
 
-  // reveal full board permanently so players can review
   setAllPiecesVisible(true);
 
   if (isDraw){
     showOverlay("Draw", "No more moves left. You can close this and review the final board. Click New Game when you're ready to restart.", "Close");
-    // Just close — don't reset the board automatically
     overlayBtn.onclick = () => { overlayBtn.onclick = null; hideOverlay(); };
     return;
   }
@@ -509,23 +625,26 @@ function endGame(winObj, isDraw=false){
   sfxWin();
 
   const winnerText =
-    (winObj.player === P1) ? "Player 1 (Blue)" :
-    (mode==="ai" ? "AI (Red)" : "Player 2 (Red)");
+    (winObj.player === P1) ? "Player 1 (Black)" :
+    (mode==="ai" ? "AI (White)" : "Player 2 (White)");
 
   showOverlay("Winner!", `${winnerText} connected ${goal}. Close this to review the final board. Click New Game to play again.`, "Close");
-  // Just close — keep the revealed board for review
   overlayBtn.onclick = () => { overlayBtn.onclick = null; hideOverlay(); };
 }
-
-
-
 
 // ---------- AI ----------
 function aiMoveSoon(){
   inputLocked = true;
+  
+  const tMs = window.getAIParams ? window.getAIParams().timeMs : 400;
+  const thinkingTime = tMs * (0.8 + Math.random() * 0.4);
+
   setTimeout(() => {
     if (gameOver) return;
-    const move = chooseAiMove();
+    
+    // Call the AI engine directly from ai.js
+    const move = window.chooseAiMove ? window.chooseAiMove() : randomEmptyMove();
+    
     if (!move){
       endGame({player:0,line:[]}, true);
       return;
@@ -542,85 +661,7 @@ function aiMoveSoon(){
     }
     switchTurn();
     inputLocked = false;
-  }, 420);
-}
-
-
-function chooseAiMove(){
-  // AI engine is in ai.js (window.aiChooseMove). No legacy heuristic fallbacks.
-  if (aiLevel === "easy") aiLevel = "medium"; // just in case old settings existed
-  if (window.aiChooseMove) return window.aiChooseMove();
-  // Fallback: pick first empty (should never happen if ai.js loaded)
-  return randomEmptyMove();
-}
-
-
-function randomEmptyMove(){
-  const empties = [];
-  for (let r=0; r<size; r++){
-    for (let c=0; c<size; c++){
-      if (state[idx(r,c)]===0) empties.push({r,c});
-    }
-  }
-  if (!empties.length) return null;
-  return empties[Math.floor(Math.random()*empties.length)];
-}
-
-// ----- Minimax for 3x3 -----
-function minimaxBestMove(player){
-  const opponent = (player===P1)?P2:P1;
-
-  function winnerOn3(){
-    const lines = [
-      [0,1,2],[3,4,5],[6,7,8],
-      [0,3,6],[1,4,7],[2,5,8],
-      [0,4,8],[2,4,6]
-    ];
-    for (const L of lines){
-      const a=state[L[0]], b=state[L[1]], c=state[L[2]];
-      if (a && a===b && b===c) return a;
-    }
-    return 0;
-  }
-
-  function minimax(turn, depth){
-    const w = winnerOn3();
-    if (w === player) return 10 - depth;
-    if (w === opponent) return depth - 10;
-    if (!state.includes(0)) return 0;
-
-    let best = (turn===player) ? -Infinity : Infinity;
-
-    for (let i=0; i<9; i++){
-      if (state[i]!==0) continue;
-      state[i] = turn;
-      const score = minimax(turn===player?opponent:player, depth+1);
-      state[i] = 0;
-
-      if (turn===player) best = Math.max(best, score);
-      else best = Math.min(best, score);
-    }
-    return best;
-  }
-
-  let bestScore = -Infinity;
-  let bestMove = null;
-
-  for (let r=0; r<3; r++){
-    for (let c=0; c<3; c++){
-      const k = idx(r,c);
-      if (state[k]!==0) continue;
-      state[k] = player;
-      const score = minimax(opponent, 0);
-      state[k] = 0;
-      if (score > bestScore){
-        bestScore = score;
-        bestMove = {r,c};
-      }
-    }
-  }
-
-  return bestMove || randomEmptyMove();
+  }, thinkingTime);
 }
 
 // ---------- Setup / UI ----------
@@ -629,6 +670,8 @@ function applySettingsFromUI(){
   size = parseInt(boardSelect.value, 10);
   vanishMs = parseInt(vanishSelect.value, 10);
   aiLevel = aiSelect.value;
+  
+  ruleMode = (ruleSelect && ruleSelect.value) ? ruleSelect.value : "nolimit";
 
   goal = (size === 3) ? 3 : 5;
 
@@ -636,24 +679,57 @@ function applySettingsFromUI(){
   setPills();
 }
 
+function finalizeRoles(winnerOfOpening) {
+  clearOverlayButtons();
+  overlayBtn.onclick = null;
+
+  if ((swap2Phase === 2 && winnerOfOpening === P1) || (swap2Phase === 4 && winnerOfOpening === P2)) {
+     aiPlaysAs = (aiPlaysAs === P1) ? P2 : P1;
+  }
+  
+  swap2Phase = 0;
+  hideOverlay();
+  inputLocked = false;
+  
+  const now = performance.now();
+  for (let i = 0; i < state.length; i++) { if (state[i] !== 0) placedAt[i] = now; }
+  
+  // FIX: Explicitly trigger the vanish logic now that Swap2 phase is over
+  setAllPiecesVisible(false);
+  
+  currentPlayer = P2; 
+  setPills();
+  if (mode === "ai" && currentPlayer === aiPlaysAs) aiMoveSoon();
+}
+
 function newGame() {
   meterPos = 0; 
   skipNext[P1] = false;
   skipNext[P2] = false;
+  openingStones = [];
   
-  ruleMode = (ruleSelect && ruleSelect.value) ? ruleSelect.value : "nolimit";
   applySettingsFromUI();
-  
   initMistakeMeter(); 
   updateMistakeMeter(); 
   
   buildBoard();
   hideOverlay();
-  setPills();
+  clearOverlayButtons();
+  overlayBtn.onclick = null; 
   
-  inputLocked = false;
+  if (ruleMode === "swap2") {
+      swap2Phase = 1;
+      inputLocked = false; 
+      currentPlayer = P1;
+      setPills();
+      showOverlay("Swap2 Opening", "Player 1: Place the first 3 stones (Black, White, Black).", "Let's Go");
+  } else {
+      swap2Phase = 0;
+      inputLocked = false;
+      currentPlayer = P1;
+      setPills();
+  }
   
-  // If vanishMs is 60 minutes, start the board in reveal mode
   if (vanishMs >= 3600000) {
     setAllPiecesVisible(true);
   } else {
@@ -661,6 +737,10 @@ function newGame() {
   }
 
   if (resumeBtn) resumeBtn.classList.add("hidden");
+  
+  if (mode === "ai" && currentPlayer === aiPlaysAs && swap2Phase === 0) {
+      aiMoveSoon();
+  }
 }
 
 newGameBtn.addEventListener("click", newGame);
@@ -672,10 +752,17 @@ modeSelect.addEventListener("change", () => {
 });
 
 boardSelect.addEventListener("change", newGame);
+
+ruleSelect.addEventListener("change", () => {
+  applySettingsFromUI();
+  newGame();
+});
+
 aiSelect.addEventListener("change", () => {
   applySettingsFromUI();
   setPills();
 });
+
 vanishSelect.addEventListener("change", newGame);
 
 audioBtn.addEventListener("click", () => {
@@ -688,6 +775,13 @@ audioBtn.addEventListener("click", () => {
 muteToggle.addEventListener("change", (e) => {
   muted = e.target.checked;
 });
+
+// Final assignments
+window.handleSwap2Move = handleSwap2Move;
+window.setSwap2Phase = function(phase) { swap2Phase = phase; }; 
+window.showOverlay = showOverlay;
+window.overlayBtn = overlayBtn;
+window.finalizeRoles = finalizeRoles;
 
 applySettingsFromUI();
 newGame();
