@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Robot City (Area Builder Prototype)</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="title">🤖🏙️ Robot City — Area Builder</div>
+
+    <div class="hud">
+      <div class="pill">Target Area: <b id="targetArea">9</b></div>
+      <div class="pill">Rows: <b id="rows">-</b></div>
+      <div class="pill">Cols: <b id="cols">-</b></div>
+      <div class="pill">Area: <b id="area">-</b></div>
+      <div class="pill">Equation: <b id="eq">-</b></div>
+      <button id="newMission" class="btn">New Mission</button>
+      <button id="reset" class="btn btn-ghost">Reset City</button>
+    </div>
+
+    <div id="msg" class="msg">Drag a rectangle to place a building with area 9.</div>
+  </header>
+
+  <main class="stage">
+    <canvas id="c" width="900" height="600"></canvas>
+    <div class="hint">
+      <b>How to play:</b> Click+drag to draw a rectangle. Release to place if it matches target area and doesn't overlap.
+      <br/>Tip: 9 tiles can be 3×3 (or 1×9, 9×1 if you allow skinny lots later).
+    </div>
+  </main>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
