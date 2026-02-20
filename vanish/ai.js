@@ -2,8 +2,9 @@
 (() => {
   'use strict';
 
+  /* Replace the AI_CONFIGS at the top of ai.js */
   const AI_CONFIGS = {
-    "easy":   { depth: 2, candidates: 3,  timeMs: 200,  forgetBase: 0.22 },
+    "easy":   { depth: 2, candidates: 2,  timeMs: 400,  forgetBase: 0.30 }, // High forgetfulness, narrow vision
     "medium": { depth: 4, candidates: 6,  timeMs: 800,  forgetBase: 0.12 },
     "hard":   { depth: 6, candidates: 12, timeMs: 2500, forgetBase: 0.04 }
   };
@@ -280,8 +281,12 @@
   }
 
   function calculateRenjuTraps(s) {
+    // Easy AI doesn't understand or look for Renju traps
+    if (window.aiLevel === "easy") return 0; 
+
     let trapBonus = 0;
-    const difficultyMultiplier = aiLevel === "hard" ? 1.5 : 1.0;
+    const difficultyMultiplier = window.aiLevel === "hard" ? 1.5 : 1.0;
+    
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size; c++) {
         if (s[idx(r, c)] !== 0) continue;
