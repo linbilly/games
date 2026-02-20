@@ -123,11 +123,17 @@ function idx(r,c){ return r*size + c; }
 function inBounds(r,c){ return r>=0 && c>=0 && r<size && c<size; }
 
 function setPills(){
-  turnPill.textContent = `Turn: ${currentPlayer === P1 ? "P1" : (mode==="ai" ? "AI" : "P2")}`;
+  turnPill.textContent = `Turn: ${currentPlayer === P1 ? "Black" : (mode === "ai" ? "AI" : "White")}`;
+  p2Label.textContent = (mode === "ai") ? "AI Opponent" : "White Player";
+  p2Sub.textContent = (mode === "ai") ? `Difficulty: ${aiLevel}` : "Classic White";
+
   goalPill.textContent = `Goal: Connect ${goal}`;
   modePill.textContent = `Mode: ${mode === "ai" ? "Single Player" : "PvP"}`;
-  p2Label.textContent = (mode==="ai") ? "AI Opponent" : "Player 2";
-  p2Sub.textContent = (mode==="ai") ? `Difficulty: ${aiLevel}` : "Red";
+
+  // Update meter labels in index.html if necessary
+  document.querySelector('.meter-label.p1').textContent = "Black";
+  document.querySelector('.meter-label.p2').textContent = "White";
+  
   // Side turn indicator piece
   if (turnPiece){
     turnPiece.classList.toggle("p1", currentPlayer === P1);
@@ -169,12 +175,11 @@ function hideOverlay(){
   overlay.classList.add("hidden");
 }
 
-function buildBoard(){
+function buildBoard() {
   boardEl.innerHTML = "";
-  state = new Array(size*size).fill(0);
-  pieceEls = new Array(size*size).fill(null);
-  placedAt = new Array(size*size).fill(0);
-  lastRevealAt = 0;
+  state = new Array(size * size).fill(0);
+  pieceEls = new Array(size * size).fill(null);
+  placedAt = new Array(size * size).fill(0);
   gameOver = false;
   currentPlayer = P1;
   inputLocked = false;
@@ -182,25 +187,47 @@ function buildBoard(){
   boardEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
   boardEl.style.gridTemplateRows = `repeat(${size}, 1fr)`;
 
-  for (let r=0; r<size; r++){
-    for (let c=0; c<size; c++){
+  // Tic-Tac-Toe check (3x3 special case)
+  if (size === 3) {
+    boardEl.classList.add("tictactoe");
+    boardEl.parentElement.classList.add("no-border");
+  } else {
+    boardEl.classList.remove("tictactoe");
+    boardEl.parentElement.classList.remove("no-border");
+  }
+
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
       const cell = document.createElement("div");
       cell.className = "cell";
-      cell.dataset.r = r;
-      cell.dataset.c = c;
+
+      // Tag edges for intersection clipping
+      if (size > 3) {
+        if (r === 0) cell.classList.add("edge-top");
+        if (r === size - 1) cell.classList.add("edge-bottom");
+        if (c === 0) cell.classList.add("edge-left");
+        if (c === size - 1) cell.classList.add("edge-right");
+        
+        // --- Add Hoshi (Star Points) for 15x15 ---
+        if (size === 15) {
+          const hoshiCoords = [3, 7, 11]; // 4th, 8th, and 12th lines (0-indexed)
+          if (hoshiCoords.includes(r) && hoshiCoords.includes(c)) {
+            cell.classList.add("hoshi");
+          }
+        }
+      }
 
       const piece = document.createElement("div");
       piece.className = "piece";
       cell.appendChild(piece);
-
-      const k = idx(r,c);
+      
+      const k = idx(r, c);
       pieceEls[k] = piece;
-
-      cell.addEventListener("click", () => onCellClick(r,c));
+      cell.addEventListener("click", () => onCellClick(r, c));
       boardEl.appendChild(cell);
     }
   }
-
+  
   clearWinHighlights();
   setPills();
   initMistakeMeter();
