@@ -116,11 +116,71 @@ select { background: rgba(255,255,255,.06); color: var(--text); border: 1px soli
 .meter-slot.marker::after { content: ""; position: absolute; inset: 2px; border-radius: 2px; background: #fff; box-shadow: 0 0 5px #fff; }
 .meter-slot.endcap { border: 1px solid #ff4b6e; }
 
-.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.75); border-radius: 16px; z-index: 100; }
-.overlay.hidden { display: none; }
-.overlay-card { width: min(420px, 90%); background: #1a1a1a; border: 1px solid #444; border-radius: 16px; padding: 24px; text-align: center; }
-.overlay-title { font-weight: 800; font-size: 22px; margin-bottom: 12px; color: #ff4b6e; }
-.overlay-body { line-height: 1.6; color: #ddd; margin-bottom: 24px; }
+/* --- Floating Bottom Overlay --- */
+.overlay { 
+  position: absolute; 
+  inset: 0; 
+  display: flex; 
+  align-items: flex-end; /* Push the card to the bottom of the board */
+  justify-content: center; 
+  padding-bottom: 24px;
+  /* Gradient backdrop: completely clear at the top, dark at the bottom for text contrast */
+  background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.2) 60%, rgba(0,0,0,0.8) 100%); 
+  border-radius: 2px; 
+  z-index: 100; 
+}
+
+.overlay.hidden { 
+  display: none; 
+}
+
+.overlay-card { 
+  width: min(500px, 95%); 
+  /* Slightly transparent dark grey with a glassmorphism blur */
+  background: rgba(26, 26, 26, 0.90); 
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15); 
+  border-radius: 16px; 
+  padding: 24px; 
+  text-align: center; 
+  box-shadow: 0 16px 40px rgba(0,0,0,0.6);
+  /* Smooth entry animation */
+  animation: slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes slideUp {
+  0% { transform: translateY(30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.overlay-title { 
+  font-weight: 800; 
+  font-size: 22px; 
+  margin-bottom: 12px; 
+  color: #ff4b6e; 
+}
+
+.overlay-body { 
+  line-height: 1.6; 
+  color: #ddd; 
+  margin-bottom: 24px; 
+  font-size: 15px;
+}
+
+/* Dynamic Swap2 Choice buttons */
+.choice-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+
+.choice-container .btn {
+  flex: 1;
+  min-width: 120px;
+}
 
 /* Dynamic Swap2 Choice buttons */
 .choice-container {
