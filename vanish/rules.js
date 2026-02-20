@@ -2,9 +2,7 @@
 (() => {
   'use strict';
 
-  function inBounds(r, c) { 
-    return r >= 0 && r < size && c >= 0 && c < size; 
-  }
+  function inBounds(r, c) { return r >= 0 && r < size && c >= 0 && c < size; }
 
   function lineCountAt(r, c, dr, dc, player) {
     let count = 1;
@@ -85,13 +83,11 @@
     return false;
   }
 
-  window.violatesRenju = function(r, c) {
-    if (currentPlayer !== 1) return { isValid: true };
+  // Accepts 'player' parameter so AI can test restrictions while it is White's turn
+  window.violatesRenju = function(r, c, player = currentPlayer) {
+    if (player !== 1) return { isValid: true };
 
-    if (isOverlineAt(r, c, 1)) {
-        return { isValid: false, reason: "Forbidden Overline (6+ stones)" };
-    }
-
+    if (isOverlineAt(r, c, 1)) return { isValid: false, reason: "Forbidden Overline (6+ stones)" };
     if (isExactFiveAt(r, c, 1)) return { isValid: true };
 
     const fours = countFoursAfterMove(r, c);
@@ -101,8 +97,6 @@
     for (const d of dirs) { 
         if (isFreeThreeInDirection(r, c, d.dr, d.dc)) freeThrees++; 
     }
-
-    console.log(`Renju Check [${r},${c}]: Fours=${fours}, Threes=${freeThrees}`);
 
     if (fours >= 2) return { isValid: false, reason: "Forbidden 4x4 Fork" };
     if (freeThrees >= 2) return { isValid: false, reason: "Forbidden 3x3 Fork" };

@@ -1,6 +1,6 @@
+/* Append or overwrite these into style.css */
 :root {
   --bg: #1a1a1a;
-  /* Classic Wooden Board (Kaya/Yellow-ish wood) */
   --board-color: #deb887; 
   --grid-color: #2a2a2a;
   --text: #e7ecff;
@@ -19,204 +19,54 @@ body {
   overflow-x: hidden;
 }
 
-/* --- UI Containers --- */
-.topbar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 18px;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
+.topbar { display: flex; align-items: flex-start; justify-content: space-between; padding: 18px; gap: 16px; flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 12px; }
-.logo {
-  width: 38px; height: 38px;
-  border-radius: 10px;
-  display: grid; place-items: center;
-  font-weight: 800;
-  background: linear-gradient(135deg, #444, #000);
-  border: 1px solid rgba(255,255,255,0.15);
-}
-
+.logo { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; background: linear-gradient(135deg, #444, #000); border: 1px solid rgba(255,255,255,0.15); }
 .title { font-weight: 800; font-size: 18px; }
 .subtitle { color: var(--dim); font-size: 12px; }
 
 .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 .control { display: flex; flex-direction: column; gap: 6px; }
 .control label { font-size: 12px; color: var(--dim); }
+select { background: rgba(255,255,255,.06); color: var(--text); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; padding: 10px; outline: none; }
 
-select {
-  background: rgba(255,255,255,.06);
-  color: var(--text);
-  border: 1px solid rgba(255,255,255,.14);
-  border-radius: 10px;
-  padding: 10px;
-  outline: none;
-}
-
-.btn {
-  background: #f0f0f0;
-  color: #111;
-  border: 0;
-  border-radius: 12px;
-  padding: 10px 14px;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  transition: transform .08s ease;
-}
+.btn { background: #f0f0f0; color: #111; border: 0; border-radius: 12px; padding: 10px 14px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: transform .08s ease; }
 .btn:hover { filter: brightness(1.1); }
 .btn:active { transform: translateY(1px); }
-.btn.ghost {
-  background: rgba(255,255,255,.06);
-  color: var(--text);
-  border: 1px solid rgba(255,255,255,.16);
-}
+.btn.ghost { background: rgba(255,255,255,.06); color: var(--text); border: 1px solid rgba(255,255,255,.16); }
 
-/* --- Layout --- */
-.main {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 16px;
-  padding: 18px;
-}
+.main { display: grid; grid-template-columns: 1fr 320px; gap: 16px; padding: 18px; }
+@media (max-width: 980px) { .main { grid-template-columns: 1fr; } }
+.panel { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
 
-@media (max-width: 980px) {
-  .main { grid-template-columns: 1fr; }
-}
+.board-wrap { position: relative; background: var(--board-color); padding: 0; border: 4px solid var(--grid-color); border-radius: 2px; margin: 0 auto; box-shadow: var(--shadow), inset 0 0 100px rgba(0,0,0,0.2); overflow: visible; }
+.board { display: grid; width: min(85vmin, 720px); height: min(85vmin, 720px); margin: 0 auto; position: relative; overflow: visible; }
 
-.panel {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: var(--shadow);
-}
+.cell { position: relative; background: none; border: none; cursor: pointer; }
+.cell::before { content: ""; position: absolute; top: 50%; left: 0; right: 0; height: 1.5px; background: var(--grid-color); transform: translateY(-50%); z-index: 1; }
+.cell::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background: var(--grid-color); transform: translateX(-50%); z-index: 1; }
 
-/* --- Classic Wooden Board Grid --- */
-.board-wrap {
-  position: relative;
-  background: var(--board-color);
-  padding: 0;
-  /* Thick Border of the Playable Area */
-  border: 4px solid var(--grid-color); 
-  border-radius: 2px;
-  margin: 0 auto;
-  box-shadow: var(--shadow), inset 0 0 100px rgba(0,0,0,0.2);
-}
-
-.board {
-  display: grid;
-  width: min(85vmin, 720px);
-  height: min(85vmin, 720px);
-  margin: 0 auto;
-  position: relative;
-  overflow: visible; /* Stones can sit on intersections at the edges */
-}
-
-.cell {
-  position: relative;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-/* Grid Line Components */
-.cell::before {
-  content: "";
-  position: absolute;
-  top: 50%; left: 0; right: 0;
-  height: 1.5px; /* Slightly thicker for visibility */
-  background: var(--grid-color);
-  transform: translateY(-50%);
-  z-index: 1;
-}
-
-.cell::after {
-  content: "";
-  position: absolute;
-  left: 50%; top: 0; bottom: 0;
-  width: 1.5px;
-  background: var(--grid-color);
-  transform: translateX(-50%);
-  z-index: 1;
-}
-
-/* --- Edge Handling: Stop lines at the border --- */
-
-/* Top edge: No vertical line above center */
 .cell.edge-top::after { top: 50%; }
-
-/* Bottom edge: No vertical line below center */
 .cell.edge-bottom::after { bottom: 50%; }
-
-/* Left edge: No horizontal line left of center */
 .cell.edge-left::before { left: 50%; }
-
-/* Right edge: No horizontal line right of center */
 .cell.edge-right::before { right: 50%; }
 
-/* --- Stones --- */
-.piece {
-  position: absolute;
-  inset: 8%; /* Stones sit centered on intersections */
-  border-radius: 50%;
-  z-index: 5;
-  opacity: 0;
-  transition: opacity 500ms ease, transform 200ms ease;
-  box-shadow: 3px 6px 10px rgba(0,0,0,0.6);
-}
-
-/* Slate Black Stone */
-.piece.p1 {
-  background: radial-gradient(circle at 35% 35%, #555 0%, #000 75%);
-}
-
-/* Shell White Stone */
-.piece.p2 {
-  background: radial-gradient(circle at 35% 35%, #fff 0%, #dcdcdc 85%);
-  border: 1px solid rgba(0,0,0,0.1);
-}
+.piece { position: absolute; inset: 8%; border-radius: 50%; z-index: 5; opacity: 0; transition: opacity 500ms ease, transform 200ms ease; box-shadow: 3px 6px 10px rgba(0,0,0,0.6); }
+.piece.p1 { background: radial-gradient(circle at 35% 35%, #555 0%, #000 75%); }
+.piece.p2 { background: radial-gradient(circle at 35% 35%, #fff 0%, #dcdcdc 85%); border: 1px solid rgba(0,0,0,0.1); }
 
 .pop-in { animation: stonePop .2s ease-out forwards; }
-@keyframes stonePop {
-  0% { transform: scale(1.25); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
+@keyframes stonePop { 0% { transform: scale(1.25); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 .fade-out { animation: fadeOut .8s ease forwards; }
 @keyframes fadeOut { to { opacity: 0; transform: scale(0.95); } }
+.reveal .piece { opacity: 1 !important; transform: scale(1) !important; animation: none !important; }
 
-.reveal .piece {
-  opacity: 1 !important;
-  transform: scale(1) !important;
-  animation: none !important;
-}
-
-/* Winning Highlight: Gold Glow */
 .win-line { z-index: 10; }
-.win-line::before, .win-line::after {
-  background: #ffcf40 !important;
-  box-shadow: 0 0 12px #ffcf40;
-  height: 2.5px !important;
-  width: 2.5px !important;
-}
+.win-line::before, .win-line::after { background: #ffcf40 !important; box-shadow: 0 0 12px #ffcf40; height: 2.5px !important; width: 2.5px !important; }
 
-/* --- Side UI & Overlays --- */
 .side { display: flex; flex-direction: column; gap: 12px; }
-.legend, .mini {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 16px;
-  padding: 14px;
-}
-
-.turn-box {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px; border-radius: 12px; background: rgba(0,0,0,0.3);
-}
-
+.legend, .mini { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 14px; }
+.turn-box { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 12px; background: rgba(0,0,0,0.3); }
 .turn-piece { width: 24px; height: 24px; border-radius: 50%; box-shadow: 2px 3px 5px rgba(0,0,0,0.4); }
 .turn-piece.p1 { background: radial-gradient(circle at 30% 30%, #555, #000); }
 .turn-piece.p2 { background: radial-gradient(circle at 30% 30%, #fff, #ccc); border: 1px solid #999; }
@@ -227,72 +77,34 @@ select {
 .meter-slot.marker::after { content: ""; position: absolute; inset: 2px; border-radius: 2px; background: #fff; box-shadow: 0 0 5px #fff; }
 .meter-slot.endcap { border: 1px solid #ff4b6e; }
 
-.overlay {
-  position: absolute; inset: 0; display: grid; place-items: center;
-  background: rgba(0,0,0,0.75); border-radius: 16px; z-index: 100;
-}
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,0.75); border-radius: 16px; z-index: 100; }
 .overlay.hidden { display: none; }
 .overlay-card { width: min(420px, 90%); background: #1a1a1a; border: 1px solid #444; border-radius: 16px; padding: 24px; text-align: center; }
 .overlay-title { font-weight: 800; font-size: 22px; margin-bottom: 12px; color: #ff4b6e; }
 .overlay-body { line-height: 1.6; color: #ddd; margin-bottom: 24px; }
 
-
-/* Remove the thick outer border for 3x3 mode */
-.board-wrap.no-border {
-  border: none;
-  background: var(--board-color);
-  box-shadow: var(--shadow);
+/* Dynamic Swap2 Choice buttons */
+.choice-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+.choice-container .btn {
+  flex: 1;
+  min-width: 120px;
 }
 
-/* Tic-Tac-Toe Grid Styling */
-.board.tictactoe .cell {
-  /* Remove the intersection crosshairs */
-  background: none;
-}
-
-.board.tictactoe .cell::before,
-.board.tictactoe .cell::after {
-  display: none; /* Hide the Renju intersection lines */
-}
-
-/* Draw the hashtag # grid using cell borders */
-.board.tictactoe .cell {
-  border: 2px solid var(--grid-color);
-}
-
-/* Remove outer borders to leave only the 2x2 inner crossing lines */
+.board-wrap.no-border { border: none; background: var(--board-color); box-shadow: var(--shadow); }
+.board.tictactoe .cell { background: none; }
+.board.tictactoe .cell::before, .board.tictactoe .cell::after { display: none; }
+.board.tictactoe .cell { border: 2px solid var(--grid-color); }
 .board.tictactoe .cell:nth-child(-n + 3) { border-top: none; }
 .board.tictactoe .cell:nth-last-child(-n + 3) { border-bottom: none; }
 .board.tictactoe .cell:nth-child(3n + 1) { border-left: none; }
 .board.tictactoe .cell:nth-child(3n) { border-right: none; }
+.board.tictactoe .piece { inset: 15%; opacity: 0; }
 
-/* Adjust stones for 3x3 boxes */
-.board.tictactoe .piece {
-  inset: 15%; /* Make stones slightly smaller for better fit in boxes */
-  opacity: 0;
-}
-
-/* Star Points (Hoshi) */
-.cell.hoshi::before {
-  /* We use a pseudo-element or a small radial gradient to create the dot */
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 8px;
-  height: 8px;
-  background: var(--grid-color);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2; /* Sits above the grid lines but below stones */
-}
-
-/* Ensure stones appear above Hoshi */
-.piece {
-  z-index: 5;
-}
-
-/* For 15x15, slightly smaller stones look more professional on the intersections */
-.board:not(.tictactoe) .piece {
-  inset: 6%; 
-}
+.cell.hoshi::before { content: ""; position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: var(--grid-color); border-radius: 50%; transform: translate(-50%, -50%); z-index: 2; }
+.board:not(.tictactoe) .piece { inset: 6%; }

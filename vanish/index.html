@@ -44,10 +44,10 @@
         </select>
       </div>
 
-
       <div class="control" id="aiControl">
         <label>AI</label>
         <select id="aiSelect">
+          <option value="easy">Easy</option>
           <option value="medium" selected>Medium</option>
           <option value="hard">Hard</option>
         </select>
@@ -61,10 +61,6 @@
           <option value="3000" selected>3.0s</option>
           <option value="4000">4.0s</option>
           <option value="5000">5.0s</option>
-          <option value="6000">6.0s</option>
-          <option value="7000">7.0s</option>
-          <option value="8000">8.0s</option>
-          <option value="9000">9.0s</option>
           <option value="10000">10.0s</option>
           <option value="3600000">60 minutes (stay revealed)</option>
         </select>
@@ -110,13 +106,12 @@
         <div class="meter-box">
           <div class="meter-title">Mistake Meter</div>
           <div class="meter-row">
-            <div class="meter-label p1">P1</div>
+            <div class="meter-label p1">Black</div>
             <div id="mistakeMeter" class="meter" aria-label="Mistake meter"></div>
-            <div class="meter-label p2">P2</div>
+            <div class="meter-label p2">White</div>
           </div>
           <div class="meter-note">
-            P1 mistake moves the marker left. P2 mistake moves it right.
-            Reaching an end (3 steps) means that player forfeits their <b>current</b> move.
+            Mistakes move the marker toward the offender. Reaching the end (3 steps) forfeits the turn.
           </div>
         </div>
 
@@ -124,7 +119,7 @@
           <div class="chip p1"></div>
           <div>
             <div class="legend-title">Player 1</div>
-            <div class="legend-sub">Blue</div>
+            <div class="legend-sub">Black</div>
           </div>
         </div>
 
@@ -132,7 +127,7 @@
           <div class="chip p2"></div>
           <div>
             <div class="legend-title" id="p2Label">Player 2</div>
-            <div class="legend-sub" id="p2Sub">Red</div>
+            <div class="legend-sub" id="p2Sub">White</div>
           </div>
         </div>
       </div>
@@ -141,14 +136,8 @@
         <div class="mini-title">Rules</div>
         <ul>
           <li>Place one piece per turn.</li>
-          <li>Placed pieces fade and disappear after the vanish time.</li>
-          <li>Trying to place on an occupied cell is a mistake:
-            <ul>
-              <li>Board reveals for review</li>
-              <li>Mistake meter shifts toward that player</li>
-              <li>If the meter hits an end, that player forfeits their current move</li>
-            </ul>
-          </li>
+          <li>Pieces visually fade based on the vanish timer.</li>
+          <li>Occupied cell clicks are mistakes.</li>
           <li>First to connect the goal length wins.</li>
         </ul>
       </div>
@@ -162,13 +151,12 @@
             <label for="muteToggle">Mute</label>
           </div>
         </div>
-        <div class="small dim">Browsers require a click before sound can play.</div>
       </div>
     </aside>
   </main>
 
   <footer class="footer">
-    Tip: In Single Player, AI can be unfair (perfect memory). Use Medium/Hard for a more human feel.
+    Tip: In Swap2 mode, Player 1 places 3 stones, Player 2 chooses sides.
   </footer>
 
   <script src="rules.js"></script>
