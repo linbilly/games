@@ -91,6 +91,79 @@ function startLocalClocks() {
   }, 100); 
 }
 
+async function updateLeaderboard() {
+  try {
+    const response = await fetch('http://localhost:3000/leaderboard');
+    if (!response.ok) return;
+    
+    const players = await response.json();
+    const list = document.getElementById('leaderboardList');
+    
+    if (list) {
+      list.innerHTML = players.map((p, i) => `
+        <li>
+          <span class="rank">#${i + 1}</span>
+          <span class="name">${p.username}</span>
+          <span class="rating">${Math.round(p.rating_15_standard || 1500)}</span>
+        </li>
+      `).join('');
+    }
+  } catch (err) {
+    console.error("Leaderboard UI update failed:", err);
+  }
+}
+
+async function initializeUser() {
+  const isNative = window.Capacitor && Capacitor.isNativePlatform();
+  let userData = { playerId: "mock_user_123", displayName: "BrowserDev" };
+
+  try {
+    const response = await fetch('http://localhost:3000/auth/gamecenter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+
+    // --- ADD THIS LOGGING ---
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Server Error Response:", errorText);
+      return;
+    }
+
+    const dbUser = await response.json();
+    currentUser = dbUser.username;
+    console.log(`Logged in as: ${currentUser}`);
+  } catch (err) {
+    console.error("Fetch failed entirely:", err);
+  }
+
+  if (isNative) {
+    try {
+      const { AppleGameCenter } = await import('@capacitor-community/apple-game-center');
+      const result = await AppleGameCenter.signIn();
+      userData.playerId = result.playerID;
+      userData.displayName = result.alias;
+    } catch (err) {
+      console.error("Native login failed, using guest.", err);
+    }
+  }
+
+  const response = await fetch('http://localhost:3000/auth/gamecenter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData)
+  });
+
+  const dbUser = await response.json();
+  currentUser = dbUser.username;
+  myRating = dbUser.rating; //
+  
+  // Update UI with ranking
+  console.log(`Authenticated as ${currentUser}. Rating: ${Math.round(myRating)}`);
+  updateLeaderboard(); 
+}
+
 function ensureAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === "suspended") audioCtx.resume();
@@ -1018,4 +1091,6 @@ window.overlayBtn = overlayBtn;
 window.finalizeRoles = finalizeRoles;
 
 applySettingsFromUI();
+// Manually trigger the login sequence on load
+initializeUser();
 newGame();

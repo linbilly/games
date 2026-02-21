@@ -5,8 +5,11 @@ const { Server } = require('socket.io');
 const { Pool } = require('pg');
 
 const app = express();
+// Add this line to handle JSON data in POST requests
+app.use(express.json()); 
 
-app.use(express.static('public'));
+app.use(express.static('public')); // Existing line
+
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -197,21 +200,118 @@ function startMatchTimer(matchId) {
     }
 
     if (Date.now() >= currentMatch.turnDeadline) {
-      console.log(`Match ${matchId}: Time limit reached for Player ${currentMatch.turn}`);
-      
-      const winnerRole = currentMatch.turn === 1 ? 2 : 1;
-      
-      // 1. Tell the players
-      io.to(matchId).emit('timeout_loss', { 
-        loserRole: currentMatch.turn, 
-        winnerRole: winnerRole 
-      });
-      
-      // 2. Cleanup
+      const loserRole = currentMatch.turn;
+      const winnerRole = loserRole === 1 ? 2 : 1;
+
+      // Identify players
+      const winner = (winnerRole === 1) ? currentMatch.host : currentMatch.guest;
+      const loser = (loserRole === 1) ? currentMatch.host : currentMatch.guest;
+
+      io.to(matchId).emit('timeout_loss', { loserRole, winnerRole });
+
+      // Update Glicko-2 ratings in DB
+      if (winner.appleId && loser.appleId) {
+          finalizeMatchRatings(winner.appleId, loser.appleId);
+      }
+
       clearInterval(currentMatch.timerInterval);
       activeMatches.delete(matchId);
     }
   }, 500); 
 }
+
+async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
+    // Map the vanish setting to your specific column
+    let ratingCol = 'rating_15_standard';
+    if (vanishMs === 3000) ratingCol = 'rating_15_3s';
+    if (vanishMs === 10000) ratingCol = 'rating_15_10s';
+
+    try {
+        const winner = (await pool.query('SELECT * FROM users WHERE apple_id = $1', [winnerAppleId])).rows[0];
+        const loser = (await pool.query('SELECT * FROM users WHERE apple_id = $1', [loserAppleId])).rows[0];
+
+        if (!winner || !loser) return;
+
+        // Calculate changes (simplified Glicko-2 step)
+        const K = 32;
+        const expectedW = 1 / (1 + Math.pow(10, (loser[ratingCol] - winner[ratingCol]) / 400));
+        const gain = Math.round(K * (1 - expectedW));
+
+        // Update the specific rating column in the DB
+        await pool.query(`
+            UPDATE users SET 
+            ${ratingCol} = ${ratingCol} + $1, 
+            rd = GREATEST(30, rd * 0.95), 
+            wins = wins + 1 
+            WHERE apple_id = $2`, [gain, winnerAppleId]);
+            
+        await pool.query(`
+            UPDATE users SET 
+            ${ratingCol} = ${ratingCol} - $1, 
+            losses = losses + 1 
+            WHERE apple_id = $2`, [gain, loserAppleId]);
+    } catch (err) {
+        console.error("Glicko Update Error:", err);
+    }
+}
+
+// Glicko-2 Helper: Update ratings in the DB
+async function processMatchResult(winnerId, loserId) {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Fetch current ratings
+        const winner = (await client.query('SELECT * FROM users WHERE apple_id = $1', [winnerId])).rows[0];
+        const loser = (await client.query('SELECT * FROM users WHERE apple_id = $1', [loserId])).rows[0];
+
+        if (!winner || !loser) throw new Error("Player not found");
+
+        // 2. Calculate Elo/Glicko Change (Simplified for example)
+        const K = 32; 
+        const expectedW = 1 / (1 + Math.pow(10, (loser.rating - winner.rating) / 400));
+        const ratingChange = Math.round(K * (1 - expectedW));
+
+        // 3. Update Database
+        await client.query('UPDATE users SET rating = rating + $1, wins = wins + 1 WHERE apple_id = $2', [ratingChange, winnerId]);
+        await client.query('UPDATE users SET rating = rating - $1, losses = losses + 1 WHERE apple_id = $2', [ratingChange, loserId]);
+
+        await client.query('COMMIT');
+        return { ratingChange, newWinnerRating: winner.rating + ratingChange };
+    } catch (e) {
+        await client.query('ROLLBACK');
+        console.error("Glicko Update Failed", e);
+    } finally {
+        client.release();
+    }
+}
+
+// GET /leaderboard - Fetch the masters of Vanish
+app.get('/leaderboard', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT username, rating, wins, losses 
+            FROM users 
+            ORDER BY rating DESC 
+            LIMIT 10
+        `);
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Leaderboard fetch error", err);
+        res.status(500).json({ error: "Failed to load rankings" });
+    }
+});
+
+app.post('/auth/gamecenter', async (req, res) => {
+  const { playerId, displayName } = req.body; // main.js sends playerId
+  try {
+    let result = await pool.query('SELECT * FROM users WHERE apple_id = $1', [playerId]);
+    // ... rest of your insertion logic
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("Auth error", err);
+    res.status(500).send("Server Error");
+  }
+});
 
 server.listen(3000, () => console.log('Vanish Server running on port 3000'));
