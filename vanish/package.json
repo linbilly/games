@@ -12,14 +12,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@capacitor/core": "^8.1.0",
-    "@capacitor/ios": "^8.1.0",
+    "@capacitor/cli": "^5.7.8",
+    "@capacitor/core": "^5.7.8",
+    "@capacitor/ios": "^5.7.8",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "pg": "^8.18.0",
     "socket.io": "^4.8.3"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^8.1.0"
   }
 }
