@@ -53,7 +53,9 @@ io.on('connection', (socket) => {
       guest: null,
       size, vanishMs, ruleMode,
       state: new Array(size * size).fill(0),
-      turn: 1 // 1 for P1 (Black), 2 for P2 (White)
+      turn: 1, // 1 for P1 (Black), 2 for P2 (White)
+      turnDeadline: Date.now() + 30000, // Exactly 30 seconds from now
+      timerInterval: null
     });
     socket.join(roomCode);
     socket.emit('room_created', roomCode);
@@ -68,8 +70,10 @@ io.on('connection', (socket) => {
       // Notify both players
       io.to(match.host.socketId).emit('match_start', { role: 1, matchId: roomCode, settings: match });
       io.to(match.guest.socketId).emit('match_start', { role: 2, matchId: roomCode, settings: match });
+
+      // FIX: Use roomCode here, not matchId!
+      startMatchTimer(roomCode); 
       
-      // Persist to DB
       pool.query(
         'INSERT INTO matches (id, host_username, guest_username, rule_set, vanish_ms, board_size) VALUES ($1, $2, $3, $4, $5, $6)',
         [roomCode, match.host.username, match.guest.username, match.ruleMode, match.vanishMs, match.size]
@@ -84,18 +88,20 @@ io.on('connection', (socket) => {
     const match = activeMatches.get(matchId);
     if (!match) return;
 
-    // Identify player role (1 or 2)
     const isHost = match.host.socketId === socket.id;
     const playerRole = isHost ? 1 : 2;
-
-    // Validate turn and empty square
     const idx = r * match.size + c;
+
+    // VALIDATION: Must be your turn and cell must be empty
     if (match.turn !== playerRole || match.state[idx] !== 0) return;
 
-    // Apply move
+    // Apply the move
     match.state[idx] = playerRole;
     match.turn = playerRole === 1 ? 2 : 1;
-    const placedAtUtc = Date.now(); // Absolute UTC time for Vanish syncing
+    
+    // RESET THE CLOCK: Set the new deadline 30s into the future
+    const placedAtUtc = Date.now(); 
+    match.turnDeadline = placedAtUtc + 30000;
 
     // Log to DB
     pool.query(
@@ -104,7 +110,10 @@ io.on('connection', (socket) => {
     );
 
     // Broadcast valid move to both players
-    io.to(matchId).emit('move_made', { r, c, player: playerRole, placedAtUtc });
+    io.to(matchId).emit('move_made', { 
+      r, c, player: playerRole, placedAtUtc,
+      turnDeadline: match.turnDeadline 
+    });
   });
 
   // --- HANDLE MISTAKES ---
@@ -156,15 +165,53 @@ function startOnlineMatch(p1, p2, size, vanishMs, ruleMode) {
   const matchId = require('crypto').randomUUID();
   const match = {
     id: matchId, host: p1, guest: p2, size, vanishMs, ruleMode,
-    state: new Array(size * size).fill(0), turn: 1
+    state: new Array(size * size).fill(0), turn: 1, 
+    turnDeadline: Date.now() + 30000, // Exactly 30 seconds from now
+    timerInterval: null
   };
   activeMatches.set(matchId, match);
+
   
   io.sockets.sockets.get(p1.socketId).join(matchId);
   io.sockets.sockets.get(p2.socketId).join(matchId);
 
   io.to(p1.socketId).emit('match_start', { role: 1, matchId, settings: match });
   io.to(p2.socketId).emit('match_start', { role: 2, matchId, settings: match });
+  startMatchTimer(matchId);
+}
+
+function startMatchTimer(matchId) {
+  const match = activeMatches.get(matchId);
+  if (!match) return;
+
+  // Clear any existing interval just in case
+  if (match.timerInterval) clearInterval(match.timerInterval);
+
+  match.timerInterval = setInterval(() => {
+    const currentMatch = activeMatches.get(matchId);
+    
+    // If match was deleted by a move or disconnect, kill this timer
+    if (!currentMatch) {
+      clearInterval(match.timerInterval);
+      return;
+    }
+
+    if (Date.now() >= currentMatch.turnDeadline) {
+      console.log(`Match ${matchId}: Time limit reached for Player ${currentMatch.turn}`);
+      
+      const winnerRole = currentMatch.turn === 1 ? 2 : 1;
+      
+      // 1. Tell the players
+      io.to(matchId).emit('timeout_loss', { 
+        loserRole: currentMatch.turn, 
+        winnerRole: winnerRole 
+      });
+      
+      // 2. Cleanup
+      clearInterval(currentMatch.timerInterval);
+      activeMatches.delete(matchId);
+    }
+  }, 500); 
 }
 
 server.listen(3000, () => console.log('Vanish Server running on port 3000'));

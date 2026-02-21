@@ -47,6 +47,50 @@ let audioCtx = null;
 let audioEnabled = false;
 let muted = false;
 
+// --- TIMERS ---
+let turnDeadline = 0;
+let localTickInterval = null;
+
+function formatTime(ms) {
+  if (ms <= 0) return "00:00";
+  // Use Math.ceil so the clock doesn't show 00:00 while there is still 0.9s left
+  const totalSeconds = Math.ceil(ms / 1000); 
+  const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const s = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function startLocalClocks() {
+  if (localTickInterval) clearInterval(localTickInterval);
+  
+  localTickInterval = setInterval(() => {
+    if (gameOver || (inputLocked && !isOnline)) return; 
+
+    const timeLeft = Math.max(0, turnDeadline - Date.now());
+    
+    // SAFETY NET: If time hits absolute zero, lock the board
+    if (timeLeft <= 0 && !gameOver) {
+      inputLocked = true;
+    }
+
+    const displayStr = formatTime(timeLeft);
+    const isPanic = timeLeft > 0 && timeLeft <= 5000; 
+    
+    const activeTimer = (currentPlayer === P1) ? $('timerP1') : $('timerP2');
+    const idleTimer = (currentPlayer === P1) ? $('timerP2') : $('timerP1');
+
+    // Update active timer text and panic style
+    activeTimer.textContent = displayStr;
+    activeTimer.classList.remove('dimmed');
+    activeTimer.classList.toggle('panic', isPanic);
+
+    // Update idle timer
+    idleTimer.textContent = "00:30";
+    idleTimer.classList.add('dimmed');
+    idleTimer.classList.remove('panic');
+  }, 100); 
+}
+
 function ensureAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === "suspended") audioCtx.resume();
@@ -312,10 +356,12 @@ function setAllPiecesVisible(forceVisible) {
   }
 }
 
-
-
-function switchTurn(){
+function switchTurn() {
   currentPlayer = (currentPlayer === P1) ? P2 : P1;
+
+  // Reset the clock if playing locally
+  if (!isOnline) turnDeadline = Date.now() + 30000; 
+
   setPills();
 }
 
@@ -780,6 +826,9 @@ function finalizeRoles(winnerOfOpening) {
 function newGame() {
   meterPos = 0; 
   openingStones = [];
+
+  turnDeadline = Date.now() + 30000;
+  startLocalClocks();
   
   applySettingsFromUI();
   initMistakeMeter(); 
@@ -875,6 +924,9 @@ socket.on('match_start', (data) => {
   isOnline = true;
   onlineMatchId = data.matchId;
   myOnlineRole = data.role;
+
+  turnDeadline = data.settings.turnDeadline || (Date.now() + 30000);
+  startLocalClocks();
   
   // Sync UI to server settings
   size = data.settings.size;
@@ -889,17 +941,27 @@ socket.on('match_start', (data) => {
   turnPill.textContent = myOnlineRole === 1 ? "You are Black" : "You are White";
 });
 
-socket.on('move_made', ({ r, c, player, placedAtUtc }) => {
-  // Server confirmed the move. Render it using the absolute UTC time.
-  placePiece(r, c, player, { animate: true, sfx: true, absoluteTime: placedAtUtc });
+socket.on('move_made', (data) => {
+  // Destructure the data object so the rest of your code works
+  const { r, c, player, placedAtUtc, turnDeadline: serverDeadline } = data;
+
+  // Sync the timer
+  turnDeadline = serverDeadline;
+  lastLocalTick = Date.now();
   
-  // Standard win checks
+  // Place the piece
+  placePiece(r, c, player, { animate: true, sfx: true });
+  placedAt[idx(r, c)] = placedAtUtc;
+  
   const win = checkWinFrom(r, c, player);
-  if (win) { endGame(win); return; }
+  if (win) { 
+    endGame(win); 
+    return; 
+  }
   
   switchTurn();
   
-  // Unlock if it's now your turn
+  // Unlock the board only if it's now your turn
   inputLocked = (currentPlayer !== myOnlineRole);
 });
 
@@ -928,6 +990,25 @@ socket.on('turn_forfeited', ({ player }) => {
 
 socket.on('game_resumed', ({ resumeTimeUtc }) => {
   executeResume(resumeTimeUtc);
+});
+
+socket.on('timeout_loss', ({ loserRole, winnerRole }) => {
+  gameOver = true;
+  inputLocked = true;
+  if (localTickInterval) clearInterval(localTickInterval);
+  
+  // Clean up timers
+  $('timerP1').classList.remove('panic');
+  $('timerP2').classList.remove('panic');
+  
+  const winnerText = (winnerRole === myOnlineRole) ? "You win by timeout!" : "You lost by timeout.";
+  const loserColor = (loserRole === 1) ? "Black" : "White";
+  
+  showOverlay("Time's Up!", `${loserColor} ran out of time. ${winnerText}`, "Main Menu");
+  
+  overlayBtn.onclick = () => {
+    location.reload(); // Simplest way to reset the game state
+  };
 });
 
 // Final assignments

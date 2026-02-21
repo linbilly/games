@@ -198,6 +198,22 @@ select { background: rgba(255,255,255,.06); color: var(--text); border: 1px soli
   min-width: 120px;
 }
 
+/* Panic mode for the last 5 seconds */
+.timer.panic {
+  color: #ff4040 !important; /* Bright red */
+  font-size: 20px;
+  border-color: #ff4040;
+  animation: shake 0.2s infinite;
+}
+
+@keyframes shake {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(2px, 2px); }
+  50% { transform: translate(-2px, 1px); }
+  75% { transform: translate(1px, -1px); }
+  100% { transform: translate(0, 0); }
+}
+
 .board.tictactoe .cell { background: none; }
 .board.tictactoe .cell::before, .board.tictactoe .cell::after { display: none; }
 .board.tictactoe .cell { border: 2px solid var(--grid-color); }
