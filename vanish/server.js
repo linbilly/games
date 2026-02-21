@@ -1,11 +1,14 @@
 // server.js
 const express = require('express');
 const http = require('http');
+const cors = require('cors'); // 1. Import cors
+
 const { Server } = require('socket.io');
 const { Pool } = require('pg');
 
 const app = express();
 // Add this line to handle JSON data in POST requests
+app.use(cors({ origin: '*' })); // Allow all origins for testing
 app.use(express.json()); 
 
 app.use(express.static('public')); // Existing line
@@ -126,7 +129,7 @@ io.on('connection', (socket) => {
       io.to(matchId).emit('move_made', { r, c, player: playerRole, turnDeadline: match.turnDeadline });
   });
 
-  
+
   // --- HANDLE MISTAKES ---
   socket.on('commit_mistake', ({ matchId }) => {
     const match = activeMatches.get(matchId);

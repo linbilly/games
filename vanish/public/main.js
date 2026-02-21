@@ -140,12 +140,24 @@ async function initializeUser() {
 
   if (isNative) {
     try {
-      const { AppleGameCenter } = await import('@capacitor-community/apple-game-center');
-      const result = await AppleGameCenter.signIn();
-      userData.playerId = result.playerID;
-      userData.displayName = result.alias;
+      // 1. Use the correct GameServices plugin name
+      const GameCenter = Capacitor.Plugins.GameServices; 
+      
+      if (!GameCenter) {
+          throw new Error("GameServices plugin is not registered.");
+      }
+
+      // 2. The API call remains exactly the same!
+      const authResult = await GameCenter.signIn();
+      
+      userData = { 
+          playerId: authResult.player_id, 
+          displayName: authResult.player_name 
+      };
+      console.log("Native Game Center Login Success!", userData);
+
     } catch (err) {
-      console.error("Native login failed, using guest.", err);
+      console.error("Native login failed:", err);
     }
   }
 

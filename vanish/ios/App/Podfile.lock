@@ -1,0 +1,28 @@
+PODS:
+  - Capacitor (5.7.8):
+    - CapacitorCordova
+  - CapacitorCordova (5.7.8)
+  - OpenforgeCapacitorGameConnect (5.0.2):
+    - Capacitor
+
+DEPENDENCIES:
+  - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+  - "OpenforgeCapacitorGameConnect (from `../../node_modules/@openforge/capacitor-game-connect`)"
+
+EXTERNAL SOURCES:
+  Capacitor:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorCordova:
+    :path: "../../node_modules/@capacitor/ios"
+  OpenforgeCapacitorGameConnect:
+    :path: "../../node_modules/@openforge/capacitor-game-connect"
+
+SPEC CHECKSUMS:
+  Capacitor: 9686e5711b48a1aa84671ede795d0175848abcba
+  CapacitorCordova: 31ab98dca2ddcee051027a1afe7e8c85c82f7297
+  OpenforgeCapacitorGameConnect: f964863580b3478b8c5c758e3dc1be503e7f6013
+
+PODFILE CHECKSUM: ecf073a5d8bba805cf0b345727ebc532bbefd544
+
+COCOAPODS: 1.16.2

@@ -1,0 +1,6 @@
+{
+  "appId": "com.vanish.game",
+  "appName": "Vanish",
+  "webDir": "public",
+  "bundledWebRuntime": false
+}
