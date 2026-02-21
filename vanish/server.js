@@ -87,38 +87,46 @@ io.on('connection', (socket) => {
   });
 
   // --- 3. GAMEPLAY LOOP ---
-  socket.on('submit_move', ({ matchId, r, c }) => {
-    const match = activeMatches.get(matchId);
-    if (!match) return;
 
-    const isHost = match.host.socketId === socket.id;
-    const playerRole = isHost ? 1 : 2;
-    const idx = r * match.size + c;
+  socket.on('submit_move', async ({ matchId, r, c }) => {
+      const match = activeMatches.get(matchId);
+      if (!match) return;
 
-    // VALIDATION: Must be your turn and cell must be empty
-    if (match.turn !== playerRole || match.state[idx] !== 0) return;
+      const playerRole = (match.host.socketId === socket.id) ? 1 : 2;
+      const idx = r * match.size + c;
 
-    // Apply the move
-    match.state[idx] = playerRole;
-    match.turn = playerRole === 1 ? 2 : 1;
-    
-    // RESET THE CLOCK: Set the new deadline 30s into the future
-    const placedAtUtc = Date.now(); 
-    match.turnDeadline = placedAtUtc + 30000;
+      if (match.turn !== playerRole || match.state[idx] !== 0) return;
 
-    // Log to DB
-    pool.query(
-      'INSERT INTO moves (match_id, username, row_idx, col_idx, placed_at_utc) VALUES ($1, $2, $3, $4, $5)',
-      [matchId, isHost ? match.host.username : match.guest.username, r, c, placedAtUtc]
-    );
+      match.state[idx] = playerRole; // Update board
+      
+      // 1. Authoritative Win Check
+      const hasWon = checkServerWin(match.state, match.size, 5, r, c, playerRole);
 
-    // Broadcast valid move to both players
-    io.to(matchId).emit('move_made', { 
-      r, c, player: playerRole, placedAtUtc,
-      turnDeadline: match.turnDeadline 
-    });
+      if (hasWon) {
+          const winner = playerRole === 1 ? match.host : match.guest;
+          const loser = playerRole === 1 ? match.guest : match.host;
+
+          // Trigger Glicko-2 Logic
+          const ratingData = await finalizeMatchRatings(winner.appleId, loser.appleId, match.vanishMs);
+
+          io.to(matchId).emit('match_over', {
+              winnerRole: playerRole,
+              newRating: ratingData ? Math.round(ratingData.winnerRating) : null,
+              pointsGained: ratingData ? ratingData.winnerGain : 0
+          });
+
+          if (match.timerInterval) clearInterval(match.timerInterval);
+          activeMatches.delete(matchId);
+          return; // Stop processing further move logic
+      }
+
+      // 2. Otherwise, continue turn rotation as normal
+      match.turn = playerRole === 1 ? 2 : 1;
+      match.turnDeadline = Date.now() + 30000;
+      io.to(matchId).emit('move_made', { r, c, player: playerRole, turnDeadline: match.turnDeadline });
   });
 
+  
   // --- HANDLE MISTAKES ---
   socket.on('commit_mistake', ({ matchId }) => {
     const match = activeMatches.get(matchId);
@@ -211,13 +219,51 @@ function startMatchTimer(matchId) {
 
       // Update Glicko-2 ratings in DB
       if (winner.appleId && loser.appleId) {
-          finalizeMatchRatings(winner.appleId, loser.appleId);
+          // We wrap this in an async IIFE or handle the promise to avoid blocking the interval
+          (async () => {
+              const ratingData = await finalizeMatchRatings(winner.appleId, loser.appleId, currentMatch.vanishMs);
+              
+              if (ratingData) {
+                  io.to(matchId).emit('match_over', {
+                      winnerRole,
+                      newRating: Math.round(ratingData.winnerRating),
+                      pointsGained: ratingData.winnerGain
+                  });
+              }
+          })();
       }
 
       clearInterval(currentMatch.timerInterval);
       activeMatches.delete(matchId);
     }
   }, 500); 
+}
+
+// server.js: Authoritative Win Checker
+function checkServerWin(state, size, goal, r, c, player) {
+  const directions = [
+    { dr: 0, dc: 1 },  // Horizontal
+    { dr: 1, dc: 0 },  // Vertical
+    { dr: 1, dc: 1 },  // Diagonal \
+    { dr: 1, dc: -1 }, // Diagonal /
+  ];
+
+  for (const { dr, dc } of directions) {
+    let count = 1;
+    // Check forward
+    let rr = r + dr, cc = c + dc;
+    while (rr >= 0 && rr < size && cc >= 0 && cc < size && state[rr * size + cc] === player) {
+      count++; rr += dr; cc += dc;
+    }
+    // Check backward
+    rr = r - dr; cc = c - dc;
+    while (rr >= 0 && rr < size && cc >= 0 && cc < size && state[rr * size + cc] === player) {
+      count++; rr -= dr; cc -= dc;
+    }
+
+    if (count >= goal) return true;
+  }
+  return false;
 }
 
 async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
