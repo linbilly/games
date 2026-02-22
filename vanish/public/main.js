@@ -273,6 +273,12 @@ function startLocalClocks() {
     // Calculate time remaining
     const timeLeft = Math.max(0, turnDeadline - Date.now());
 
+    // If the board isn't currently revealed (mistake mode) and vanishing is enabled...
+    if (!boardEl.classList.contains("reveal") && vanishMs < 3600000) {
+        // Force a visibility check for all pieces based on their local timestamps
+        setAllPiecesVisible(false); 
+    }
+
     // 1. TIMEOUT LOSS LOGIC
     if (timeLeft <= 0 && !gameOver) {
       gameOver = true;
@@ -936,6 +942,7 @@ function onCellClick(r, c) {
     socket.emit('submit_move', { matchId: onlineMatchId, r, c });
     return;
   }
+
 
   // 3. EXISTING LOCAL LOGIC
   if (isOccupied(r, c)) {
