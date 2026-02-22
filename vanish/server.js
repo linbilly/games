@@ -235,6 +235,10 @@ io.on('connection', (socket) => {
         match.turnDeadline = Date.now() + 30000;
         match.rematchRequests.clear();
 
+        // --- ADD THESE TWO LINES TO RESET SWAP2 ---
+        match.swap2Phase = (match.ruleMode === 'swap2') ? 1 : 0;
+        match.openingStones = [];
+
         // Swap roles
         const temp = match.host;
         match.host = match.guest;

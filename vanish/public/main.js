@@ -135,11 +135,8 @@ function joinPrivateRoom() {
 }
 
 function confirmStart() {
-    // 1. Map new HTML selects to your existing variables
-    size = parseInt($('board-size-select').value);
-    ruleMode = $('rule-set-select').value;
-    vanishMs = parseInt($('vanish-timer-select').value);
-    goal = (size === 3) ? 3 : 5;
+    // Read the dropdowns ONLY when clicking "Start Match"
+    applySettingsFromUI();
 
     // 2. Route the mode
     if (currentMode.includes('local')) {
@@ -240,6 +237,17 @@ function setupOnlineGame(data) {
     vanishMs = data.settings.vanishMs;
     ruleMode = data.settings.ruleMode;
 
+    // --- CRITICAL REMATCH RESET ---
+    if (ruleMode === "swap2") {
+        swap2Phase = 1;
+        openingStones = [];
+        if (myOnlineRole === 1) {
+            showOverlay("Swap2 Opening", "Player 1: Place the first 3 stones (Black, White, Black).", "Let's Go");
+        }
+    } else {
+        swap2Phase = 0;
+    }
+
     // Set names for online play
     $('p1-name').innerText = data.settings.host.username;
     $('p2-name').innerText = data.settings.guest ? data.settings.guest.username : "Opponent";
@@ -250,7 +258,15 @@ function setupOnlineGame(data) {
     
     currentPlayer = 1;
     inputLocked = (myOnlineRole !== 1); 
-    $('turnPill').textContent = myOnlineRole === 1 ? "You: Black" : "You: White";
+    
+    // Trigger vanish state properly for rematches
+    if (vanishMs < 3600000 && swap2Phase === 0) {
+        setAllPiecesVisible(false);
+    } else {
+        setAllPiecesVisible(true);
+    }
+
+    setPills();
 }
 
 function formatTime(ms) {
@@ -1346,7 +1362,6 @@ function newGame() {
   turnDeadline = Date.now() + 30000;
   startLocalClocks();
   
-  applySettingsFromUI();
   initMistakeMeter(); 
   updateMistakeMeter(); 
   
@@ -1389,28 +1404,6 @@ function newGame() {
 
 socket.on('room_created', (code) => {
   showOverlay("Private Room", `Your room code is: ${code}. Waiting for guest...`, "Cancel");
-});
-
-socket.on('match_start', (data) => {
-  hideOverlay();
-  isOnline = true;
-  onlineMatchId = data.matchId;
-  myOnlineRole = data.role;
-
-  turnDeadline = data.settings.turnDeadline || (Date.now() + 30000);
-  startLocalClocks();
-  
-  // Sync UI to server settings
-  size = data.settings.size;
-  vanishMs = data.settings.vanishMs;
-  ruleMode = data.settings.ruleMode;
-  
-  // Reset board
-  buildBoard();
-  currentPlayer = 1;
-  inputLocked = (myOnlineRole !== 1); // Lock if you are White
-  
-  turnPill.textContent = myOnlineRole === 1 ? "You are Black" : "You are White";
 });
 
 socket.on('move_made', (data) => {
