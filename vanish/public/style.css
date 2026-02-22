@@ -68,7 +68,7 @@ select { background: rgba(255,255,255,.06); color: var(--text); border: 1px soli
 
 .board { display: grid; width: min(85vmin, 720px); height: min(85vmin, 720px); margin: 0 auto; position: relative; overflow: visible; }
 
-.cell { position: relative; background: none; border: none; cursor: pointer; }
+.cell { position: relative; background: none; border: none; cursor: pointer; aspect-ratio: 1 / 1; }
 .cell::before { content: ""; position: absolute; top: 50%; left: 0; right: 0; height: 1.5px; background: var(--grid-color); transform: translateY(-50%); z-index: 1; }
 .cell::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background: var(--grid-color); transform: translateX(-50%); z-index: 1; }
 
@@ -114,7 +114,21 @@ select { background: rgba(255,255,255,.06); color: var(--text); border: 1px soli
 .turn-piece.p2 { background: radial-gradient(circle at 30% 30%, #fff, #ccc); border: 1px solid #999; }
 
 .meter-box { padding: 12px; border-radius: 14px; background: rgba(0,0,0,0.3); }
-.meter { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; padding: 8px; background: #000; border-radius: 10px; }
+.meter { 
+    display: grid; 
+    grid-template-columns: repeat(7, 1fr); 
+    gap: 6px; 
+    padding: 8px; 
+    background: #000; 
+    border-radius: 10px; 
+    flex-shrink: 0;
+    
+    /* These three lines make it match the button width */
+    width: 80%;
+    max-width: 300px;
+    margin: 10px auto 0 auto;
+}
+
 .meter-slot { height: 16px; border-radius: 4px; background: #222; position: relative; }
 .meter-slot.marker::after { content: ""; position: absolute; inset: 2px; border-radius: 2px; background: #fff; box-shadow: 0 0 5px #fff; }
 .meter-slot.endcap { border: 1px solid #ff4b6e; }
@@ -311,8 +325,20 @@ html, body {
   display: flex; justify-content: space-between; align-items: center; padding: 15px;
 }
 
+/* Guarantees the board container perfectly fills the middle of the screen */
 #board-container {
-  flex-grow: 1; display: flex; justify-content: center; align-items: center; width: 100%;
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 0; /* CRITICAL: Prevents the board from pushing controls off screen */
+    width: 100%;
+}
+
+/* Prevent the board from being crushed vertically */
+#board {
+    flex-shrink: 0;
+    aspect-ratio: 1 / 1; 
 }
 
 .menu-container { display: flex; flex-direction: column; gap: 15px; width: 85%; max-width: 350px; }
@@ -387,4 +413,60 @@ html, body {
 .restore-btn:hover {
     background: var(--accent-gold, #ffcf40);
     color: #000;
+}
+
+
+/* The Square Selection Cursor */
+.selected-cell {
+    outline: 3px solid #000;
+    outline-offset: -3px; /* Pulls the border inside the cell */
+    background-color: rgba(0, 0, 0, 0.25) !important;
+    z-index: 5;
+}
+
+
+@keyframes pulse-ring {
+    0% { transform: scale(0.85); opacity: 0.6; }
+    50% { transform: scale(1.05); opacity: 1; }
+    100% { transform: scale(0.85); opacity: 0.6; }
+}
+
+/* Compact Confirm Button */
+#btn-place {
+    width: 80%; /* Don't stretch all the way across */
+    max-width: 300px; /* Keep it neat on tablets/desktop */
+    margin: 10px auto; /* Centers it and reduces top/bottom gap */
+    display: block; /* Ensures auto-margins work */
+    background-color: var(--accent-gold, #ffcf40);
+    color: #000;
+    font-size: 16px; /* Slightly smaller text */
+    font-weight: bold;
+    padding: 10px; /* Less padding to save vertical space */
+    border-radius: 8px;
+    border: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transition: transform 0.1s;
+}
+
+#btn-place:active {
+    transform: scale(0.96);
+}
+
+#btn-place:disabled {
+    background-color: #4a4a5a;
+    color: #888;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+    opacity: 0.6;
+}
+
+/* Prevent the bottom controls and mistake meter from squishing */
+#bottom-controls, 
+/* Force Mistake Meter to perfectly match the Confirm button's width */
+#mistakeMeter {
+    width: 80%;
+    max-width: 300px;
+    margin: 10px auto 0 auto; /* Centers it and adds a small gap below the button */
+    box-sizing: border-box;
 }

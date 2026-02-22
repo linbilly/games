@@ -51,6 +51,9 @@ let mmTimer5s, mmTimer20s;
 let isRoomHost = false;
 let leftSideRole = 1; // 1 = Black, 2 = White. Tracks the color of the Left Side UI.
 
+let selectedR = null;
+let selectedC = null;
+
 function showGamePage() {
     $('landing-page').classList.add('hidden');
     $('game-page').classList.remove('hidden');
@@ -69,7 +72,7 @@ function resizeBoard() {
     const board = $('board');
     if (!container || !board) return;
 
-    const margin = 20; 
+    const margin = 30; 
     const maxSize = Math.min(container.clientWidth, container.clientHeight) - margin;
     board.style.width = `${maxSize}px`;
     board.style.height = `${maxSize}px`;
@@ -794,6 +797,7 @@ function setAllPiecesVisible(forceVisible) {
 }
 
 function switchTurn() {
+  clearSelection();
   currentPlayer = (currentPlayer === P1) ? P2 : P1;
 
   // Reset the clock if playing locally
@@ -935,77 +939,101 @@ function showP1FinalChoice() {
 // ------------------------------------
 
 function onCellClick(r, c) {
-  if (gameOver || inputLocked) return;
+    if (gameOver || inputLocked) return;
 
-  // 1. CLEAR MISTAKE STATE FIRST
-  if (mistakeResumeArmed) {
-    if (isOnline) {
-      // Tell the server we are ready to resume so both screens sync
-      socket.emit('resume_game', { matchId: onlineMatchId });
-    } else {
-      // Local play: just resume immediately
-      executeResume(Date.now());
+    // 1. CLEAR MISTAKE STATE FIRST
+    if (mistakeResumeArmed) {
+        if (isOnline) socket.emit('resume_game', { matchId: onlineMatchId });
+        else executeResume(Date.now());
+        return; 
     }
-    return; // Stop here! The click ONLY resumes the game. They must click again to move.
-  }
 
-  // 2. ONLINE MULTIPLAYER INTERCEPTION
-  if (isOnline) {
-    if (currentPlayer !== myOnlineRole) return; 
+    // --- NEW: DOUBLE-TAP TO CONFIRM ---
+    // If they clicked the exact cell that is already highlighted, confirm it!
+    if (selectedR === r && selectedC === c) {
+        confirmPlacement();
+        return;
+    }
+
+    // 2. MOVE THE CURSOR
+    selectedR = r;
+    selectedC = c;
+
+    // Visually update the board
+    const cells = boardEl.querySelectorAll('.cell');
+    cells.forEach(cell => cell.classList.remove('selected-cell'));
+    cells[idx(r, c)].classList.add('selected-cell');
+
+    updatePlaceButton();
+}
+
+function confirmPlacement() {
+    if (selectedR === null || selectedC === null || gameOver || inputLocked) return;
+
+    // Lock in the coordinates
+    const r = selectedR;
+    const c = selectedC;
+
+    // Immediately hide the cursor and button so they don't click it twice
+    clearSelection();
+
+    // 1. ONLINE MULTIPLAYER INTERCEPTION
+    if (isOnline) {
+        if (currentPlayer !== myOnlineRole) return; 
+        
+        if (isOccupied(r, c)) { 
+            socket.emit('commit_mistake', { matchId: onlineMatchId }); 
+            return; 
+        } 
+        
+        inputLocked = true;
+        socket.emit('submit_move', { matchId: onlineMatchId, r, c });
+        return;
+    }
+
+    // 2. LOCAL LOGIC (PvP and AI)
+    if (isOccupied(r, c)) {
+        handleMistake();
+        return;
+    }
+
+    // Local SWAP2 OPENING MOVES
+    if (ruleMode === "swap2" && swap2Phase > 0) {
+        handleSwap2Move(r, c);
+        setPills(); 
+        return;     
+    }
+
+    const isRenju = (ruleMode === "renju" || ruleMode === "swap2");
+    if (isRenju && currentPlayer === P1) {
+        state[idx(r,c)] = P1; 
+        const result = window.violatesRenju(r, c, 1, state);
+        state[idx(r,c)] = 0; 
+
+        if (!result.isValid) {
+            handleMistake(result.reason); 
+            return;
+        }
+    }
+
+    placePiece(r, c, currentPlayer, { animate: true, sfx: true });
     
-    if (isOccupied(r, c)) { 
-      socket.emit('commit_mistake', { matchId: onlineMatchId }); 
-      return; 
-    } 
-    
-    inputLocked = true;
-    socket.emit('submit_move', { matchId: onlineMatchId, r, c });
-    return;
-  }
+    const win = checkWinFrom(r, c, currentPlayer);
+    if (win) {
+        endGame(win);
+        return;
+    }
 
+    if (!state.includes(0)) {
+        endGame({ player: 0, line: [] }, true);
+        return;
+    }
 
-  // 3. EXISTING LOCAL LOGIC
-  if (isOccupied(r, c)) {
-    handleMistake();
-    return;
-  }
+    switchTurn();
 
-  // Local SWAP2 OPENING MOVES ---
-  if (ruleMode === "swap2" && swap2Phase > 0) {
-      handleSwap2Move(r, c);
-      setPills(); // Instantly update the new dual-player UI!
-      return;     // Stop here so it doesn't trigger a normal turn switch
-  }
-
-  const isRenju = (ruleMode === "renju" || ruleMode === "swap2");
-  if (isRenju && currentPlayer === P1) {
-      state[idx(r,c)] = P1; 
-      const result = window.violatesRenju(r, c, 1, state);
-      state[idx(r,c)] = 0; 
-
-      if (!result.isValid) {
-          handleMistake(result.reason); 
-          return;
-      }
-  }
-
-  placePiece(r, c, currentPlayer, { animate: true, sfx: true });
-  const win = checkWinFrom(r, c, currentPlayer);
-  if (win) {
-    endGame(win);
-    return;
-  }
-
-  if (!state.includes(0)) {
-    endGame({ player: 0, line: [] }, true);
-    return;
-  }
-
-  switchTurn();
-
-  if (mode === "ai" && currentPlayer === aiPlaysAs) {
-    aiMoveSoon();
-  }
+    if (mode === "ai" && currentPlayer === aiPlaysAs) {
+        aiMoveSoon();
+    }
 }
 
 function placePiece(r, c, player, { animate = false, sfx = false, absoluteTime = null } = {}) {
@@ -1076,6 +1104,7 @@ function executeResume(syncTime) {
 }
 
 function handleMistake(customMsg, offender = currentPlayer) {
+  clearSelection();
   sfxMistake();
   
   if (!isOnline || currentPlayer === myOnlineRole) {
@@ -1401,6 +1430,7 @@ function finalizeRoles(winnerOfOpening) {
 }
 
 function newGame() {
+  clearSelection();
   meterPos = 0; 
   openingStones = [];
   leftSideRole = 1;
@@ -1444,6 +1474,34 @@ function newGame() {
   if (mode === "ai" && currentPlayer === aiPlaysAs && swap2Phase === 0) {
       aiMoveSoon();
   }
+}
+
+function clearSelection() {
+    selectedR = null;
+    selectedC = null;
+    
+    // Remove cursor from all cells
+    const cells = boardEl.querySelectorAll('.cell');
+    cells.forEach(cell => cell.classList.remove('selected-cell'));
+    
+    // THE FIX: Recalculate button state instead of hiding it
+    updatePlaceButton();
+}
+
+function updatePlaceButton() {
+    const placeBtn = $('btn-place');
+    if (!placeBtn) return;
+
+    // The button is strictly DISABLED if:
+    // 1. The game is over
+    // 2. Input is currently locked (opponent's turn, AI thinking, or Swap2 menu is open)
+    // 3. No square is currently targeted
+    // 4. The board is revealed due to a mistake
+    if (gameOver || inputLocked || selectedR === null || selectedC === null || mistakeResumeArmed) {
+        placeBtn.disabled = true;
+    } else {
+        placeBtn.disabled = false;
+    }
 }
 
 
