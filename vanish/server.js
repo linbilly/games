@@ -35,9 +35,9 @@ io.on('connection', (socket) => {
   let currentUser = `Guest_${Math.floor(Math.random()*1000)}`; // Mock user auth
 
   // --- 1. GLOBAL MATCHMAKING (15x15 Only) ---
-  socket.on('find_global_match', ({ vanishMs, ruleMode }) => {
-    const request = { socketId: socket.id, username: currentUser, vanishMs, ruleMode };
-    
+  socket.on('find_global_match', ({ vanishMs, ruleMode, appleId }) => {
+    const request = { socketId: socket.id, username: currentUser, appleId, vanishMs, ruleMode };
+
     // Look for an exact match (simplified for MVP)
     const matchIndex = matchmakingQueue.findIndex(p => p.vanishMs === vanishMs && p.ruleMode === ruleMode);
     
@@ -92,46 +92,45 @@ io.on('connection', (socket) => {
   // --- 3. GAMEPLAY LOOP ---
 
   socket.on('submit_move', async ({ matchId, r, c }) => {
-      const match = activeMatches.get(matchId);
-      if (!match) return;
+        const match = activeMatches.get(matchId);
+        if (!match) return;
 
-      const playerRole = (match.host.socketId === socket.id) ? 1 : 2;
-      const idx = r * match.size + c;
+        const playerRole = (match.host.socketId === socket.id) ? 1 : 2;
+        const idx = r * match.size + c;
 
-      if (match.turn !== playerRole || match.state[idx] !== 0) return;
+        if (match.turn !== playerRole || match.state[idx] !== 0) return;
 
-      match.state[idx] = playerRole; // Update board
-      
-      // 1. Authoritative Win Check
-      const hasWon = checkServerWin(match.state, match.size, 5, r, c, playerRole);
+        match.state[idx] = playerRole; // Update internal board
+        
+        // 1. NEW: Advance the turn and broadcast the move IMMEDIATELY so the 5th piece renders!
+        match.turn = playerRole === 1 ? 2 : 1;
+        match.turnDeadline = Date.now() + 30000;
+        io.to(matchId).emit('move_made', { r, c, player: playerRole, turnDeadline: match.turnDeadline });
+        
+        // 2. Authoritative Win Check
+        const hasWon = checkServerWin(match.state, match.size, 5, r, c, playerRole);
 
-      if (hasWon) {
-          const winner = playerRole === 1 ? match.host : match.guest;
-          const loser = playerRole === 1 ? match.guest : match.host;
+        if (hasWon) {
+            const winner = playerRole === 1 ? match.host : match.guest;
+            const loser = playerRole === 1 ? match.guest : match.host;
 
-          // Trigger Glicko-2 Logic
-          const ratingData = await finalizeMatchRatings(winner.appleId, loser.appleId, match.vanishMs);
+            // Trigger Glicko-2 Logic
+            const ratingData = await finalizeMatchRatings(winner.appleId, loser.appleId, match.vanishMs);
 
-          io.to(matchId).emit('match_over', {
-              winnerRole: playerRole,
-              newRating: ratingData ? Math.round(ratingData.winnerRating) : null,
-              pointsGained: ratingData ? ratingData.winnerGain : 0
-          });
+            io.to(matchId).emit('match_over', {
+                winnerRole: playerRole,
+                newRating: ratingData ? Math.round(ratingData.winnerRating) : null,
+                pointsGained: ratingData ? ratingData.winnerGain : 0
+            });
 
-          if (match.timerInterval) clearInterval(match.timerInterval);
-          if (matchId.length > 6) {
-              activeMatches.delete(matchId); // It's a Global match, delete it
-          } else {
-              match.isOver = true; // It's a Private Room, keep it alive for a rematch!
-          }
-          return; // Stop processing further move logic
-      }
+            if (match.timerInterval) clearInterval(match.timerInterval);
+            
+            
+            match.isOver = true; 
 
-      // 2. Otherwise, continue turn rotation as normal
-      match.turn = playerRole === 1 ? 2 : 1;
-      match.turnDeadline = Date.now() + 30000;
-      io.to(matchId).emit('move_made', { r, c, player: playerRole, turnDeadline: match.turnDeadline });
-  });
+            return; 
+        }
+    });
 
 
   // --- HANDLE MISTAKES ---
@@ -184,6 +183,7 @@ io.on('connection', (socket) => {
     if (idx !== -1) matchmakingQueue.splice(idx, 1);
   });
 
+  // --- DECLINE MATCH LOGIC ---
   socket.on('decline_match', ({ matchId }) => {
     const match = activeMatches.get(matchId);
     if (!match) return;
@@ -198,48 +198,56 @@ io.on('connection', (socket) => {
     matchmakingQueue.unshift({
         socketId: innocentPlayer.socketId, 
         username: innocentPlayer.username, 
+        appleId: innocentPlayer.appleId, // <--- ADD THIS LINE
         vanishMs: match.vanishMs, 
         ruleMode: match.ruleMode 
     });
 
-    // --- REMATCH & DISCONNECT LOGIC ---
-    socket.on('request_rematch', ({ matchId }) => {
-      const match = activeMatches.get(matchId);
-      if (!match) return;
-
-      // Track who wants to play again
-      match.rematchRequests = match.rematchRequests || new Set();
-      match.rematchRequests.add(socket.id);
-
-      // If both players clicked "New Game"
-      if (match.rematchRequests.size === 2) {
-          match.state = new Array(match.size * match.size).fill(0);
-          match.turn = 1;
-          match.isOver = false;
-          match.turnDeadline = Date.now() + 30000;
-          match.rematchRequests.clear();
-
-          // Swap roles so they take turns being Black (P1)
-          const temp = match.host;
-          match.host = match.guest;
-          match.guest = temp;
-
-          io.to(match.host.socketId).emit('match_start', { role: 1, matchId, settings: match });
-          io.to(match.guest.socketId).emit('match_start', { role: 2, matchId, settings: match });
-          startMatchTimer(matchId);
-      } else {
-          // Tell the other player someone wants a rematch
-          socket.to(matchId).emit('rematch_requested');
-      }
-    });
-
-    socket.on('leave_room', ({ matchId }) => {
-        socket.leave(matchId);
-        socket.to(matchId).emit('opponent_left');
-        activeMatches.delete(matchId);
-    });
-    
+    // This line MUST be inside the decline_match block, right before the closing bracket!
     io.to(innocentPlayer.socketId).emit('matchmaking_status', 'Opponent declined. Resuming search...');
+  }); // <-- CRUCIAL: decline_match closes right here!
+
+
+  // --- REMATCH & DISCONNECT LOGIC ---
+  // (These should be completely separate listeners, sitting right below decline_match)
+  socket.on('request_rematch', ({ matchId }) => {
+    console.log(`[REMATCH] Player ${socket.id} requesting rematch for room: ${matchId}`);
+    
+    const match = activeMatches.get(matchId);
+    if (!match) {
+        console.log(`[REMATCH FAILED] Room ${matchId} no longer exists on the server!`);
+        return;
+    }
+
+    match.rematchRequests = match.rematchRequests || new Set();
+    match.rematchRequests.add(socket.id);
+
+    if (match.rematchRequests.size === 2) {
+        console.log(`[REMATCH SUCCESS] Both players agreed. Restarting room ${matchId}`);
+        match.state = new Array(match.size * match.size).fill(0);
+        match.turn = 1;
+        match.isOver = false;
+        match.turnDeadline = Date.now() + 30000;
+        match.rematchRequests.clear();
+
+        // Swap roles
+        const temp = match.host;
+        match.host = match.guest;
+        match.guest = temp;
+
+        io.to(match.host.socketId).emit('match_start', { role: 1, matchId, settings: match });
+        io.to(match.guest.socketId).emit('match_start', { role: 2, matchId, settings: match });
+        startMatchTimer(matchId);
+    } else {
+        console.log(`[REMATCH WAITING] Telling the other player in ${matchId}...`);
+        socket.to(matchId).emit('rematch_requested');
+    }
+  });
+
+  socket.on('leave_room', ({ matchId }) => {
+      socket.leave(matchId);
+      socket.to(matchId).emit('opponent_left');
+      activeMatches.delete(matchId);
   });
 });
 
@@ -305,11 +313,7 @@ function startMatchTimer(matchId) {
       }
 
       clearInterval(currentMatch.timerInterval);
-      if (matchId.length > 6) {
-          activeMatches.delete(matchId); // It's a Global match, delete it
-      } else {
           match.isOver = true; // It's a Private Room, keep it alive for a rematch!
-      }
     }
   }, 500); 
 }
@@ -342,6 +346,10 @@ function checkServerWin(state, size, goal, r, c, player) {
 }
 
 async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
+
+  // GUARD CLAUSE: If either player has no ID, it's an unranked/private match. Skip Elo!
+    if (!winnerAppleId || !loserAppleId) return null;
+    
     // Map the vanish setting to your specific column
     let ratingCol = 'rating_15_standard';
     if (vanishMs === 3000) ratingCol = 'rating_15_3s';

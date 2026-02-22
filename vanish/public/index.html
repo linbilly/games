@@ -64,8 +64,11 @@
             </select>
         </div>
 
-        <button class="btn highlight-btn" onclick="confirmStart()">Start Match</button>
-        <button class="btn ghost" onclick="backToMainMenu()">Back</button>
+        <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 10px;">
+            <button id="start-btn" class="btn highlight-btn" onclick="confirmStart()">Start Match</button>
+            <button id="join-btn" class="btn highlight-btn hidden" onclick="joinPrivateRoom()">Join a Room</button>
+            <button class="btn ghost" onclick="backToMainMenu()">Back</button>
+        </div>
     </div>
 </div>
 
