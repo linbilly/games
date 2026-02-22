@@ -92,45 +92,50 @@ io.on('connection', (socket) => {
   // --- 3. GAMEPLAY LOOP ---
 
   socket.on('submit_move', async ({ matchId, r, c }) => {
-        const match = activeMatches.get(matchId);
-        if (!match) return;
+    const match = activeMatches.get(matchId);
+    if (!match) return;
 
-        const playerRole = (match.host.socketId === socket.id) ? 1 : 2;
-        const idx = r * match.size + c;
+    const playerRole = (match.host.socketId === socket.id) ? 1 : 2;
+    const idx = r * match.size + c;
 
-        if (match.turn !== playerRole || match.state[idx] !== 0) return;
-
-        match.state[idx] = playerRole; // Update internal board
+    // --- SWAP2 SERVER OVERRIDE ---
+    if (match.ruleMode === 'swap2' && (!match.swap2Phase || match.swap2Phase > 0)) {
+        match.openingStones = match.openingStones || [];
         
-        // 1. NEW: Advance the turn and broadcast the move IMMEDIATELY so the 5th piece renders!
-        match.turn = playerRole === 1 ? 2 : 1;
-        match.turnDeadline = Date.now() + 30000;
-        io.to(matchId).emit('move_made', { r, c, player: playerRole, turnDeadline: match.turnDeadline });
-        
-        // 2. Authoritative Win Check
-        const hasWon = checkServerWin(match.state, match.size, 5, r, c, playerRole);
-
-        if (hasWon) {
-            const winner = playerRole === 1 ? match.host : match.guest;
-            const loser = playerRole === 1 ? match.guest : match.host;
-
-            // Trigger Glicko-2 Logic
-            const ratingData = await finalizeMatchRatings(winner.appleId, loser.appleId, match.vanishMs);
-
-            io.to(matchId).emit('match_over', {
-                winnerRole: playerRole,
-                newRating: ratingData ? Math.round(ratingData.winnerRating) : null,
-                pointsGained: ratingData ? ratingData.winnerGain : 0
-            });
-
-            if (match.timerInterval) clearInterval(match.timerInterval);
+        // Phase 1: Host places first 3 stones
+        if (match.openingStones.length < 3) {
+            if (playerRole !== 1) return; // Only host can place first 3
+            const color = (match.openingStones.length === 1) ? 2 : 1; 
+            executeServerMove(match, r, c, color, matchId);
+            match.openingStones.push({ r, c, color });
             
-            
-            match.isOver = true; 
-
-            return; 
+            if (match.openingStones.length === 3) {
+                match.swap2Phase = 2; // Move to Guest Choice phase
+                io.to(matchId).emit('swap2_choice_required', { phase: 2 });
+            }
+            return;
         }
-    });
+        
+        // Phase 3: Guest places 2 more stones
+        if (match.swap2Phase === 3 && match.openingStones.length < 5) {
+            if (playerRole !== 2) return; // Only guest can place these
+            const color = (match.openingStones.length === 3) ? 2 : 1;
+            executeServerMove(match, r, c, color, matchId);
+            match.openingStones.push({ r, c, color });
+            
+            if (match.openingStones.length === 5) {
+                match.swap2Phase = 4; // Move to Host Final Choice phase
+                io.to(matchId).emit('swap2_choice_required', { phase: 4 });
+            }
+            return;
+        }
+    }
+
+    // --- NORMAL MOVE LOGIC ---
+    if (match.turn !== playerRole || match.state[idx] !== 0) return;
+    executeServerMove(match, r, c, playerRole, matchId);
+  });
+
 
 
   // --- HANDLE MISTAKES ---
@@ -249,7 +254,56 @@ io.on('connection', (socket) => {
       socket.to(matchId).emit('opponent_left');
       activeMatches.delete(matchId);
   });
+
+  socket.on('swap2_decision', ({ matchId, decision, role }) => {
+    const match = activeMatches.get(matchId);
+    if (!match) return;
+
+    if (decision === 'stay') {
+        finalizeOnlineRoles(match, matchId, match.host, match.guest);
+    } else if (decision === 'swap') {
+        // Switch host and guest roles
+        const newHost = match.guest;
+        const newGuest = match.host;
+        finalizeOnlineRoles(match, matchId, newHost, newGuest);
+    } else if (decision === 'plus2') {
+        match.swap2Phase = 3;
+        io.to(matchId).emit('swap2_plus2_started');
+    }
+  });
+
 });
+
+
+  // Helper to keep code clean
+  function executeServerMove(match, r, c, playerRole, matchId) {
+    const idx = r * match.size + c;
+    match.state[idx] = playerRole;
+    match.turn = playerRole === 1 ? 2 : 1;
+    match.turnDeadline = Date.now() + 30000;
+    io.to(matchId).emit('move_made', { r, c, player: playerRole, turnDeadline: match.turnDeadline });
+    
+    // Win check (only if not in opening phase)
+    if (!match.swap2Phase || match.swap2Phase === 0) {
+        const hasWon = checkServerWin(match.state, match.size, 5, r, c, playerRole);
+        if (hasWon) handleServerWin(match, playerRole, matchId);
+    }
+  }
+
+  
+  function finalizeOnlineRoles(match, matchId, newHost, newGuest) {
+    match.host = newHost;
+    match.guest = newGuest;
+    match.swap2Phase = 0;
+    match.turn = 2; // White always moves after opening is set
+    match.turnDeadline = Date.now() + 30000;
+    
+    io.to(matchId).emit('roles_finalized', { 
+        hostId: match.host.socketId, 
+        guestId: match.guest.socketId 
+    });
+}
+  
 
 function startOnlineMatch(p1, p2, size, vanishMs, ruleMode) {
   const matchId = require('crypto').randomUUID();
@@ -349,7 +403,7 @@ async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
 
   // GUARD CLAUSE: If either player has no ID, it's an unranked/private match. Skip Elo!
     if (!winnerAppleId || !loserAppleId) return null;
-    
+
     // Map the vanish setting to your specific column
     let ratingCol = 'rating_15_standard';
     if (vanishMs === 3000) ratingCol = 'rating_15_3s';

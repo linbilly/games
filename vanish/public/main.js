@@ -48,6 +48,8 @@ let isWaitingForMatch = false;
 let pendingMatchData = null;
 let mmTimer5s, mmTimer20s;
 
+let isRoomHost = false; // Tracks if you are the player on the left side
+
 function showGamePage() {
     $('landing-page').classList.add('hidden');
     $('game-page').classList.remove('hidden');
@@ -229,10 +231,16 @@ function setupOnlineGame(data) {
     turnDeadline = data.settings.turnDeadline || (Date.now() + 30000);
 
     opponentWantsRematch = false; // Reset the flag for the new match
+
+    isRoomHost = (data.role === 1);
     
     size = data.settings.size;
     vanishMs = data.settings.vanishMs;
     ruleMode = data.settings.ruleMode;
+
+    // Set names for online play
+    $('p1-name').innerText = data.settings.host.username;
+    $('p2-name').innerText = data.settings.guest ? data.settings.guest.username : "Opponent";
     
     showGamePage(); // Ensure we are on the game page
     buildBoard();
@@ -473,26 +481,59 @@ function idx(r,c){ return r*size + c; }
 function inBounds(r,c){ return r>=0 && c>=0 && r<size && c<size; }
 
 function setPills() {
-  const turnPill = $('turnPill');
-  if (!turnPill) return;
+    const p1Info = $('p1-info'); // Left Slot (Host)
+    const p2Info = $('p2-info'); // Right Slot (Guest)
+    const p1Pill = $('p1-pill');
+    const p2Pill = $('p2-pill');
+    
+    if (!p1Info || !p2Info) return;
 
-  if (isOnline) {
-      // Online: Show clearly if it's your turn or opponent's
-      if (currentPlayer === myOnlineRole) {
-          turnPill.textContent = myOnlineRole === P1 ? "Your Turn (Black)" : "Your Turn (White)";
-          turnPill.style.color = "#ffcf40"; // Highlight gold when it's your turn
-      } else {
-          turnPill.textContent = myOnlineRole === P1 ? "Opponent (White)" : "Opponent (Black)";
-          turnPill.style.color = "#fff";
-      }
-  } else {
-      // Local/AI: Standard display
-      turnPill.textContent = `Turn: ${currentPlayer === P1 ? "Black" : (mode === "ai" ? "AI" : "White")}`;
-      turnPill.style.color = "#fff";
-  }
+    // 1. Reset
+    p1Info.classList.remove('active');
+    p2Info.classList.remove('active');
+    p1Pill.className = 'turn-piece hidden';
+    p2Pill.className = 'turn-piece hidden';
 
-  updateMistakeMeter();
+    // 2. Identify whose turn it is
+    // Role 1 is ALWAYS Black, Role 2 is ALWAYS White
+    const activeColor = (currentPlayer === 1) ? 'p1' : 'p2';
+    const isMyTurn = (isOnline) ? (currentPlayer === myOnlineRole) : (currentPlayer === 1);
+
+    // 3. Logic: Should the highlight be on the Left or Right?
+    // If I am the Host and it's my turn -> Left
+    // If I am the Guest and it's my turn -> Right
+    // If I am the Host and it's NOT my turn -> Right
+    let hostSideActive = (isRoomHost && isMyTurn) || (!isRoomHost && !isMyTurn);
+
+    // 4. Handle Swap2 Opening
+    if (ruleMode === 'swap2' && swap2Phase > 0) {
+        if (swap2Phase === 1) {
+            p1Info.classList.add('active');
+            p1Pill.className = `turn-piece ${(openingStones.length === 1) ? 'p2' : 'p1'}`;
+            p1Pill.classList.remove('hidden');
+        } else if (swap2Phase === 3) {
+            p2Info.classList.add('active');
+            p2Pill.className = `turn-piece ${(openingStones.length === 3) ? 'p2' : 'p1'}`;
+            p2Pill.classList.remove('hidden');
+        }
+        updateMistakeMeter();
+        return;
+    }
+
+    // 5. Apply the Pill and Highlight
+    if (hostSideActive) {
+        p1Info.classList.add('active');
+        p1Pill.className = `turn-piece ${activeColor}`;
+        p1Pill.classList.remove('hidden');
+    } else {
+        p2Info.classList.add('active');
+        p2Pill.className = `turn-piece ${activeColor}`;
+        p2Pill.classList.remove('hidden');
+    }
+
+    updateMistakeMeter();
 }
+
 function initMistakeMeter(){
   if (!mistakeMeterEl) return;
   mistakeMeterEl.innerHTML = ""; 
@@ -786,30 +827,44 @@ function showSwap2ChoiceOverlay() {
   showOverlay("Swap2: Choice", "Choose your path as Player 2:", "Stay White");
 
   const card = document.querySelector('.overlay-card');
+  const btnRow = $('overlayBtn').parentElement; // Get the flex container holding the buttons
   clearOverlayButtons();
 
   const btnContainer = document.createElement('div');
   btnContainer.className = "choice-container";
+  btnContainer.style.display = "flex";
+  btnContainer.style.gap = "10px";
+  btnContainer.style.marginBottom = "15px";
 
   const swapBtn = document.createElement('button');
   swapBtn.className = "btn ghost";
   swapBtn.textContent = "Swap to Black";
-  swapBtn.onclick = () => { overlayBtn.onclick = null; finalizeRoles(P1); };
+  swapBtn.onclick = () => { 
+      if (isOnline) socket.emit('swap2_decision', { matchId: onlineMatchId, decision: 'swap' });
+      else finalizeRoles(P1); 
+  };
 
   const plus2Btn = document.createElement('button');
   plus2Btn.className = "btn ghost";
   plus2Btn.textContent = "Place 2 More";
   plus2Btn.onclick = () => { 
-    overlayBtn.onclick = null; 
-    swap2Phase = 3; 
-    inputLocked = false; 
-    hideOverlay(); 
+    if (isOnline) socket.emit('swap2_decision', { matchId: onlineMatchId, decision: 'plus2' });
+    else {
+        swap2Phase = 3; 
+        inputLocked = false; 
+        hideOverlay(); 
+        setPills();
+    }
   };
 
   btnContainer.append(swapBtn, plus2Btn);
-  card.insertBefore(btnContainer, overlayBtn);
+  // FIX: Insert before the row container, not inside it
+  card.insertBefore(btnContainer, btnRow);
 
-  overlayBtn.onclick = () => { overlayBtn.onclick = null; finalizeRoles(P2); };
+  overlayBtn.onclick = () => { 
+      if (isOnline) socket.emit('swap2_decision', { matchId: onlineMatchId, decision: 'stay' });
+      else finalizeRoles(P2); 
+  };
 }
 
 function showP1FinalChoice() {
@@ -819,26 +874,37 @@ function showP1FinalChoice() {
 
   showOverlay(
     "Swap2: Final Choice", 
-    `Player 2 has added two stones. Now, Player 1 (You) must choose your final color. (AI suggests: ${suggestion})`, 
+    `Player 2 has added two stones. Choose your final color. (AI suggests: ${suggestion})`, 
     "Play as Black"
   );
 
   const card = document.querySelector('.overlay-card');
+  const btnRow = $('overlayBtn').parentElement;
   clearOverlayButtons();
 
   const btnContainer = document.createElement('div');
   btnContainer.className = "choice-container";
+  btnContainer.style.display = "flex";
+  btnContainer.style.gap = "10px";
+  btnContainer.style.marginBottom = "15px";
 
   const whiteBtn = document.createElement('button');
   whiteBtn.className = "btn ghost";
   whiteBtn.textContent = "Play as White";
-  whiteBtn.onclick = () => { overlayBtn.onclick = null; finalizeRoles(P2); };
+  whiteBtn.onclick = () => { 
+      if (isOnline) socket.emit('swap2_decision', { matchId: onlineMatchId, decision: 'stay', role: 2 });
+      else finalizeRoles(P2); 
+  };
 
   btnContainer.appendChild(whiteBtn);
-  card.insertBefore(btnContainer, overlayBtn);
+  card.insertBefore(btnContainer, btnRow);
 
-  overlayBtn.onclick = () => { overlayBtn.onclick = null; finalizeRoles(P1); };
+  overlayBtn.onclick = () => { 
+      if (isOnline) socket.emit('swap2_decision', { matchId: onlineMatchId, decision: 'swap', role: 1 });
+      else finalizeRoles(P1); 
+  };
 }
+
 
 // ------------------------------------
 
@@ -875,6 +941,13 @@ function onCellClick(r, c) {
   if (isOccupied(r, c)) {
     handleMistake();
     return;
+  }
+
+  // Local SWAP2 OPENING MOVES ---
+  if (ruleMode === "swap2" && swap2Phase > 0) {
+      handleSwap2Move(r, c);
+      setPills(); // Instantly update the new dual-player UI!
+      return;     // Stop here so it doesn't trigger a normal turn switch
   }
 
   const isRenju = (ruleMode === "renju" || ruleMode === "swap2");
@@ -1157,11 +1230,6 @@ function aiMoveSoon() {
     inputLocked = true;
   }
 
-  if (turnPill) {
-    turnPill.textContent = "Turn: AI (Thinking...)";
-    turnPill.style.color = "#ffcf40"; 
-  }
-
   setTimeout(() => {
     // 1. Pass the actual board state and player role to the AI!
     let move = window.chooseAiMove ? window.chooseAiMove(state, currentPlayer) : null;
@@ -1273,6 +1341,12 @@ function newGame() {
   hideOverlay();
   clearOverlayButtons();
   overlayBtn.onclick = null; 
+
+  // Set names for local play
+  if (!isOnline) {
+      $('p1-name').innerText = currentUser || "Player 1";
+      $('p2-name').innerText = mode === "ai" ? `AI (${aiLevel})` : "Player 2";
+  }
   
   if (ruleMode === "swap2") {
       swap2Phase = 1;
@@ -1456,6 +1530,38 @@ socket.on('match_over', ({ winnerRole, newRating, pointsGained }) => {
         const gainStr = pointsGained >= 0 ? `+${pointsGained}` : pointsGained;
         bodyEl.textContent += `\n\nRating Updated: ${newRating} (${gainStr})`;
     }
+});
+
+socket.on('swap2_choice_required', ({ phase }) => {
+    swap2Phase = phase;
+    if (phase === 2 && myOnlineRole === 2) {
+        showSwap2ChoiceOverlay(); // Use your existing UI
+    } else if (phase === 4 && myOnlineRole === 1) {
+        showP1FinalChoice(); // Use your existing UI
+    }
+});
+
+socket.on('roles_finalized', ({ hostId, guestId }) => {
+    // Update your role (1=Black, 2=White)
+    myOnlineRole = (socket.id === hostId) ? 1 : 2;
+    
+    swap2Phase = 0; // End opening
+    currentPlayer = 2; // White (P2) moves first after opening
+    
+    // Unlock if the current turn (White) matches your new role
+    inputLocked = (myOnlineRole !== 2); 
+    
+    hideOverlay();
+    clearOverlayButtons();
+    setPills(); 
+});
+
+socket.on('swap2_plus2_started', () => {
+    swap2Phase = 3;
+    hideOverlay();
+    clearOverlayButtons();
+    inputLocked = (myOnlineRole !== 2); // Only Player 2 (the guest) can move now
+    setPills();
 });
 
 // Final assignments

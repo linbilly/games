@@ -74,9 +74,21 @@
 
 <div id="game-page" class="hidden">
     <div id="game-top-bar">
-        <button class="btn ghost" onclick="showLandingPage()">Quit</button>
-        <div id="turnPill" class="pill">Turn: P1</div>
-        <div id="timerP1" class="timer">00:30</div>
+        <button class="btn ghost" onclick="quitGame()">Quit</button>
+        
+        <div id="players-display" style="display: flex; flex-grow: 1; justify-content: space-evenly; align-items: center; padding: 0 10px;">
+            <div id="p1-info" class="player-info">
+                <span id="p1-name">P1</span>
+                <div id="p1-pill" class="turn-piece hidden"></div>
+            </div>
+            
+            <div id="timerP1" class="timer" style="font-family: monospace; font-size: 18px; font-weight: bold;">00:30</div>
+            
+            <div id="p2-info" class="player-info">
+                <div id="p2-pill" class="turn-piece hidden"></div>
+                <span id="p2-name">P2</span>
+            </div>
+        </div>
     </div>
 
     <div id="board-container">
