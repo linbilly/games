@@ -48,7 +48,8 @@ let isWaitingForMatch = false;
 let pendingMatchData = null;
 let mmTimer5s, mmTimer20s;
 
-let isRoomHost = false; // Tracks if you are the player on the left side
+let isRoomHost = false;
+let leftSideRole = 1; // 1 = Black, 2 = White. Tracks the color of the Left Side UI.
 
 function showGamePage() {
     $('landing-page').classList.add('hidden');
@@ -233,6 +234,7 @@ function setupOnlineGame(data) {
     opponentWantsRematch = false; // Reset the flag for the new match
 
     isRoomHost = (data.role === 1);
+    leftSideRole = 1; // Always start as Black
     
     size = data.settings.size;
     vanishMs = data.settings.vanishMs;
@@ -487,51 +489,47 @@ function idx(r,c){ return r*size + c; }
 function inBounds(r,c){ return r>=0 && c>=0 && r<size && c<size; }
 
 function setPills() {
-    const p1Info = $('p1-info'); // Left Slot (Host)
-    const p2Info = $('p2-info'); // Right Slot (Guest)
+    const p1Info = $('p1-info'); // Left Side
+    const p2Info = $('p2-info'); // Right Side
     const p1Pill = $('p1-pill');
     const p2Pill = $('p2-pill');
-    
+
     if (!p1Info || !p2Info) return;
 
-    // 1. Reset
     p1Info.classList.remove('active');
     p2Info.classList.remove('active');
     p1Pill.className = 'turn-piece hidden';
     p2Pill.className = 'turn-piece hidden';
 
-    // 2. Identify whose turn it is
-    // Role 1 is ALWAYS Black, Role 2 is ALWAYS White
-    const activeColor = (currentPlayer === 1) ? 'p1' : 'p2';
-    const isMyTurn = (isOnline) ? (currentPlayer === myOnlineRole) : (currentPlayer === 1);
-
-    // 3. Logic: Should the highlight be on the Left or Right?
-    // If I am the Host and it's my turn -> Left
-    // If I am the Guest and it's my turn -> Right
-    // If I am the Host and it's NOT my turn -> Right
-    let hostSideActive = (isRoomHost && isMyTurn) || (!isRoomHost && !isMyTurn);
-
-    // 4. Handle Swap2 Opening
+    // 1. Handle Swap2 Opening (Placing the 3 or 5 stones)
     if (ruleMode === 'swap2' && swap2Phase > 0) {
         if (swap2Phase === 1) {
-            p1Info.classList.add('active');
+            p1Info.classList.add('active'); // Left side placing
             p1Pill.className = `turn-piece ${(openingStones.length === 1) ? 'p2' : 'p1'}`;
             p1Pill.classList.remove('hidden');
         } else if (swap2Phase === 3) {
-            p2Info.classList.add('active');
+            p2Info.classList.add('active'); // Right side placing
             p2Pill.className = `turn-piece ${(openingStones.length === 3) ? 'p2' : 'p1'}`;
             p2Pill.classList.remove('hidden');
+        } else if (swap2Phase === 2) {
+            p2Info.classList.add('active'); // Right side thinking
+        } else if (swap2Phase === 4) {
+            p1Info.classList.add('active'); // Left side thinking
         }
         updateMistakeMeter();
         return;
     }
 
-    // 5. Apply the Pill and Highlight
-    if (hostSideActive) {
+    // 2. Standard Play / Post-Swap
+    const activeColor = (currentPlayer === 1) ? 'p1' : 'p2';
+
+    if (currentPlayer === leftSideRole) {
+        // It is the Left Side's turn
         p1Info.classList.add('active');
         p1Pill.className = `turn-piece ${activeColor}`;
         p1Pill.classList.remove('hidden');
     } else {
+        // It is the Right Side's turn
         p2Info.classList.add('active');
         p2Pill.className = `turn-piece ${activeColor}`;
         p2Pill.classList.remove('hidden');
@@ -1314,6 +1312,13 @@ function finalizeRoles(winnerOfOpening) {
   clearOverlayButtons();
   overlayBtn.onclick = null;
 
+  if (!isOnline) {
+      // If Phase 2 (Right Side) chooses Black, Left Side becomes White (P2)
+      if (swap2Phase === 2 && winnerOfOpening === P1) leftSideRole = P2;
+      // If Phase 4 (Left Side) chooses White, Left Side becomes White (P2)
+      if (swap2Phase === 4 && winnerOfOpening === P2) leftSideRole = P2;
+  }
+
   if ((swap2Phase === 2 && winnerOfOpening === P1) || (swap2Phase === 4 && winnerOfOpening === P2)) {
      aiPlaysAs = (aiPlaysAs === P1) ? P2 : P1;
   }
@@ -1336,6 +1341,7 @@ function finalizeRoles(winnerOfOpening) {
 function newGame() {
   meterPos = 0; 
   openingStones = [];
+  leftSideRole = 1;
 
   turnDeadline = Date.now() + 30000;
   startLocalClocks();
@@ -1551,6 +1557,11 @@ socket.on('swap2_choice_required', ({ phase }) => {
 socket.on('roles_finalized', ({ hostId, guestId }) => {
     // Update your role (1=Black, 2=White)
     myOnlineRole = (socket.id === hostId) ? 1 : 2;
+
+    // THE FIX: Explicitly set the Left Side's color based on the swap result
+    // If I created the room, the left side is my color.
+    // If I joined the room, the left side is the opponent's color.
+    leftSideRole = isRoomHost ? myOnlineRole : (myOnlineRole === 1 ? 2 : 1);
     
     swap2Phase = 0; // End opening
     currentPlayer = 2; // White (P2) moves first after opening
