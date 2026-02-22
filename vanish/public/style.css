@@ -345,3 +345,46 @@ html, body {
 .player-info.active {
     color: #ffcf40; /* Gold highlight for active player */
 }
+
+/* Minimize button inside the overlay card */
+#minimize-overlay-btn {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: transparent;
+    border: none;
+    color: var(--text-color, #fff);
+    font-size: 20px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    padding: 5px;
+}
+
+#minimize-overlay-btn:hover {
+    opacity: 1;
+}
+
+/* Floating Restore Button */
+.restore-btn {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-card, #2a2a35);
+    color: var(--text-color, #fff);
+    border: 2px solid var(--accent-gold, #ffcf40);
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    transition: background 0.2s, color 0.2s;
+}
+
+.restore-btn:hover {
+    background: var(--accent-gold, #ffcf40);
+    color: #000;
+}

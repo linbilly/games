@@ -258,7 +258,7 @@ function setupOnlineGame(data) {
     
     currentPlayer = 1;
     inputLocked = (myOnlineRole !== 1); 
-    
+
     // Trigger vanish state properly for rematches
     if (vanishMs < 3600000 && swap2Phase === 0) {
         setAllPiecesVisible(false);
@@ -609,6 +609,12 @@ function showOverlay(title, body, btn1Text="Continue", btn2Text=null, btn2Action
 function hideOverlay() {
   const overlayEl = $('overlay');
   if(overlayEl) overlayEl.classList.add("hidden");
+
+  // Cleanup the new buttons so they don't bleed into other overlays
+  const minBtn = $('minimize-overlay-btn');
+  const restoreBtn = $('restore-overlay-btn');
+  if (minBtn) minBtn.classList.add('hidden');
+  if (restoreBtn) restoreBtn.classList.add('hidden');
 }
 
 function quitGame() {
@@ -1229,6 +1235,24 @@ function endGame(winObj, isDraw = false) {
       quitGame();
   });
 
+  const minBtn = $('minimize-overlay-btn');
+  if (minBtn) minBtn.classList.remove('hidden');
+
+  // --- DYNAMICALLY INJECT RESTORE BUTTON ---
+  let restoreBtn = $('restore-overlay-btn');
+  
+  if (!restoreBtn) {
+      restoreBtn = document.createElement('button');
+      restoreBtn.id = 'restore-overlay-btn';
+      restoreBtn.className = 'restore-btn hidden';
+      restoreBtn.innerHTML = '▲ Show';
+      restoreBtn.onclick = restoreOverlay;
+  }
+  
+  // THE MAGIC LINE: This forces the button to be attached directly to the page body.
+  // If it was accidentally nested inside the overlay in your HTML, this physically moves it out!
+  document.body.appendChild(restoreBtn);
+
   const mainBtn = $('overlayBtn');
   if (mainBtn) {
       // If we caught the race condition, make sure it's gold right from the start!
@@ -1243,6 +1267,7 @@ function endGame(winObj, isDraw = false) {
           handleNewGameRequest();
       };
   }
+
 }
 
 // ---------- AI ----------
@@ -1322,6 +1347,22 @@ function applySettingsFromUI() {
   // Game automatically adjusts to Connect-3 for a 3x3 board
   goal = (size === 3) ? 3 : 5;
   setPills();
+}
+
+function minimizeOverlay() {
+    const overlayEl = $('overlay');
+    if (overlayEl) overlayEl.classList.add("hidden");
+    
+    const restoreBtn = $('restore-overlay-btn');
+    if (restoreBtn) restoreBtn.classList.remove('hidden');
+}
+
+function restoreOverlay() {
+    const overlayEl = $('overlay');
+    if (overlayEl) overlayEl.classList.remove("hidden");
+    
+    const restoreBtn = $('restore-overlay-btn');
+    if (restoreBtn) restoreBtn.classList.add('hidden');
 }
 
 function finalizeRoles(winnerOfOpening) {
