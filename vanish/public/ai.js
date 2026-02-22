@@ -19,20 +19,17 @@
   }
 
   function chooseAiMove() {
-    // 1. Swap2 Opening Phase 2 (Removed 'window.' prefix)
-    if (ruleMode === "renju" && swap2Phase === 2) {
+    
+    if (ruleMode === "swap2" && swap2Phase === 2) {
       return aiSwap2Choice();
     }
     
-    // Calculate roles dynamically (Removed 'window.' prefix)
     const me = aiPlaysAs;
     const opp = (me === P1) ? P2 : P1;
 
-    // 2. Standard Tactic (Win/Block)
     const tactic = findImmediateTactic(state, me, opp);
     if (tactic) return tactic;
 
-    // 3. Minimax Search
     const best = alphaBetaBestMove(getAIParams());
     return best || randomEmptyMove();
   }
@@ -72,7 +69,8 @@
   function getAiPerceivedState(forgetBase){
     if (boardEl.classList.contains("reveal") || vanishMs >= 3600000) return state;
 
-    const now = performance.now();
+    // FIX: Match main.js by using Date.now() instead of performance.now()
+    const now = Date.now(); 
     const dt = Math.max(0, now - lastRevealAt);
     const t = Math.max(0, Math.min(1, dt / 15000));
     const p = forgetBase * t;
@@ -87,7 +85,8 @@
       if (s[i] === opp){
         const age = Math.max(0, now - (placedAt[i] || 0));
         const ageFactor = Math.max(0.35, Math.min(1, age / 8000));
-        if (Math.random() < p * ageFactor) s[i] = 0;
+        // The AI rolls the dice to see if it forgets this opponent's piece
+        if (Math.random() < p * ageFactor) s[i] = 0; 
       }
     }
     return s;

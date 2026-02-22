@@ -1277,25 +1277,32 @@ function aiMoveSoon() {
   }
 
   setTimeout(() => {
-    // 1. Pass the actual board state and player role to the AI!
     let move = window.chooseAiMove ? window.chooseAiMove(state, currentPlayer) : null;
     
-    // 2. FAILSAFE: If the AI tries to overwrite a piece, reject it and find an empty cell
-    if (!move || isOccupied(move.r, move.c)) {
-        console.warn("AI attempted an illegal move! Overriding.");
-        move = null;
+    // 1. TRUE FAILSAFE: Only trigger if the AI engine completely crashes and returns null
+    if (!move) {
+        console.warn("AI engine failed to return a move! Using random fallback.");
+        let emptySpots = [];
         for (let r = 0; r < size; r++) {
             for (let c = 0; c < size; c++) {
-                if (!isOccupied(r, c)) {
-                    move = { r, c };
-                    break;
-                }
+                if (!isOccupied(r, c)) emptySpots.push({ r, c });
             }
-            if (move) break;
+        }
+        if (emptySpots.length > 0) {
+            move = emptySpots[Math.floor(Math.random() * emptySpots.length)];
         }
     }
 
     if (move) {
+      // 2. THE FIX: If the AI forgot a piece and chose an occupied square, trigger a mistake!
+      if (isOccupied(move.r, move.c)) {
+          console.log("AI forgot a piece and triggered a mistake!");
+          // Trigger the mistake penalty specifically for the AI
+          handleMistake("The AI tried to place a stone on an occupied square", currentPlayer);
+          return; // Stop the piece placement!
+      }
+      
+      // 3. Normal placement
       placePiece(move.r, move.c, currentPlayer, { animate: true, sfx: true });
       
       const win = checkWinFrom(move.r, move.c, currentPlayer);
@@ -1311,8 +1318,6 @@ function aiMoveSoon() {
       
       switchTurn();
       inputLocked = false; 
-      
-      if (turnPill) turnPill.style.color = ""; 
     }
   }, 50);
 }
