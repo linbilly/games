@@ -119,7 +119,11 @@ io.on('connection', (socket) => {
           });
 
           if (match.timerInterval) clearInterval(match.timerInterval);
-          activeMatches.delete(matchId);
+          if (matchId.length > 6) {
+              activeMatches.delete(matchId); // It's a Global match, delete it
+          } else {
+              match.isOver = true; // It's a Private Room, keep it alive for a rematch!
+          }
           return; // Stop processing further move logic
       }
 
@@ -172,6 +176,70 @@ io.on('connection', (socket) => {
     // Basic cleanup
     const idx = matchmakingQueue.findIndex(p => p.socketId === socket.id);
     if (idx !== -1) matchmakingQueue.splice(idx, 1);
+  });
+
+  // 4. MATCHMAKING CANCELLATIONS
+  socket.on('cancel_search', () => {
+    const idx = matchmakingQueue.findIndex(p => p.socketId === socket.id);
+    if (idx !== -1) matchmakingQueue.splice(idx, 1);
+  });
+
+  socket.on('decline_match', ({ matchId }) => {
+    const match = activeMatches.get(matchId);
+    if (!match) return;
+
+    const declinerRole = match.host.socketId === socket.id ? 1 : 2;
+    const innocentPlayer = declinerRole === 1 ? match.guest : match.host;
+
+    if (match.timerInterval) clearInterval(match.timerInterval);
+    activeMatches.delete(matchId);
+
+    // Put the innocent player back in the queue
+    matchmakingQueue.unshift({
+        socketId: innocentPlayer.socketId, 
+        username: innocentPlayer.username, 
+        vanishMs: match.vanishMs, 
+        ruleMode: match.ruleMode 
+    });
+
+    // --- REMATCH & DISCONNECT LOGIC ---
+    socket.on('request_rematch', ({ matchId }) => {
+      const match = activeMatches.get(matchId);
+      if (!match) return;
+
+      // Track who wants to play again
+      match.rematchRequests = match.rematchRequests || new Set();
+      match.rematchRequests.add(socket.id);
+
+      // If both players clicked "New Game"
+      if (match.rematchRequests.size === 2) {
+          match.state = new Array(match.size * match.size).fill(0);
+          match.turn = 1;
+          match.isOver = false;
+          match.turnDeadline = Date.now() + 30000;
+          match.rematchRequests.clear();
+
+          // Swap roles so they take turns being Black (P1)
+          const temp = match.host;
+          match.host = match.guest;
+          match.guest = temp;
+
+          io.to(match.host.socketId).emit('match_start', { role: 1, matchId, settings: match });
+          io.to(match.guest.socketId).emit('match_start', { role: 2, matchId, settings: match });
+          startMatchTimer(matchId);
+      } else {
+          // Tell the other player someone wants a rematch
+          socket.to(matchId).emit('rematch_requested');
+      }
+    });
+
+    socket.on('leave_room', ({ matchId }) => {
+        socket.leave(matchId);
+        socket.to(matchId).emit('opponent_left');
+        activeMatches.delete(matchId);
+    });
+    
+    io.to(innocentPlayer.socketId).emit('matchmaking_status', 'Opponent declined. Resuming search...');
   });
 });
 
@@ -237,7 +305,11 @@ function startMatchTimer(matchId) {
       }
 
       clearInterval(currentMatch.timerInterval);
-      activeMatches.delete(matchId);
+      if (matchId.length > 6) {
+          activeMatches.delete(matchId); // It's a Global match, delete it
+      } else {
+          match.isOver = true; // It's a Private Room, keep it alive for a rematch!
+      }
     }
   }, 500); 
 }

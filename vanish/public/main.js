@@ -21,26 +21,14 @@ const overlayTitle = $("overlayTitle");
 const overlayBody = $("overlayBody");
 const overlayBtn = $("overlayBtn");
 
-const modeSelect = $("modeSelect");
-const boardSelect = $("boardSelect");
-const aiSelect = $("aiSelect");
-const aiControl = $("aiControl");
-const vanishSelect = $("vanishSelect");
-const ruleSelect = $("ruleSelect");
+
 
 const turnPill = $("turnPill");
 const goalPill = $("goalPill");
 const modePill = $("modePill");
 
-const newGameBtn = $("newGameBtn");
-const audioBtn = $("audioBtn");
-const muteToggle = $("muteToggle");
-const p2Label = $("p2Label");
-const p2Sub = $("p2Sub");
-const turnPiece = $("turnPiece");
 const mistakeMeterEl = $("mistakeMeter");
 
-const resumeBtn = $("resumeBtn");
 
 // ---------- Audio ----------
 let audioCtx = null;
@@ -50,6 +38,178 @@ let muted = false;
 // --- TIMERS ---
 let turnDeadline = 0;
 let localTickInterval = null;
+
+// --- MOBILE UI ROUTING & STATE ---
+let currentMode = '';
+let isWaitingForMatch = false;
+let pendingMatchData = null;
+let mmTimer5s, mmTimer20s;
+
+function showGamePage() {
+    $('landing-page').classList.add('hidden');
+    $('game-page').classList.remove('hidden');
+    resizeBoard(); 
+}
+
+function showLandingPage() {
+    $('game-page').classList.add('hidden');
+    $('landing-page').classList.remove('hidden');
+    if (localTickInterval) clearInterval(localTickInterval);
+}
+
+// Dynamically scale the CSS Grid board to fit the screen
+function resizeBoard() {
+    const container = $('board-container');
+    const board = $('board');
+    if (!container || !board) return;
+
+    const margin = 20; 
+    const maxSize = Math.min(container.clientWidth, container.clientHeight) - margin;
+    board.style.width = `${maxSize}px`;
+    board.style.height = `${maxSize}px`;
+}
+window.addEventListener('resize', resizeBoard);
+
+// --- MENU LOGIC ---
+function selectMode(selectedMode) {
+    currentMode = selectedMode;
+    $('main-menu').classList.add('hidden');
+    $('sub-menu').classList.remove('hidden');
+    
+    $('mode-title').innerText = selectedMode.replace('_', ' ').toUpperCase();
+    
+    const sizeSelect = $('board-size-select');
+    const aiGroup = $('ai-level-group'); // Grab the new AI group
+    
+    // Toggle AI dropdown visibility
+    if (selectedMode === 'local_ai') {
+        aiGroup.style.display = 'flex';
+    } else {
+        aiGroup.style.display = 'none';
+    }
+
+    if (selectedMode === 'online_ladder') {
+        sizeSelect.value = "15";
+        sizeSelect.disabled = true;
+    } else {
+        sizeSelect.disabled = false;
+    }
+}
+
+function backToMainMenu() {
+    $('sub-menu').classList.add('hidden');
+    $('main-menu').classList.remove('hidden');
+}
+
+function confirmStart() {
+    // 1. Map new HTML selects to your existing variables
+    size = parseInt($('board-size-select').value);
+    ruleMode = $('rule-set-select').value;
+    vanishMs = parseInt($('vanish-timer-select').value);
+    goal = (size === 3) ? 3 : 5;
+
+    // 2. Route the mode
+    if (currentMode.includes('local')) {
+        mode = currentMode === 'local_ai' ? 'ai' : 'pvp';
+        isOnline = false;
+        showGamePage();
+        newGame(); // Triggers your existing setup
+    } else if (currentMode === 'online_private') {
+        showGamePage();
+        socket.emit('create_private_room', { size, vanishMs, ruleMode }); 
+    } else if (currentMode === 'online_ladder') {
+        startMatchmakingUI();
+        socket.emit('find_global_match', { vanishMs, ruleMode });
+    }
+}
+
+// --- MATCHMAKING UI & BACKGROUND AI ---
+function startMatchmakingUI() {
+    $('matchmaking-text').innerText = "Searching for opponent...";
+    $('matchmaking-spinner').classList.remove('hidden');
+    $('matchmaking-actions').classList.add('hidden');
+    $('matchmaking-cancel-initial').classList.remove('hidden');
+    $('matchmaking-modal').classList.remove('hidden');
+
+    mmTimer5s = setTimeout(() => { $('matchmaking-text').innerText = "Broadening search..."; }, 5000);
+    mmTimer20s = setTimeout(() => {
+        $('matchmaking-text').innerText = "No opponent found.";
+        $('matchmaking-spinner').classList.add('hidden');
+        $('matchmaking-cancel-initial').classList.add('hidden');
+        $('matchmaking-actions').classList.remove('hidden'); // Shows the "Play AI" button
+    }, 20000);
+}
+
+function cancelMatchmaking() {
+    clearTimeout(mmTimer5s); clearTimeout(mmTimer20s);
+    $('matchmaking-modal').classList.add('hidden');
+    isWaitingForMatch = false;
+    socket.emit('cancel_search');
+}
+
+function playAIWhileWaiting() {
+    clearTimeout(mmTimer5s); clearTimeout(mmTimer20s);
+    $('matchmaking-modal').classList.add('hidden');
+    isWaitingForMatch = true; // Crucial: We are still in the server queue!
+    
+    mode = 'ai';
+    isOnline = false;
+    showGamePage();
+    newGame();
+}
+
+// --- INTERCEPTING THE ONLINE MATCH ---
+// Update your existing socket.on('match_start') to this:
+socket.on('match_start', (data) => {
+    clearTimeout(mmTimer5s); clearTimeout(mmTimer20s);
+    
+    if (isWaitingForMatch) {
+        // Pause AI game, show prompt
+        pendingMatchData = data;
+        inputLocked = true; 
+        $('match-found-modal').classList.remove('hidden');
+    } else {
+        // Not playing AI, jump straight in
+        $('matchmaking-modal').classList.add('hidden');
+        setupOnlineGame(data);
+    }
+});
+
+function acceptOnlineMatch() {
+    $('match-found-modal').classList.add('hidden');
+    isWaitingForMatch = false;
+    setupOnlineGame(pendingMatchData);
+    pendingMatchData = null;
+}
+
+function declineOnlineMatch() {
+    $('match-found-modal').classList.add('hidden');
+    socket.emit('decline_match', { matchId: pendingMatchData.settings.id });
+    pendingMatchData = null;
+    isWaitingForMatch = false; 
+    inputLocked = false; // Resume AI game
+}
+
+function setupOnlineGame(data) {
+    hideOverlay();
+    isOnline = true;
+    mode = 'pvp';
+    onlineMatchId = data.matchId;
+    myOnlineRole = data.role;
+    turnDeadline = data.settings.turnDeadline || (Date.now() + 30000);
+    
+    size = data.settings.size;
+    vanishMs = data.settings.vanishMs;
+    ruleMode = data.settings.ruleMode;
+    
+    showGamePage(); // Ensure we are on the game page
+    buildBoard();
+    startLocalClocks();
+    
+    currentPlayer = 1;
+    inputLocked = (myOnlineRole !== 1); 
+    $('turnPill').textContent = myOnlineRole === 1 ? "You: Black" : "You: White";
+}
 
 function formatTime(ms) {
   if (ms <= 0) return "00:00";
@@ -64,30 +224,54 @@ function startLocalClocks() {
   if (localTickInterval) clearInterval(localTickInterval);
   
   localTickInterval = setInterval(() => {
-    if (gameOver || (inputLocked && !isOnline)) return; 
-
-    const timeLeft = Math.max(0, turnDeadline - Date.now());
-    
-    // SAFETY NET: If time hits absolute zero, lock the board
-    if (timeLeft <= 0 && !gameOver) {
-      inputLocked = true;
+    // Stop counting if the game is already over
+    if (gameOver) {
+        clearInterval(localTickInterval);
+        return; 
     }
 
+    // Calculate time remaining
+    const timeLeft = Math.max(0, turnDeadline - Date.now());
+
+    // 1. TIMEOUT LOSS LOGIC
+    if (timeLeft <= 0 && !gameOver) {
+      gameOver = true;
+      inputLocked = true;
+      clearInterval(localTickInterval);
+      
+      // Reveal the board so players can see the final state
+      setAllPiecesVisible(true);
+
+      // Figure out who ran out of time
+      const loserName = currentPlayer === P1 ? "Player 1 (Black)" : (mode === "ai" ? "AI (White)" : "Player 2 (White)");
+      const winnerName = currentPlayer === P1 ? (mode === "ai" ? "AI (White)" : "Player 2 (White)") : "Player 1 (Black)";
+
+      // Trigger the end game UI
+      showOverlay("Time's Up!", `${loserName} ran out of time. ${winnerName} wins!`, "New Game", "Main Menu", () => {
+        hideOverlay();
+        quitGame();
+    });
+  
+    overlayBtn.onclick = () => {
+        overlayBtn.onclick = null;
+        hideOverlay();
+        handleNewGameRequest();
+    };
+      
+      return; // Stop processing the rest of the interval
+    }
+
+    // 2. NORMAL UI UPDATES
     const displayStr = formatTime(timeLeft);
     const isPanic = timeLeft > 0 && timeLeft <= 5000; 
     
-    const activeTimer = (currentPlayer === P1) ? $('timerP1') : $('timerP2');
-    const idleTimer = (currentPlayer === P1) ? $('timerP2') : $('timerP1');
+    // Grab our single mobile timer
+    const activeTimer = $('timerP1'); 
 
-    // Update active timer text and panic style
-    activeTimer.textContent = displayStr;
-    activeTimer.classList.remove('dimmed');
-    activeTimer.classList.toggle('panic', isPanic);
-
-    // Update idle timer
-    idleTimer.textContent = "00:30";
-    idleTimer.classList.add('dimmed');
-    idleTimer.classList.remove('panic');
+    if (activeTimer) {
+        activeTimer.textContent = displayStr;
+        activeTimer.classList.toggle('panic', isPanic);
+    }
   }, 100); 
 }
 
@@ -241,7 +425,7 @@ let gameOver = false;
 
 let mode = "pvp";        
 let aiLevel = "medium";
-let ruleMode = (ruleSelect && ruleSelect.value) ? ruleSelect.value : "nolimit"; 
+let ruleMode = "nolimit";
 let aiPlaysAs = P2;      
 let inputLocked = false;
 let mistakeResumeArmed = false; 
@@ -256,21 +440,27 @@ let meterPos = 0;
 function idx(r,c){ return r*size + c; }
 function inBounds(r,c){ return r>=0 && c>=0 && r<size && c<size; }
 
-function setPills(){
-  turnPill.textContent = `Turn: ${currentPlayer === P1 ? "Black" : (mode==="ai" ? "AI" : "White")}`;
-  goalPill.textContent = `Goal: Connect ${goal}`;
-  modePill.textContent = `Mode: ${mode === "ai" ? "Single Player" : "PvP"}`;
-  p2Label.textContent = (mode==="ai") ? "AI Opponent" : "Player 2";
-  p2Sub.textContent = (mode==="ai") ? `Difficulty: ${aiLevel}` : "White";
-  
-  if (turnPiece){
-    turnPiece.classList.toggle("p1", currentPlayer === P1);
-    turnPiece.classList.toggle("p2", currentPlayer !== P1);
+function setPills() {
+  const turnPill = $('turnPill');
+  if (!turnPill) return;
+
+  if (isOnline) {
+      // Online: Show clearly if it's your turn or opponent's
+      if (currentPlayer === myOnlineRole) {
+          turnPill.textContent = myOnlineRole === P1 ? "Your Turn (Black)" : "Your Turn (White)";
+          turnPill.style.color = "#ffcf40"; // Highlight gold when it's your turn
+      } else {
+          turnPill.textContent = myOnlineRole === P1 ? "Opponent (White)" : "Opponent (Black)";
+          turnPill.style.color = "#fff";
+      }
+  } else {
+      // Local/AI: Standard display
+      turnPill.textContent = `Turn: ${currentPlayer === P1 ? "Black" : (mode === "ai" ? "AI" : "White")}`;
+      turnPill.style.color = "#fff";
   }
 
   updateMistakeMeter();
 }
-
 function initMistakeMeter(){
   if (!mistakeMeterEl) return;
   mistakeMeterEl.innerHTML = ""; 
@@ -291,14 +481,61 @@ function updateMistakeMeter(){
   if (slots[idxSlot]) slots[idxSlot].classList.add('marker');
 }
 
-function showOverlay(title, body, btnText="Continue"){
-  overlayTitle.textContent = title;
-  overlayBody.textContent = body;
-  overlayBtn.textContent = btnText;
-  overlay.classList.remove("hidden");
+function showOverlay(title, body, btn1Text="Continue", btn2Text=null, btn2Action=null) {
+  const titleEl = $('overlayTitle');
+  const bodyEl = $('overlayBody');
+  const btn1 = $('overlayBtn');
+  const btn2 = $('overlayBtn2');
+
+  if(titleEl) titleEl.textContent = title;
+  if(bodyEl) bodyEl.textContent = body;
+  if(btn1) btn1.textContent = btn1Text;
+  
+  if (btn2Text && btn2) {
+    btn2.textContent = btn2Text;
+    btn2.classList.remove('hidden');
+    btn2.onclick = btn2Action;
+  } else if (btn2) {
+    btn2.classList.add('hidden');
+    btn2.onclick = null;
+  }
+  
+  const overlayEl = $('overlay');
+  if(overlayEl) overlayEl.classList.remove("hidden");
 }
-function hideOverlay(){
-  overlay.classList.add("hidden");
+
+function hideOverlay() {
+  const overlayEl = $('overlay');
+  if(overlayEl) overlayEl.classList.add("hidden");
+}
+
+function quitGame() {
+    showLandingPage();
+    if (isOnline && onlineMatchId) {
+        socket.emit('leave_room', { matchId: onlineMatchId });
+    }
+}
+
+function handleNewGameRequest() {
+    if (isOnline) {
+        if (currentMode === 'online_private') {
+            // Stay in the room and ask the host/guest for a rematch!
+            showOverlay("Waiting...", "Asking opponent for a rematch...", "Cancel");
+            overlayBtn.onclick = () => {
+                hideOverlay();
+                quitGame();
+            };
+            socket.emit('request_rematch', { matchId: onlineMatchId });
+        } else {
+            // Online Ladder: Quit and immediately re-queue
+            quitGame();
+            startMatchmakingUI();
+            socket.emit('find_global_match', { vanishMs, ruleMode });
+        }
+    } else {
+        // Local or AI Game: Just rebuild the board immediately
+        newGame();
+    }
 }
 
 function buildBoard(){
@@ -625,6 +862,12 @@ function onCellClick(r, c) {
 
 function placePiece(r, c, player, { animate = false, sfx = false, absoluteTime = null } = {}) {
   const _k = idx(r, c);
+
+  if (state[_k] !== 0) {
+      console.error("FATAL: Attempted to overwrite an existing piece at", r, c);
+      return; 
+  }
+
   state[_k] = player;
   
   // Use server time if online, otherwise local performance time
@@ -660,7 +903,6 @@ function executeResume(syncTime) {
   if (!boardEl.classList.contains("reveal")) return; 
 
   mistakeResumeArmed = false;
-  if (resumeBtn) resumeBtn.classList.add("hidden");
 
   // FIX: Reset all existing pieces to the sync time. 
   // This forces them to respect the vanish timer and fade out gracefully!
@@ -748,7 +990,6 @@ function handleMistake(customMsg, offender = currentPlayer) {
     }
 
     mistakeResumeArmed = true;
-    if (resumeBtn) resumeBtn.classList.remove("hidden");
     
     // FIX: Explicitly unlock the board so the player's next click actually registers!
     if (isOnline) {
@@ -759,8 +1000,6 @@ function handleMistake(customMsg, offender = currentPlayer) {
 
     if (mode === "ai" && currentPlayer === aiPlaysAs && !gameOver) resumeGame();
   };
-
-  if (!hitEnd && resumeBtn) resumeBtn.onclick = resumeGame; 
 }
 
 overlayBtn.addEventListener("click", hideOverlay);
@@ -803,29 +1042,43 @@ function highlightWin(line){
   }
 }
 
-function endGame(winObj, isDraw=false){
+function endGame(winObj, isDraw = false) {
   gameOver = true;
   inputLocked = true;
 
   setAllPiecesVisible(true);
 
-  if (isDraw){
-    showOverlay("Draw", "No more moves left. You can close this and review the final board. Click New Game when you're ready to restart.", "Close");
-    overlayBtn.onclick = () => { overlayBtn.onclick = null; hideOverlay(); };
-    return;
-  }
-
-  if (winObj?.line?.length){
+  // 1. Visuals and Audio
+  if (winObj && winObj.line && winObj.line.length) {
     highlightWin(winObj.line);
   }
-  sfxWin();
+  if (!isDraw) sfxWin();
 
+  // 2. Determine Text
   const winnerText =
-    (winObj.player === P1) ? "Player 1 (Black)" :
-    (mode==="ai" ? "AI (White)" : "Player 2 (White)");
+    (winObj && winObj.player === P1) ? "Player 1 (Black)" :
+    (mode === "ai" ? "AI (White)" : "Player 2 (White)");
 
-  showOverlay("Winner!", `${winnerText} connected ${goal}. Close this to review the final board. Click New Game to play again.`, "Close");
-  overlayBtn.onclick = () => { overlayBtn.onclick = null; hideOverlay(); };
+  const title = isDraw ? "Draw" : "Winner!";
+  const msg = isDraw 
+    ? "No more moves left. Review the final board, or play again." 
+    : `${winnerText} connected ${goal}. Review the final board, or play again.`;
+
+  // 3. Trigger the 2-button overlay
+  showOverlay(title, msg, "New Game", "Main Menu", () => {
+      hideOverlay();
+      quitGame();
+  });
+
+  // 4. Safely bind the "New Game" action to the first button
+  const mainBtn = $('overlayBtn');
+  if (mainBtn) {
+      mainBtn.onclick = () => { 
+          mainBtn.onclick = null; 
+          hideOverlay(); 
+          handleNewGameRequest();
+      };
+  }
 }
 
 // ---------- AI ----------
@@ -834,17 +1087,30 @@ function aiMoveSoon() {
     inputLocked = true;
   }
 
-  // UX Fix: Tell the user the AI is crunching numbers before locking the thread
   if (turnPill) {
     turnPill.textContent = "Turn: AI (Thinking...)";
-    turnPill.style.color = "#ffcf40"; // Give it a gold highlight while thinking
+    turnPill.style.color = "#ffcf40"; 
   }
 
-  // Use a short 50ms timeout. This gives the browser exactly enough time 
-  // to paint the "Thinking..." text to the screen before the AI locks the thread.
   setTimeout(() => {
-    const move = window.chooseAiMove();
+    // 1. Pass the actual board state and player role to the AI!
+    let move = window.chooseAiMove ? window.chooseAiMove(state, currentPlayer) : null;
     
+    // 2. FAILSAFE: If the AI tries to overwrite a piece, reject it and find an empty cell
+    if (!move || isOccupied(move.r, move.c)) {
+        console.warn("AI attempted an illegal move! Overriding.");
+        move = null;
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                if (!isOccupied(r, c)) {
+                    move = { r, c };
+                    break;
+                }
+            }
+            if (move) break;
+        }
+    }
+
     if (move) {
       placePiece(move.r, move.c, currentPlayer, { animate: true, sfx: true });
       
@@ -862,26 +1128,29 @@ function aiMoveSoon() {
       switchTurn();
       inputLocked = false; 
       
-      // Reset the turn pill color back to normal for the human
       if (turnPill) turnPill.style.color = ""; 
     }
   }, 50);
 }
 
 // ---------- Setup / UI ----------
-function applySettingsFromUI(){
-  mode = modeSelect.value;
-  size = parseInt(boardSelect.value, 10);
-  vanishMs = parseInt(vanishSelect.value, 10);
-  aiLevel = aiSelect.value;
-  
-  window.aiLevel = aiLevel; // ✅ syncs difficulty for ai.js engine
-  
-  ruleMode = (ruleSelect && ruleSelect.value) ? ruleSelect.value : "nolimit"; // ✅ keeps rules working
+function applySettingsFromUI() {
+  const sizeSelect = $('board-size-select');
+  const vanishSel = $('vanish-timer-select');
+  const ruleSel = $('rule-set-select');
+  const aiSel = $('ai-level-select'); // Target the new AI dropdown
 
+  mode = currentMode.includes('ai') ? 'ai' : 'pvp';
+  size = sizeSelect ? parseInt(sizeSelect.value, 10) : 15;
+  vanishMs = vanishSel ? parseInt(vanishSel.value, 10) : 10000;
+  ruleMode = ruleSel ? ruleSel.value : "nolimit"; 
+  
+  // Read the AI level from the UI instead of hardcoding
+  aiLevel = aiSel ? aiSel.value : "medium"; 
+  window.aiLevel = aiLevel; 
+  
+  // Game automatically adjusts to Connect-3 for a 3x3 board
   goal = (size === 3) ? 3 : 5;
-
-  aiControl.style.display = (mode === "ai") ? "flex" : "none";
   setPills();
 }
 
@@ -942,63 +1211,13 @@ function newGame() {
   } else {
     setAllPiecesVisible(false);
   }
-
-  if (resumeBtn) resumeBtn.classList.add("hidden");
   
   if (mode === "ai" && currentPlayer === aiPlaysAs && swap2Phase === 0) {
       aiMoveSoon();
   }
 }
 
-newGameBtn.addEventListener("click", newGame);
 
-modeSelect.addEventListener("change", () => {
-  applySettingsFromUI();
-  setPills();
-  newGame();
-});
-
-boardSelect.addEventListener("change", newGame);
-
-ruleSelect.addEventListener("change", () => {
-  applySettingsFromUI();
-  newGame();
-});
-
-aiSelect.addEventListener("change", () => {
-  applySettingsFromUI();
-  setPills();
-});
-
-vanishSelect.addEventListener("change", newGame);
-
-audioBtn.addEventListener("click", () => {
-  ensureAudio();
-  audioEnabled = true;
-  audioBtn.textContent = "Sound Enabled";
-  sfxReveal();
-});
-
-muteToggle.addEventListener("change", (e) => {
-  muted = e.target.checked;
-});
-
-// Add to bottom of main.js
-// --- SOCKET MULTIPLAYER EVENTS ---
-
-$('btnGlobal').onclick = () => {
-  socket.emit('find_global_match', { vanishMs, ruleMode });
-  showOverlay("Matchmaking", "Searching for a 15x15 opponent...", "Cancel");
-};
-
-$('btnCreateRoom').onclick = () => {
-  socket.emit('create_private_room', { size, vanishMs, ruleMode });
-};
-
-$('btnJoinRoom').onclick = () => {
-  const code = prompt("Enter 6-digit Room Code:");
-  if (code) socket.emit('join_private_room', code.toUpperCase());
-};
 
 socket.on('room_created', (code) => {
   showOverlay("Private Room", `Your room code is: ${code}. Waiting for guest...`, "Cancel");
@@ -1077,6 +1296,22 @@ socket.on('game_resumed', ({ resumeTimeUtc }) => {
   executeResume(resumeTimeUtc);
 });
 
+socket.on('rematch_requested', () => {
+    const titleEl = $('overlayTitle');
+    // If they haven't clicked New Game yet, append a message!
+    if (titleEl && titleEl.textContent !== "Waiting...") {
+        $('overlayBody').textContent += "\n\nOpponent wants a rematch!";
+    }
+});
+
+socket.on('opponent_left', () => {
+    showOverlay("Room Closed", "Your opponent left the private room.", "Main Menu");
+    overlayBtn.onclick = () => {
+        hideOverlay();
+        quitGame();
+    };
+});
+
 socket.on('timeout_loss', ({ loserRole, winnerRole }) => {
   gameOver = true;
   inputLocked = true;
@@ -1089,10 +1324,15 @@ socket.on('timeout_loss', ({ loserRole, winnerRole }) => {
   const winnerText = (winnerRole === myOnlineRole) ? "You win by timeout!" : "You lost by timeout.";
   const loserColor = (loserRole === 1) ? "Black" : "White";
   
-  showOverlay("Time's Up!", `${loserColor} ran out of time. ${winnerText}`, "Main Menu");
-  
+  showOverlay("Time's Up!", `${loserColor} ran out of time. ${winnerText}`, "New Game", "Main Menu", () => {
+    hideOverlay();
+    quitGame();
+  });
+
   overlayBtn.onclick = () => {
-    location.reload(); // Simplest way to reset the game state
+    overlayBtn.onclick = null;
+    hideOverlay();
+    handleNewGameRequest();
   };
 });
 

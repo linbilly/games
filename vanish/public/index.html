@@ -2,180 +2,128 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Vanish</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="topbar">
+  <div id="landing-page">
     <div class="brand">
       <div class="logo">V</div>
       <div>
         <div class="title">Vanish</div>
-        <div class="subtitle">Memory Connect (pieces fade after 3 seconds)</div>
+        <div class="subtitle">Memory Connect</div>
       </div>
     </div>
+    <h2 id="welcome-text">Logging in...</h2>
 
-    <div class="controls">
-      <div class="control">
-        <label>Mode</label>
-        <select id="modeSelect">
-          <option value="pvp">Two Players (Local)</option>
-          <option value="ai">Single Player vs AI</option>
-        </select>
-      </div>
-
-      <div class="control">
-        <label>Board</label>
-        <select id="boardSelect">
-          <option value="3">3×3 (Connect 3)</option>
-          <option value="9" selected>9×9 (Connect 5)</option>
-          <option value="13">13×13 (Connect 5)</option>
-          <option value="15">15×15 (Official Board)</option>
-        </select>
-      </div>
-
-      <div class="control">
-        <label>Rules</label>
-        <select id="ruleSelect">
-          <option value="nolimit" selected>No limit</option>
-          <option value="renju">Renju Mode</option>
-          <option value="swap2">Swap2 Opening</option>
-        </select>
-      </div>
-
-      <div class="control" id="aiControl">
-        <label>AI</label>
-        <select id="aiSelect">
-          <option value="easy">Easy</option>
-          <option value="medium" selected>Medium</option>
-          <option value="hard">Hard</option>
-          <option value="expert">Expert</option>
-        </select>
-      </div>
-
-      <div class="control">
-        <label>Vanish</label>
-        <select id="vanishSelect">
-          <option value="3000">3.0s (Hardcore)</option>
-          <option value="10000" selected>10.0s (Standard)</option>
-          <option value="3600000">Off (Classic)</option>
-        </select>
-      </div>
-
-      <div class="control">
-        <label>Multiplayer</label>
-        <div style="display: flex; gap: 5px;">
-          <button id="btnGlobal" class="btn">Global (15x15)</button>
-          <button id="btnCreateRoom" class="btn ghost">Create Room</button>
-          <button id="btnJoinRoom" class="btn ghost">Join Room</button>
-        </div>
-      </div>
-
-      <button id="resumeBtn" class="btn ghost hidden">Resume</button>
-      <button id="newGameBtn" class="btn">Local Game</button>
+    <div id="main-menu" class="menu-container">
+        <button class="btn" onclick="selectMode('local_pvp')">Local PvP Game</button>
+        <button class="btn" onclick="selectMode('local_ai')">Local AI Game</button>
+        <button class="btn" onclick="selectMode('online_private')">Online Private Room</button>
+        <button class="btn highlight-btn" onclick="selectMode('online_ladder')">Online Ladder</button>
     </div>
-  </header>
 
-  <main class="main">
-    <section class="panel">
-      <div class="status">
-        <div class="pill" id="turnPill">Turn: P1</div>
-        <div class="pill dim" id="goalPill">Goal: Connect 5</div>
-        <div class="pill dim" id="modePill">Mode: PvP</div>
-      </div>
-
-      <div id="boardWrap" class="board-wrap">
-        <div id="board" class="board" aria-label="Game board"></div>
-        <div id="overlay" class="overlay hidden">
-          <div class="overlay-card">
-            <div id="overlayTitle" class="overlay-title">Message</div>
-            <div id="overlayBody" class="overlay-body">...</div>
-            <button id="overlayBtn" class="btn">Continue</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="hint">
-        Click a square to place. Pieces vanish visually, but remain on the board.<br/>
-        Misclick an occupied cell → board reveals for review and the mistake meter shifts.
-      </div>
-    </section>
-
-    <aside class="side">
-      <div class="legend">
-        <div class="turn-box">
-          <div class="turn-label">Turn</div>
-          <div id="turnPiece" class="turn-piece p1" aria-label="Current turn piece"></div>
+    <div id="sub-menu" class="menu-container hidden">
+        <h3 id="mode-title">Settings</h3>
+        
+        <div class="option-group" id="ai-level-group" style="display: none;">
+            <label>AI Level:</label>
+            <select id="ai-level-select">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+                <option value="expert">Expert</option>
+            </select>
         </div>
 
-        <div class="meter-box">
-          <div class="meter-title">Mistake Meter</div>
-          <div class="meter-row">
-            <div class="meter-label p1">Black</div>
-            <div id="mistakeMeter" class="meter" aria-label="Mistake meter"></div>
-            <div class="meter-label p2">White</div>
-          </div>
-          <div class="meter-note">
-            Mistakes move the marker toward the offender. Reaching the end (3 steps) forfeits the turn.
-          </div>
+        <div class="option-group">
+            <label>Board Size:</label>
+            <select id="board-size-select">
+                <option value="3">3x3</option>
+                <option value="9">9x9</option>
+                <option value="15" selected>15x15</option>
+            </select>
         </div>
 
-        <div class="legend-row">
-          <div class="chip p1"></div>
-          <div style="flex-grow: 1;">
-            <div class="legend-title">Player 1</div>
-            <div class="legend-sub">Black</div>
-          </div>
-          <div class="timer" id="timerP1">00:30</div>
+        <div class="option-group">
+            <label>Rules:</label>
+            <select id="rule-set-select">
+                <option value="nolimit">Standard</option>
+                <option value="renju">Renju</option>
+                <option value="swap2">Swap2</option>
+            </select>
         </div>
 
-        <div class="legend-row">
-          <div class="chip p2"></div>
-          <div style="flex-grow: 1;">
-            <div class="legend-title" id="p2Label">Player 2</div>
-            <div class="legend-sub" id="p2Sub">White</div>
-          </div>
-          <div class="timer" id="timerP2">00:30</div>
+        <div class="option-group">
+            <label>Vanish:</label>
+            <select id="vanish-timer-select">
+                <option value="3000">3 Seconds</option>
+                <option value="10000" selected>10 Seconds</option>
+                <option value="3600000">Off</option>
+            </select>
         </div>
 
-      <div class="mini">
-        <div class="mini-title">Rules</div>
-        <ul>
-          <li>Place one piece per turn.</li>
-          <li>Pieces visually fade based on the vanish timer.</li>
-          <li>Occupied cell clicks are mistakes.</li>
-          <li>First to connect the goal length wins.</li>
-        </ul>
-      </div>
+        <button class="btn highlight-btn" onclick="confirmStart()">Start Match</button>
+        <button class="btn ghost" onclick="backToMainMenu()">Back</button>
+    </div>
+</div>
 
-      <div class="mini">
-        <div class="mini-title">World Rankings</div>
-        <ul id="leaderboardList" class="leaderboard-list">
-          <li class="loading">Connect to see rankings...</li>
-        </ul>
-      </div>
+<div id="game-page" class="hidden">
+    <div id="game-top-bar">
+        <button class="btn ghost" onclick="showLandingPage()">Quit</button>
+        <div id="turnPill" class="pill">Turn: P1</div>
+        <div id="timerP1" class="timer">00:30</div>
+    </div>
 
-      <div class="mini">
-        <div class="mini-title">Audio</div>
-        <div class="row">
-          <button id="audioBtn" class="btn ghost">Enable Sound</button>
-          <div class="toggle">
-            <input id="muteToggle" type="checkbox" />
-            <label for="muteToggle">Mute</label>
-          </div>
+    <div id="board-container">
+        <div id="boardWrap" class="board-wrap">
+            <div id="board" class="board"></div>
+            <div id="overlay" class="overlay hidden">
+              <div class="overlay-card">
+                <div id="overlayTitle" class="overlay-title">Message</div>
+                <div id="overlayBody" class="overlay-body" style="white-space: pre-wrap;">...</div>
+                
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                    <button id="overlayBtn" class="btn">New Game</button>
+                    <button id="overlayBtn2" class="btn ghost hidden">Main Menu</button>
+                </div>
+                
+              </div>
+            </div>
         </div>
-      </div>
-    </aside>
-  </main>
+    </div>
+    
+    <div class="meter-box" style="margin: 10px;">
+        <div class="meter-title">Mistakes</div>
+        <div id="mistakeMeter" class="meter"></div>
+    </div>
+</div>
 
-  <footer class="footer">
-    Tip: In Swap2 mode, Player 1 places 3 stones, Player 2 chooses sides.
-  </footer>
+<div id="matchmaking-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <h2 id="matchmaking-text">Searching for opponent...</h2>
+        <div id="matchmaking-spinner" class="spinner"></div>
+        <div id="matchmaking-actions" class="hidden" style="flex-direction: column; gap: 10px; margin-top: 20px;">
+            <button class="btn" onclick="playAIWhileWaiting()">Play AI While Waiting</button>
+            <button class="btn ghost" onclick="cancelMatchmaking()">Cancel Search</button>
+        </div>
+        <button id="matchmaking-cancel-initial" class="btn ghost" style="margin-top: 20px;" onclick="cancelMatchmaking()">Cancel</button>
+    </div>
+</div>
 
-  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
-  <script src="rules.js"></script>
-  <script src="ai.js"></script>
-  <script src="main.js"></script>
+<div id="match-found-modal" class="modal-overlay hidden" style="z-index: 2000;">
+    <div class="modal-content">
+        <h2 style="color: #ffcf40;">Opponent Found!</h2>
+        <p>Accept match and quit AI game?</p>
+        <button class="btn" style="margin-bottom: 10px;" onclick="acceptOnlineMatch()">Accept Match</button>
+        <button class="btn ghost" onclick="declineOnlineMatch()">Decline</button>
+    </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script src="rules.js"></script>
+<script src="ai.js"></script>
+<script src="main.js"></script>
 </body>
 </html>
