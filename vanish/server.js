@@ -276,6 +276,36 @@ io.on('connection', (socket) => {
     }
   });
 
+  // --- DRAW LOGIC ---
+    socket.on('offer_draw', ({ matchId }) => {
+        const match = activeMatches.get(matchId);
+        if (!match) return;
+
+        // Find the opponent and send them the offer
+        const opponent = (socket.id === match.host.socketId) ? match.guest : match.host;
+        if (opponent) {
+            io.to(opponent.socketId).emit('draw_offered');
+        }
+    });
+
+    socket.on('draw_response', ({ matchId, accepted }) => {
+        const match = activeMatches.get(matchId);
+        if (!match) return;
+
+        if (accepted) {
+            match.isOver = true;
+            // Tell BOTH players the draw was accepted
+            io.to(match.host.socketId).emit('draw_accepted');
+            if (match.guest) io.to(match.guest.socketId).emit('draw_accepted');
+        } else {
+            // Tell the person who offered that it was declined
+            const opponent = (socket.id === match.host.socketId) ? match.guest : match.host;
+            if (opponent) {
+                io.to(opponent.socketId).emit('draw_declined');
+            }
+        }
+    });
+
 });
 
 
@@ -294,7 +324,7 @@ io.on('connection', (socket) => {
     }
   }
 
-  
+
   function finalizeOnlineRoles(match, matchId, newHost, newGuest) {
     match.host = newHost;
     match.guest = newGuest;
@@ -501,4 +531,10 @@ app.post('/auth/gamecenter', async (req, res) => {
   }
 });
 
-server.listen(3000, () => console.log('Vanish Server running on port 3000'));
+// This tells the server to accept the port Railway assigns, or default to 3000
+const PORT = process.env.PORT || 3000;
+
+// The '0.0.0.0' explicitly tells the server to accept connections from the outside internet!
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Vanish server is live and listening on port ${PORT}`);
+});

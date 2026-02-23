@@ -109,9 +109,28 @@ select { background: rgba(255,255,255,.06); color: var(--text); border: 1px soli
 .side { display: flex; flex-direction: column; gap: 12px; }
 .legend, .mini { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 14px; }
 .turn-box { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 12px; background: rgba(0,0,0,0.3); }
-.turn-piece { width: 24px; height: 24px; border-radius: 50%; box-shadow: 2px 3px 5px rgba(0,0,0,0.4); }
+/*.turn-piece { width: 24px; height: 24px; border-radius: 50%; box-shadow: 2px 3px 5px rgba(0,0,0,0.4); }
 .turn-piece.p1 { background: radial-gradient(circle at 30% 30%, #555, #000); }
-.turn-piece.p2 { background: radial-gradient(circle at 30% 30%, #fff, #ccc); border: 1px solid #999; }
+.turn-piece.p2 { background: radial-gradient(circle at 30% 30%, #fff, #ccc); border: 1px solid #999; }*/
+/* Base shape with a crisp white border for contrast */
+.turn-piece { 
+    width: 24px; 
+    height: 24px; 
+    border-radius: 50%; 
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.6); 
+    border: 2px solid rgba(255, 255, 255, 0.85); /* The new white border */
+}
+
+/* Black Pill */
+.turn-piece.p1 { 
+    background: radial-gradient(circle at 30% 30%, #555, #000); 
+}
+
+/* White Pill */
+.turn-piece.p2 { 
+    background: radial-gradient(circle at 30% 30%, #fff, #ccc); 
+    border: 2px solid #aaa; /* A slightly darker grey border so the white piece doesn't wash out */
+}
 
 .meter-box { padding: 12px; border-radius: 14px; background: rgba(0,0,0,0.3); }
 .meter { 
@@ -322,7 +341,15 @@ html, body {
 #landing-page { justify-content: center; align-items: center; gap: 30px; }
 
 #game-top-bar {
-  display: flex; justify-content: space-between; align-items: center; padding: 15px;
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  padding: 12px 15px;
+  
+  /* The new background styles */
+  background: rgba(255, 255, 255, 0.08); /* Soft, slightly transparent grey */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); /* Drops a shadow onto the board area */
 }
 
 /* Guarantees the board container perfectly fills the middle of the screen */

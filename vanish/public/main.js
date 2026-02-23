@@ -8,7 +8,7 @@
 */
 
 
-const socket = io('http://localhost:3000');
+const socket = io('https://api.bigwgames.com');
 let isOnline = false;
 let onlineMatchId = null;
 let myOnlineRole = null; // 1 (Black) or 2 (White)
@@ -1444,7 +1444,7 @@ function newGame() {
   buildBoard();
   hideOverlay();
   clearOverlayButtons();
-  overlayBtn.onclick = null; 
+  if ($('overlayBtn')) $('overlayBtn').onclick = null;
 
   // Set names for local play
   if (!isOnline) {
@@ -1503,6 +1503,68 @@ function updatePlaceButton() {
         placeBtn.disabled = false;
     }
 }
+
+function offerDraw() {
+    if (gameOver) return;
+
+    if (isOnline) {
+        // Send offer to server
+        socket.emit('offer_draw', { matchId: onlineMatchId });
+        showOverlay("Draw Offer Sent", "Waiting for opponent to accept or decline...", "Cancel Offer");
+        
+        $('overlayBtn').onclick = () => {
+            hideOverlay();
+            // Optional: you could emit a cancel event here, but hiding is fine for now
+        };
+    } else if (mode === "ai") {
+        // AI Logic: Declines unless the board is very crowded (<30% empty space left)
+        const emptySpots = state.filter(v => v === 0).length;
+        if (emptySpots < (size * size * 0.3)) {
+            endGame(null, true); // AI accepts, triggers draw
+        } else {
+            showOverlay("Draw Declined", "The AI thinks it can still win and refuses your offer.", "Close");
+            $('overlayBtn').onclick = hideOverlay;
+        }
+    } else {
+        // Local PvP: Show a prompt to the other player
+        const offerer = currentPlayer === P1 ? "Player 1 (Black)" : "Player 2 (White)";
+        showOverlay("Draw Offer", `${offerer} is offering a draw. Do you accept?`, "Accept", "Decline", () => {
+            // Decline Action
+            hideOverlay();
+        });
+
+        // Accept Action
+        $('overlayBtn').onclick = () => {
+            hideOverlay();
+            endGame(null, true); // True means it's a draw
+        };
+    }
+}
+
+// --- ONLINE DRAW SOCKET LISTENERS ---
+socket.on('draw_offered', () => {
+    showOverlay("Draw Offer", "Your opponent is offering a draw. Do you accept?", "Accept", "Decline", () => {
+        // Decline Action
+        socket.emit('draw_response', { matchId: onlineMatchId, accepted: false });
+        hideOverlay();
+    });
+
+    // Accept Action
+    $('overlayBtn').onclick = () => {
+        socket.emit('draw_response', { matchId: onlineMatchId, accepted: true });
+        hideOverlay();
+    };
+});
+
+socket.on('draw_declined', () => {
+    showOverlay("Draw Declined", "Your opponent declined the draw offer. The game continues.", "Close");
+    $('overlayBtn').onclick = hideOverlay;
+});
+
+socket.on('draw_accepted', () => {
+    hideOverlay();
+    endGame(null, true); // True means it's a draw!
+});
 
 
 
