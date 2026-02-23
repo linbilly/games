@@ -8,13 +8,20 @@
 */
 
 // At the very top of main.js
-const SERVER_URL = 'https://api.bigwgames.com'; 
+// This checks if you are testing on your computer vs the live app
+const isLocal = window.location.hostname === 'localhost' || window.location.protocol === 'file:';
+const SERVER_URL = isLocal ? 'http://localhost:3000' : 'https://api.bigwgames.com'; 
 const socket = io(SERVER_URL); // Use the variable here!
 
 let isOnline = false;
 let onlineMatchId = null;
 let myOnlineRole = null; // 1 (Black) or 2 (White)
 let currentPlatformId = null;
+
+let currentUser = "Guest";
+let myRating = 1500;
+let myWins = 0;
+let myLosses = 0;
 
 const $ = (id) => document.getElementById(id);
 

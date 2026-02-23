@@ -3,6 +3,8 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors'); // 1. Import cors
 
+require('dotenv').config();
+
 const { Server } = require('socket.io');
 const { Pool } = require('pg');
 
