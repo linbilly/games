@@ -6,6 +6,25 @@ const cors = require('cors'); // 1. Import cors
 const { Server } = require('socket.io');
 const { Pool } = require('pg');
 
+// Initialize the Postgres Connection Pool
+// It will automatically grab the DATABASE_URL variable you hid inside Railway
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false // Supabase requires this to accept outside connections safely
+    }
+});
+
+// Test the connection when the server boots up
+pool.connect((err, client, release) => {
+    if (err) {
+        console.error('Database connection failed:', err.stack);
+    } else {
+        console.log('Successfully connected to Supabase PostgreSQL!');
+    }
+    if (client) release();
+});
+
 const app = express();
 // Add this line to handle JSON data in POST requests
 app.use(cors({ origin: '*' })); // Allow all origins for testing
@@ -433,9 +452,39 @@ function checkServerWin(state, size, goal, r, c, player) {
   return false;
 }
 
-async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
+function handleServerWin(match, winningPlayerRole, matchId) {
+    // 1. Stop the game and clear timers
+    match.isOver = true;
+    if (match.timerInterval) clearInterval(match.timerInterval);
 
-  // GUARD CLAUSE: If either player has no ID, it's an unranked/private match. Skip Elo!
+    // 2. Identify the winner and loser
+    const loserRole = winningPlayerRole === 1 ? 2 : 1;
+    const winner = winningPlayerRole === 1 ? match.host : match.guest;
+    const loser = loserRole === 1 ? match.host : match.guest;
+
+    // 3. Process Ratings if both players are authenticated (Apple ID exists)
+    if (winner.appleId && loser.appleId) {
+        (async () => {
+            const ratingData = await finalizeMatchRatings(winner.appleId, loser.appleId, match.vanishMs);
+            
+            io.to(matchId).emit('match_over', {
+                winnerRole: winningPlayerRole,
+                newRating: ratingData ? Math.round(ratingData.winnerRating) : null,
+                pointsGained: ratingData ? ratingData.winnerGain : null,
+                reason: 'win'
+            });
+        })();
+    } else {
+        // Unranked/Guest match: Just broadcast the win without Elo changes
+        io.to(matchId).emit('match_over', {
+            winnerRole: winningPlayerRole,
+            reason: 'win'
+        });
+    }
+}
+
+async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
+    // GUARD CLAUSE: Unranked/private match
     if (!winnerAppleId || !loserAppleId) return null;
 
     // Map the vanish setting to your specific column
@@ -444,64 +493,48 @@ async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
     if (vanishMs === 10000) ratingCol = 'rating_15_10s';
 
     try {
-        const winner = (await pool.query('SELECT * FROM users WHERE apple_id = $1', [winnerAppleId])).rows[0];
-        const loser = (await pool.query('SELECT * FROM users WHERE apple_id = $1', [loserAppleId])).rows[0];
+        const winnerRes = await pool.query('SELECT * FROM users WHERE apple_id = $1', [winnerAppleId]);
+        const loserRes = await pool.query('SELECT * FROM users WHERE apple_id = $1', [loserAppleId]);
 
-        if (!winner || !loser) return;
+        const winner = winnerRes.rows[0];
+        const loser = loserRes.rows[0];
 
-        // Calculate changes (simplified Glicko-2 step)
+        if (!winner || !loser) return null;
+
+        // Calculate changes (Standard Elo)
         const K = 32;
         const expectedW = 1 / (1 + Math.pow(10, (loser[ratingCol] - winner[ratingCol]) / 400));
         const gain = Math.round(K * (1 - expectedW));
 
-        // Update the specific rating column in the DB
+        // Update Winner
         await pool.query(`
             UPDATE users SET 
             ${ratingCol} = ${ratingCol} + $1, 
             rd = GREATEST(30, rd * 0.95), 
             wins = wins + 1 
-            WHERE apple_id = $2`, [gain, winnerAppleId]);
+            WHERE apple_id = $2`, [gain, winnerAppleId]
+        );
             
+        // Update Loser
         await pool.query(`
             UPDATE users SET 
             ${ratingCol} = ${ratingCol} - $1, 
             losses = losses + 1 
-            WHERE apple_id = $2`, [gain, loserAppleId]);
+            WHERE apple_id = $2`, [gain, loserAppleId]
+        );
+
+        // CRITICAL: Return this data so the socket can send it to the frontend!
+        return {
+            winnerRating: winner[ratingCol] + gain,
+            winnerGain: gain
+        };
+
     } catch (err) {
-        console.error("Glicko Update Error:", err);
+        console.error("Rating Update Error:", err);
+        return null;
     }
 }
 
-// Glicko-2 Helper: Update ratings in the DB
-async function processMatchResult(winnerId, loserId) {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-
-        // 1. Fetch current ratings
-        const winner = (await client.query('SELECT * FROM users WHERE apple_id = $1', [winnerId])).rows[0];
-        const loser = (await client.query('SELECT * FROM users WHERE apple_id = $1', [loserId])).rows[0];
-
-        if (!winner || !loser) throw new Error("Player not found");
-
-        // 2. Calculate Elo/Glicko Change (Simplified for example)
-        const K = 32; 
-        const expectedW = 1 / (1 + Math.pow(10, (loser.rating - winner.rating) / 400));
-        const ratingChange = Math.round(K * (1 - expectedW));
-
-        // 3. Update Database
-        await client.query('UPDATE users SET rating = rating + $1, wins = wins + 1 WHERE apple_id = $2', [ratingChange, winnerId]);
-        await client.query('UPDATE users SET rating = rating - $1, losses = losses + 1 WHERE apple_id = $2', [ratingChange, loserId]);
-
-        await client.query('COMMIT');
-        return { ratingChange, newWinnerRating: winner.rating + ratingChange };
-    } catch (e) {
-        await client.query('ROLLBACK');
-        console.error("Glicko Update Failed", e);
-    } finally {
-        client.release();
-    }
-}
 
 // GET /leaderboard - Fetch the masters of Vanish
 app.get('/leaderboard', async (req, res) => {
