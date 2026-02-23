@@ -1932,17 +1932,17 @@ socket.on('sync_match_state', (data) => {
     inputLocked = (currentPlayer !== myOnlineRole);
 });
 
-socket.on('roles_finalized', ({ hostId, guestId }) => {
+socket.on('roles_finalized', ({ hostId, guestId, decision }) => {
+    const previousPhase = swap2Phase; 
+    
     myOnlineRole = (socket.id === hostId) ? 1 : 2;
-
     leftSideRole = isRoomHost ? myOnlineRole : (myOnlineRole === 1 ? 2 : 1);
     
     swap2Phase = 0; 
-    currentPlayer = 2; 
+    currentPlayer = 2; // White always moves first after setup
     
     inputLocked = (myOnlineRole !== 2); 
     
-    // FIX 2: Update all timestamps to NOW and trigger the CSS Vanish sequence!
     const now = Date.now();
     for (let i = 0; i < state.length; i++) { 
         if (state[i] !== 0) placedAt[i] = now; 
@@ -1955,6 +1955,35 @@ socket.on('roles_finalized', ({ hostId, guestId }) => {
     hideOverlay();
     clearOverlayButtons();
     setPills(); 
+
+    // 2. THE UX NOTIFICATIONS
+    if (previousPhase === 2) {
+        // Notifications for P1 waiting on P2's Phase 2 choice
+        if (decision === 'swap' && myOnlineRole === 2) {
+            showOverlay("Roles Swapped!", "Opponent chose to play as Black. You are now White. It's your turn!", "Continue");
+            const mainBtn = $('overlayBtn');
+            if (mainBtn) mainBtn.onclick = () => { mainBtn.onclick = null; hideOverlay(); };
+            
+        } else if (decision === 'stay' && myOnlineRole === 1) {
+            showOverlay("Roles Maintained", "Opponent chose to stay as White. Waiting for their move...", "Close");
+            const mainBtn = $('overlayBtn');
+            if (mainBtn) mainBtn.onclick = () => { mainBtn.onclick = null; hideOverlay(); };
+        }
+    } else if (previousPhase === 4) {
+        // NEW: Notifications for P2 waiting on P1's Phase 4 choice
+        if (decision === 'stay' && myOnlineRole === 2) {
+            // P1 chose to stay Black. P2 is White and must play immediately.
+            showOverlay("Final Roles Set", "Opponent chose to play as Black. You are White. It's your turn!", "Continue");
+            const mainBtn = $('overlayBtn');
+            if (mainBtn) mainBtn.onclick = () => { mainBtn.onclick = null; hideOverlay(); };
+            
+        } else if (decision === 'swap' && myOnlineRole === 1) {
+            // P1 chose to swap to White. P2 is Black and must wait for P1 to play.
+            showOverlay("Final Roles Set", "Opponent chose to play as White. You are Black. Waiting for their move...", "Close");
+            const mainBtn = $('overlayBtn');
+            if (mainBtn) mainBtn.onclick = () => { mainBtn.onclick = null; hideOverlay(); };
+        }
+    }
 });
 
 socket.on('swap2_plus2_started', () => {

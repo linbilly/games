@@ -351,12 +351,13 @@ socket.on('reconnect_to_match', ({ matchId, platformId }) => {
     if (!match) return;
 
     if (decision === 'stay') {
-        finalizeOnlineRoles(match, matchId, match.host, match.guest);
+        // Pass 'stay' here
+        finalizeOnlineRoles(match, matchId, match.host, match.guest, 'stay');
     } else if (decision === 'swap') {
-        // Switch host and guest roles
         const newHost = match.guest;
         const newGuest = match.host;
-        finalizeOnlineRoles(match, matchId, newHost, newGuest);
+        // Pass 'swap' here
+        finalizeOnlineRoles(match, matchId, newHost, newGuest, 'swap');
     } else if (decision === 'plus2') {
         match.swap2Phase = 3;
         io.to(matchId).emit('swap2_plus2_started');
@@ -422,7 +423,8 @@ function executeServerMove(match, r, c, playerRole, matchId, shouldSwitchTurn = 
 }
 
 
-  function finalizeOnlineRoles(match, matchId, newHost, newGuest) {
+// Add the 'decision' parameter
+function finalizeOnlineRoles(match, matchId, newHost, newGuest, decision) {
     match.host = newHost;
     match.guest = newGuest;
     match.swap2Phase = 0;
@@ -431,7 +433,8 @@ function executeServerMove(match, r, c, playerRole, matchId, shouldSwitchTurn = 
     
     io.to(matchId).emit('roles_finalized', { 
         hostId: match.host.socketId, 
-        guestId: match.guest.socketId 
+        guestId: match.guest.socketId,
+        decision: decision // <--- Emit it to the clients
     });
 }
   
