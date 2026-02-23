@@ -188,11 +188,83 @@ io.on('connection', (socket) => {
     io.to(matchId).emit('game_resumed', { resumeTimeUtc: Date.now() });
   });
 
-  socket.on('disconnect', () => {
-    // Basic cleanup
-    const idx = matchmakingQueue.findIndex(p => p.socketId === socket.id);
-    if (idx !== -1) matchmakingQueue.splice(idx, 1);
-  });
+// A helper to handle forfeits cleanly
+async function handleForfeit(socket, matchId) {
+    const match = activeMatches.get(matchId);
+    // Only forfeit if the match is actually "ongoing"
+    if (!match || match.isOver) return; 
+
+    const isHost = match.host.socketId === socket.id;
+    const loser = isHost ? match.host : match.guest;
+    const winner = isHost ? match.guest : match.host;
+
+    if (!winner) return; // Case where guest hasn't joined yet
+
+    console.log(`Forfeit in match ${matchId}: ${loser.username} left.`);
+    match.isOver = true;
+    
+    if (match.timerInterval) {
+        clearInterval(match.timerInterval);
+        match.timerInterval = null;
+    }
+
+    // 1. Process Elo if it's a ranked match
+    let ratings = null;
+    if (winner.platformId && loser.platformId) {
+        ratings = await finalizeMatchRatings(winner.platformId, loser.platformId, match.vanishMs);
+    }
+
+    // 2. Notify the winner they won by forfeit
+    io.to(winner.socketId).emit('match_over', {
+        winnerRole: isHost ? 2 : 1, // If Host quit, Guest (2) wins
+        reason: 'opponent_forfeit',
+        ratings: ratings
+    });
+
+    // 3. Cleanup
+    activeMatches.delete(matchId);
+}
+
+// Updated Listeners
+socket.on('leave_room', ({ matchId }) => {
+    handleForfeit(socket, matchId); // Trigger the loss immediately
+    socket.leave(matchId);
+});
+
+socket.on('disconnect', () => {
+    for (const [matchId, match] of activeMatches.entries()) {
+        if (match.host.socketId === socket.id || (match.guest && match.guest.socketId === socket.id)) {
+            // Option A: Instant Loss (strict)
+            handleForfeit(socket, matchId);
+            
+            // Option B: The "Blink" logic we discussed (grace period)
+            // For now, let's stick to Option A to satisfy your requirement
+            break; 
+        }
+    }
+});
+
+
+socket.on('reconnect_to_match', ({ matchId, platformId }) => {
+    const match = activeMatches.get(matchId);
+    if (match && (match.host.platformId === platformId || match.guest?.platformId === platformId)) {
+        const isHost = (match.host.platformId === platformId);
+        
+        // Update the active socket ID to the new one
+        if (isHost) match.host.socketId = socket.id;
+        else match.guest.socketId = socket.id;
+
+        socket.join(matchId);
+        io.to(matchId).emit('player_reconnected');
+
+        // Send current state to the returning player
+        socket.emit('sync_match_state', {
+            state: match.state,
+            turn: match.turn,
+            turnDeadline: match.turnDeadline
+        });
+    }
+});
 
   // 4. MATCHMAKING CANCELLATIONS
   socket.on('cancel_search', () => {
@@ -265,11 +337,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('leave_room', ({ matchId }) => {
-      socket.leave(matchId);
-      socket.to(matchId).emit('opponent_left');
-      activeMatches.delete(matchId);
-  });
 
   socket.on('swap2_decision', ({ matchId, decision, role }) => {
     const match = activeMatches.get(matchId);
@@ -381,7 +448,7 @@ function startMatchTimer(matchId) {
     const currentMatch = activeMatches.get(matchId);
     
     // If match was deleted by a move or disconnect, kill this timer
-    if (!currentMatch) {
+    if (!currentMatch || currentMatch.isOver) {
       clearInterval(match.timerInterval);
       return;
     }
@@ -405,8 +472,7 @@ function startMatchTimer(matchId) {
               if (ratingData) {
                   io.to(matchId).emit('match_over', {
                       winnerRole,
-                      newRating: Math.round(ratingData.winnerRating),
-                      pointsGained: ratingData.winnerGain
+                      ratings: ratingData // Send the whole object, let the client sort it out!
                   });
               }
           })();
@@ -462,9 +528,7 @@ function handleServerWin(match, winningPlayerRole, matchId) {
             
             io.to(matchId).emit('match_over', {
                 winnerRole: winningPlayerRole,
-                newRating: ratingData ? Math.round(ratingData.winnerRating) : null,
-                pointsGained: ratingData ? ratingData.winnerGain : null,
-                reason: 'win'
+                ratings: ratingData // Send the whole object, let the client sort it out!
             });
         })();
     } else {
@@ -477,13 +541,10 @@ function handleServerWin(match, winningPlayerRole, matchId) {
 }
 
 async function finalizeMatchRatings(winnerplatformId, loserplatformId, vanishMs) {
-    // GUARD CLAUSE: Unranked/private match
     if (!winnerplatformId || !loserplatformId) return null;
 
-    // Map the vanish setting to your specific column
-    let ratingCol = 'rating_15_standard';
-    if (vanishMs === 3000) ratingCol = 'rating_15_3s';
-    if (vanishMs === 10000) ratingCol = 'rating_15_10s';
+    // FIX 1: Unify all 15x15 games into the standard column so the Leaderboard works!
+    let ratingCol = 'rating_15_standard'; 
 
     try {
         const winnerRes = await pool.query('SELECT * FROM users WHERE platform_id = $1', [winnerplatformId]);
@@ -494,34 +555,20 @@ async function finalizeMatchRatings(winnerplatformId, loserplatformId, vanishMs)
 
         if (!winner || !loser) return null;
 
-        // Calculate changes (Standard Elo)
         const K = 32;
         const expectedW = 1 / (1 + Math.pow(10, (loser[ratingCol] - winner[ratingCol]) / 400));
         const gain = Math.round(K * (1 - expectedW));
 
-        // Update Winner
-        await pool.query(`
-            UPDATE users SET 
-            ${ratingCol} = ${ratingCol} + $1, 
-            rd = GREATEST(30, rd * 0.95), 
-            wins = wins + 1 
-            WHERE platform_id = $2`, [gain, winnerplatformId]
-        );
-            
-        // Update Loser
-        await pool.query(`
-            UPDATE users SET 
-            ${ratingCol} = ${ratingCol} - $1, 
-            losses = losses + 1 
-            WHERE platform_id = $2`, [gain, loserplatformId]
-        );
+        await pool.query(`UPDATE users SET ${ratingCol} = ${ratingCol} + $1, rd = GREATEST(30, rd * 0.95), wins = wins + 1 WHERE platform_id = $2`, [gain, winnerplatformId]);
+        await pool.query(`UPDATE users SET ${ratingCol} = ${ratingCol} - $1, losses = losses + 1 WHERE platform_id = $2`, [gain, loserplatformId]);
 
-        // CRITICAL: Return this data so the socket can send it to the frontend!
+        // FIX 2: Return BOTH players' stats in an object
         return {
             winnerRating: winner[ratingCol] + gain,
-            winnerGain: gain
+            winnerGain: gain,
+            loserRating: loser[ratingCol] - gain,
+            loserGain: -gain // This creates the negative number for the loser
         };
-
     } catch (err) {
         console.error("Rating Update Error:", err);
         return null;
@@ -542,6 +589,23 @@ app.get('/leaderboard', async (req, res) => {
     } catch (err) {
         console.error("Leaderboard fetch error", err);
         res.status(500).json({ error: "Failed to load rankings" });
+    }
+});
+
+// GET /user/stats/:platformId - Fetch fresh stats for the profile page
+app.get('/user/stats/:platformId', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT rating_15_standard, wins, losses 
+            FROM users 
+            WHERE platform_id = $1
+        `, [req.params.platformId]);
+        
+        // Return the stats, or an empty object if somehow not found
+        res.json(result.rows[0] || {}); 
+    } catch (err) {
+        console.error("Stats fetch error", err);
+        res.status(500).json({ error: "Failed to load stats" });
     }
 });
 

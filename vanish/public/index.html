@@ -166,15 +166,17 @@
             <div class="stat-row"><span>Losses:</span> <span id="stat-losses">0</span></div>
         </div>
 
+        <div id="tab-rules" class="tab-content hidden" style="text-align: left; padding: 10px;">
+            <h3>How to Play</h3>
+            <p><strong>Standard:</strong> Connect 5 stones in a row (horizontally, vertically, or diagonally) to win.</p>
+            <p><strong>Vanish:</strong> Stones disappear from sight after a few seconds. You must remember where they are!</p>
+            <p><strong>Renju:</strong> Black (P1) has restricted moves (no double-threes or double-fours) to balance the game.</p>
+            <p><strong>Swap2:</strong> A professional opening where P1 places 3 stones, and P2 chooses to stay, swap colors, or place 2 more.</p>
+        </div>
+
         <button class="btn ghost" style="margin-top: 20px;" onclick="closeInfoOverlay()">Close</button>
     </div>
-    <div id="tab-rules" class="tab-content hidden" style="text-align: left; padding: 10px;">
-    <h3>How to Play</h3>
-    <p><strong>Standard:</strong> Connect 5 stones in a row (horizontally, vertically, or diagonally) to win.</p>
-    <p><strong>Vanish:</strong> Stones disappear from sight after a few seconds. You must remember where they are!</p>
-    <p><strong>Renju:</strong> Black (P1) has restricted moves (no double-threes or double-fours) to balance the game.</p>
-    <p><strong>Swap2:</strong> A professional opening where P1 places 3 stones, and P2 chooses to stay, swap colors, or place 2 more.</p>
-</div>
+
 </div>
 
 <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>

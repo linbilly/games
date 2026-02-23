@@ -238,6 +238,11 @@ function setupOnlineGame(data) {
     mode = 'pvp';
     onlineMatchId = data.matchId;
     myOnlineRole = data.role;
+
+    // ADD THESE: Save to memory so refresh doesn't kill the session
+    localStorage.setItem('active_match_id', onlineMatchId);
+    localStorage.setItem('my_platform_id', currentPlatformId);
+
     turnDeadline = data.settings.turnDeadline || (Date.now() + 30000);
 
     opponentWantsRematch = false; // Reset the flag for the new match
@@ -377,9 +382,14 @@ async function initializeUser() {
   const isNative = window.Capacitor && Capacitor.isNativePlatform();
   const platform = isNative ? Capacitor.getPlatform() : 'web'; 
   
-  // Default guest data
+  let savedGuestId = localStorage.getItem('vanish_guest_id');
+  if (!savedGuestId) {
+      savedGuestId = "guest_" + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem('vanish_guest_id', savedGuestId);
+  }
+
   let userData = { 
-    playerId: "guest_" + Math.random().toString(36).substr(2, 9), 
+    playerId: savedGuestId, 
     displayName: "Guest",
     platform: platform 
   };
@@ -447,6 +457,14 @@ async function initializeUser() {
         ladderBtn.classList.remove('highlight-btn'); // Remove the gold highlight
     }
   }
+}
+
+async function checkActiveMatch() {
+    const savedMatchId = localStorage.getItem('active_match_id');
+    if (savedMatchId && currentPlatformId) {
+        console.log("Attempting to rejoin match:", savedMatchId);
+        socket.emit('reconnect_to_match', { matchId: savedMatchId, platformId: currentPlatformId });
+    }
 }
 
 function ensureAudio() {
@@ -643,10 +661,16 @@ function hideOverlay() {
 }
 
 function quitGame() {
-    showLandingPage();
-    if (isOnline && onlineMatchId) {
+    if (isOnline && onlineMatchId && !gameOver) {
+        // Tell the server "I give up"
         socket.emit('leave_room', { matchId: onlineMatchId });
     }
+    
+    // Clean up local memory
+    localStorage.removeItem('active_match_id');
+    gameOver = true;
+    if (localTickInterval) clearInterval(localTickInterval);
+    showLandingPage();
 }
 
 function handleNewGameRequest() {
@@ -1096,10 +1120,34 @@ function placePiece(r, c, player, { animate = false, sfx = false, absoluteTime =
   }
 }
 
+async function refreshMyStats() {
+    try {
+        // Only fetch if we have successfully logged in and have an ID
+        if (currentPlatformId) {
+            const response = await fetch(`${SERVER_URL}/user/stats/${currentPlatformId}`);
+            if (response.ok) {
+                const freshData = await response.json();
+                
+                // Update our local variables with the absolute truth from the DB
+                myRating = freshData.rating_15_standard || 1500;
+                myWins = freshData.wins || 0;
+                myLosses = freshData.losses || 0;
+            }
+        }
+    } catch (err) {
+        console.error("Failed to pull fresh stats from DB:", err);
+    }
+    
+    // Visually update the HTML elements
+    updateMyStatsUI();
+}
+
 function openInfoOverlay() {
     $('info-overlay').classList.remove('hidden');
-    updateLeaderboard(); // Refresh global rankings
-    updateMyStatsUI();   // Show current user's ELO and stats
+    
+    // Both of these now pull fresh data directly from the PostgreSQL database!
+    updateLeaderboard(); 
+    refreshMyStats();    
 }
 
 function closeInfoOverlay() {
@@ -1176,8 +1224,8 @@ function handleMistake(customMsg, offender = currentPlayer) {
 
   const title = hitEnd ? "Penalty!" : "Mistake";
   const msg = hitEnd
-    ? `Third mistake reached the end of the meter. ${bodyMessage} ${actorText} forfeit this move.`
-    : `${bodyMessage} The board is revealed for review. Close this message, then click the board or press Resume to continue.`;
+    ? `Three strikes! ${bodyMessage} ${actorText} forfeit this move.`
+    : `${bodyMessage} The board is revealed for review. Close this message, then play a piece to continue.`;
 
   showOverlay(title, msg, "Close");
 
@@ -1289,26 +1337,39 @@ function endGame(winObj, isDraw = false) {
   }
   if (!isDraw) sfxWin();
 
-  // 2. Determine Text
-  const winnerText =
-    (winObj && winObj.player === P1) ? "Player 1 (Black)" :
-    (mode === "ai" ? "AI (White)" : "Player 2 (White)");
+  // 2. Determine Text and Title dynamically
+  let overlayTitle = "Winner!";
 
-  const title = isDraw ? "Draw" : "Winner!";
+  if (isDraw) {
+      overlayTitle = "Draw";
+  } else if (isOnline) {
+      // Online Multiplayer Logic
+      if (winObj && winObj.player === myOnlineRole) {
+          overlayTitle = "Victory!";
+      } else {
+          overlayTitle = "Defeat!";
+      }
+  } else if (mode === "ai") {
+      // Single Player AI Logic
+      if (winObj && winObj.player === aiPlaysAs) {
+          overlayTitle = "Defeat!";
+      } else {
+          overlayTitle = "Victory!";
+      }
+  } 
+
   const msg = isDraw 
-    ? "No more moves left. Review the final board, or play again." 
-    : `${winnerText} connected ${goal}. Review the final board, or play again.`;
+    ? "Game ended in a draw. Play again?" 
+    : `Play again?`;
 
-  // 1. Determine base text
   let primaryBtnText = isOnline ? "Rematch" : "New Game";
   
-  // 2. RACE CONDITION CATCH: If they asked before we even rendered the menu, swap it now!
   if (opponentWantsRematch) {
       primaryBtnText = "Accept Rematch";
   }
 
   // Trigger the 2-button overlay
-  showOverlay(title, msg, primaryBtnText, "Main Menu", () => {
+  showOverlay(overlayTitle, msg, primaryBtnText, "Main Menu", () => {
       hideOverlay();
       quitGame();
   });
@@ -1316,7 +1377,6 @@ function endGame(winObj, isDraw = false) {
   const minBtn = $('minimize-overlay-btn');
   if (minBtn) minBtn.classList.remove('hidden');
 
-  // --- DYNAMICALLY INJECT RESTORE BUTTON ---
   let restoreBtn = $('restore-overlay-btn');
   
   if (!restoreBtn) {
@@ -1327,13 +1387,10 @@ function endGame(winObj, isDraw = false) {
       restoreBtn.onclick = restoreOverlay;
   }
   
-  // THE MAGIC LINE: This forces the button to be attached directly to the page body.
-  // If it was accidentally nested inside the overlay in your HTML, this physically moves it out!
   document.body.appendChild(restoreBtn);
 
   const mainBtn = $('overlayBtn');
   if (mainBtn) {
-      // If we caught the race condition, make sure it's gold right from the start!
       if (opponentWantsRematch) {
           mainBtn.style.backgroundColor = "#ffcf40";
           mainBtn.style.color = "#000";
@@ -1345,7 +1402,6 @@ function endGame(winObj, isDraw = false) {
           handleNewGameRequest();
       };
   }
-
 }
 
 // ---------- AI ----------
@@ -1626,15 +1682,14 @@ socket.on('room_created', (code) => {
 });
 
 socket.on('move_made', (data) => {
-  // Destructure the data object so the rest of your code works
-  const { r, c, player, placedAtUtc, turnDeadline: serverDeadline } = data;
+  // 1. Remove placedAtUtc from the destructuring, the server doesn't send it!
+  const { r, c, player, turnDeadline: serverDeadline } = data;
 
   // Sync the timer
   turnDeadline = serverDeadline;
   
-  // Place the piece
+  // 2. Let placePiece handle the timestamp automatically using local Date.now()
   placePiece(r, c, player, { animate: true, sfx: true });
-  placedAt[idx(r, c)] = placedAtUtc;
   
   const win = checkWinFrom(r, c, player);
   if (win) { 
@@ -1687,7 +1742,7 @@ socket.on('rematch_requested', () => {
 });
 
 socket.on('opponent_left', () => {
-    showOverlay("Room Closed", "Your opponent left the private room.", "Main Menu");
+    showOverlay("Room Closed", "Your opponent left the room.", "Main Menu");
     overlayBtn.onclick = () => {
         hideOverlay();
         quitGame();
@@ -1747,13 +1802,63 @@ socket.on('error', (msg) => {
     }
 });
 
-socket.on('match_over', ({ winnerRole, newRating, pointsGained }) => {
-    // The app already drew the 5th piece and popped up the overlay from the move_made event.
-    // Now we just append the Elo rating changes to it!
+socket.on('match_over', ({ winnerRole, ratings, reason }) => {
+
+    gameOver = true;
+    if (localTickInterval) clearInterval(localTickInterval);
+
+    const isWinner = (winnerRole === myOnlineRole);
+    let title = isWinner ? "Victory!" : "Defeat!";
+    let msg = "Play again?";
+    let primaryBtnText = isOnline ? "Rematch" : "New Game";
+
+    
+    // NEW: Handle the forfeit message
+    if (reason === 'opponent_forfeit') {
+      msg = `Opponent quit the match. You win by forfeit!`; 
+      primaryBtnText = "Main Menu";
+    }
+
+    showOverlay(title, msg, primaryBtnText, null, null);
+
+    const mainBtn = $('overlayBtn');
     const bodyEl = $('overlayBody');
-    if (bodyEl && newRating) {
-        const gainStr = pointsGained >= 0 ? `+${pointsGained}` : pointsGained;
-        bodyEl.textContent += `\n\nRating Updated: ${newRating} (${gainStr})`;
+
+    if (mainBtn && reason === 'opponent_forfeit') {
+        mainBtn.onclick = () => {
+            hideOverlay();
+            quitGame();
+        };
+    } else if (mainBtn) {
+        // Standard rematch logic
+        mainBtn.onclick = () => {
+            hideOverlay();
+            handleNewGameRequest();
+        };
+    }
+    
+    // Ensure we have a valid DOM element and rating data
+    if (bodyEl && ratings) {
+        // FIX 4: Determine if WE are the winner or the loser
+        const isWinner = (winnerRole === myOnlineRole);
+        
+        // Extract the correct stats for our screen
+        const myNewRating = isWinner ? ratings.winnerRating : ratings.loserRating;
+        const myGain = isWinner ? ratings.winnerGain : ratings.loserGain;
+        
+        // Format the UI string (e.g. "+16" or "-16")
+        const gainStr = myGain >= 0 ? `+${myGain}` : myGain;
+        bodyEl.textContent += `\n\nRating Updated: ${Math.round(myNewRating)} (${gainStr})`;
+        
+        // Update local stats silently in the background
+        if (isWinner) {
+            myWins++;
+        } else {
+            myLosses++;
+        }
+        myRating = myNewRating;
+        
+        updateLeaderboard(); 
     }
 });
 
@@ -1764,6 +1869,30 @@ socket.on('swap2_choice_required', ({ phase }) => {
     } else if (phase === 4 && myOnlineRole === 1) {
         showP1FinalChoice(); // Use your existing UI
     }
+});
+
+socket.on('opponent_blinked', () => {
+    showOverlay("Connection Lost", "Opponent disconnected. Their clock is still ticking...", "Wait");
+    // Hide the button so they can't dismiss it until the opponent returns or time runs out
+    if ($('overlayBtn')) $('overlayBtn').classList.add('hidden');
+});
+
+socket.on('player_reconnected', () => {
+    hideOverlay(); // Hide the "Waiting" message
+});
+
+socket.on('sync_match_state', (data) => {
+    // 1. Update your local game state to match the server
+    state = data.state;
+    currentPlayer = data.turn;
+    turnDeadline = data.turnDeadline;
+    
+    // 2. Redraw the board
+    setAllPiecesVisible(true); // Temporarily show all to sync
+    setTimeout(() => setAllPiecesVisible(false), 2000);
+    
+    hideOverlay();
+    inputLocked = (currentPlayer !== myOnlineRole);
 });
 
 socket.on('roles_finalized', ({ hostId, guestId }) => {
