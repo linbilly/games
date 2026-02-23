@@ -234,6 +234,10 @@ function declineOnlineMatch() {
 
 function setupOnlineGame(data) {
     hideOverlay();
+
+    if ($('overlayBtn')) $('overlayBtn').onclick = null;
+    if ($('overlayBtn2')) $('overlayBtn2').onclick = null;
+
     isOnline = true;
     mode = 'pvp';
     onlineMatchId = data.matchId;
@@ -662,14 +666,21 @@ function hideOverlay() {
 
 function quitGame() {
     if (isOnline && onlineMatchId && !gameOver) {
-        // Tell the server "I give up"
         socket.emit('leave_room', { matchId: onlineMatchId });
     }
     
-    // Clean up local memory
     localStorage.removeItem('active_match_id');
     gameOver = true;
     if (localTickInterval) clearInterval(localTickInterval);
+    
+    // FIX 3: Completely wipe the memory slate so new games start fresh
+    onlineMatchId = null;
+    isOnline = false;
+    swap2Phase = 0;
+    openingStones = [];
+    meterPos = 0;
+    boardEl.classList.remove('reveal'); // Just in case a mistake was active
+    
     showLandingPage();
 }
 
@@ -968,7 +979,8 @@ function showP1FinalChoice() {
   whiteBtn.className = "btn ghost";
   whiteBtn.textContent = "Play as White";
   whiteBtn.onclick = () => { 
-      if (isOnline) socket.emit('swap2_decision', { matchId: onlineMatchId, decision: 'stay', role: 2 });
+      // FIX 1: To play as White (Role 2), Player 1 MUST swap roles with the Guest!
+      if (isOnline) socket.emit('swap2_decision', { matchId: onlineMatchId, decision: 'swap' });
       else finalizeRoles(P2); 
   };
 
@@ -976,7 +988,8 @@ function showP1FinalChoice() {
   card.insertBefore(btnContainer, btnRow);
 
   overlayBtn.onclick = () => { 
-      if (isOnline) socket.emit('swap2_decision', { matchId: onlineMatchId, decision: 'swap', role: 1 });
+      // FIX 1 (Cont): To play as Black (Role 1), Player 1 stays as the Host!
+      if (isOnline) socket.emit('swap2_decision', { matchId: onlineMatchId, decision: 'stay' });
       else finalizeRoles(P1); 
   };
 }
@@ -1016,16 +1029,15 @@ function onCellClick(r, c) {
 function confirmPlacement() {
     if (selectedR === null || selectedC === null || gameOver || inputLocked) return;
 
-    // Lock in the coordinates
     const r = selectedR;
     const c = selectedC;
-
-    // Immediately hide the cursor and button so they don't click it twice
     clearSelection();
 
-    // 1. ONLINE MULTIPLAYER INTERCEPTION
     if (isOnline) {
-        if (currentPlayer !== myOnlineRole) return; 
+        // Explicitly allow P1 to move if Phase 1 is active, regardless of currentPlayer
+        const isMyOpening = (swap2Phase === 1 && myOnlineRole === 1) || (swap2Phase === 3 && myOnlineRole === 2);
+        
+        if (!isMyOpening && currentPlayer !== myOnlineRole) return; 
         
         if (isOccupied(r, c)) { 
             socket.emit('commit_mistake', { matchId: onlineMatchId }); 
@@ -1177,6 +1189,10 @@ function executeResume(syncTime) {
 
   mistakeResumeArmed = false;
 
+  // FIX 1: Auto-dismiss the overlay if the opponent already resumed!
+  hideOverlay();
+  if ($('overlayBtn')) $('overlayBtn').onclick = null;
+
   // FIX: Reset all existing pieces to the sync time. 
   // This forces them to respect the vanish timer and fade out gracefully!
   for (let i = 0; i < state.length; i++) {
@@ -1223,25 +1239,18 @@ function handleMistake(customMsg, offender = currentPlayer) {
   const bodyMessage = customMsg ? `${customMsg}.` : `${actorText} clicked an occupied square.`;
 
   const title = hitEnd ? "Penalty!" : "Mistake";
-  const msg = hitEnd
+  
+  // UX Tweak: Tell the innocent player they are just waiting
+  let msg = hitEnd
     ? `Three strikes! ${bodyMessage} ${actorText} forfeit this move.`
     : `${bodyMessage} The board is revealed for review. Close this message, then play a piece to continue.`;
+    
+  if (!hitEnd && isOnline && offender !== myOnlineRole) {
+      msg = `${bodyMessage} The board is revealed. Waiting for opponent to resume...`;
+  }
 
   showOverlay(title, msg, "Close");
 
-  const resumeGame = () => {
-    if (hitEnd) return;
-    
-    if (isOnline) {
-      // Tell the server we are ready to resume
-      socket.emit('resume_game', { matchId: onlineMatchId });
-    } else {
-      // Local play: just resume immediately
-      executeResume(Date.now());
-    }
-  };
-
-  // Fetch the LIVE button from the DOM
   const mainBtn = $('overlayBtn');
   
   if (mainBtn) {
@@ -1265,6 +1274,12 @@ function handleMistake(customMsg, offender = currentPlayer) {
             if (mode === "ai" && currentPlayer === aiPlaysAs && !gameOver) aiMoveSoon();
           }
           return;
+        }
+
+        // FIX 2: Only the OFFENDER is allowed to arm the resume click!
+        if (isOnline && offender !== myOnlineRole) {
+            mistakeResumeArmed = false;
+            return; // Exit here and keep waiting for them to resume
         }
 
         mistakeResumeArmed = true;
@@ -1682,13 +1697,16 @@ socket.on('room_created', (code) => {
 });
 
 socket.on('move_made', (data) => {
-  // 1. Remove placedAtUtc from the destructuring, the server doesn't send it!
-  const { r, c, player, turnDeadline: serverDeadline } = data;
+  const { r, c, player, turnDeadline: serverDeadline, nextTurn } = data;
 
   // Sync the timer
   turnDeadline = serverDeadline;
   
-  // 2. Let placePiece handle the timestamp automatically using local Date.now()
+  // FIX 1: Keep local opening stones synced so UI updates properly!
+  if (ruleMode === 'swap2' && (swap2Phase === 1 || swap2Phase === 3)) {
+      openingStones.push({ r, c, color: player });
+  }
+
   placePiece(r, c, player, { animate: true, sfx: true });
   
   const win = checkWinFrom(r, c, player);
@@ -1697,10 +1715,23 @@ socket.on('move_made', (data) => {
     return; 
   }
   
-  switchTurn();
+  // FIX 2: Trust the server's turn rather than blindly flipping
+  if (nextTurn !== undefined) {
+      currentPlayer = nextTurn;
+      clearSelection();
+      setPills();
+  } else {
+      switchTurn();
+  }
   
-  // Unlock the board only if it's now your turn
-  inputLocked = (currentPlayer !== myOnlineRole);
+  // FIX 3: Accurately manage input lock during Swap2 phases
+  if (ruleMode === 'swap2' && swap2Phase === 1) {
+      inputLocked = (myOnlineRole !== 1);
+  } else if (ruleMode === 'swap2' && swap2Phase === 3) {
+      inputLocked = (myOnlineRole !== 2);
+  } else {
+      inputLocked = (currentPlayer !== myOnlineRole);
+  }
 });
 
 socket.on('turn_forfeited', ({ player }) => {
@@ -1832,6 +1863,7 @@ socket.on('match_over', ({ winnerRole, ratings, reason }) => {
     } else if (mainBtn) {
         // Standard rematch logic
         mainBtn.onclick = () => {
+            mainBtn.onclick = null; // <--- FIX 1: Wipe the memory!
             hideOverlay();
             handleNewGameRequest();
         };
@@ -1864,10 +1896,15 @@ socket.on('match_over', ({ winnerRole, ratings, reason }) => {
 
 socket.on('swap2_choice_required', ({ phase }) => {
     swap2Phase = phase;
+    setPills(); // Refresh the UI to show the phase change
+
     if (phase === 2 && myOnlineRole === 2) {
-        showSwap2ChoiceOverlay(); // Use your existing UI
+        showSwap2ChoiceOverlay(); 
     } else if (phase === 4 && myOnlineRole === 1) {
-        showP1FinalChoice(); // Use your existing UI
+        showP1FinalChoice(); 
+    } else {
+        // FIX 4: If it's not my choice, lock my board!
+        inputLocked = true;
     }
 });
 
@@ -1896,19 +1933,24 @@ socket.on('sync_match_state', (data) => {
 });
 
 socket.on('roles_finalized', ({ hostId, guestId }) => {
-    // Update your role (1=Black, 2=White)
     myOnlineRole = (socket.id === hostId) ? 1 : 2;
 
-    // THE FIX: Explicitly set the Left Side's color based on the swap result
-    // If I created the room, the left side is my color.
-    // If I joined the room, the left side is the opponent's color.
     leftSideRole = isRoomHost ? myOnlineRole : (myOnlineRole === 1 ? 2 : 1);
     
-    swap2Phase = 0; // End opening
-    currentPlayer = 2; // White (P2) moves first after opening
+    swap2Phase = 0; 
+    currentPlayer = 2; 
     
-    // Unlock if the current turn (White) matches your new role
     inputLocked = (myOnlineRole !== 2); 
+    
+    // FIX 2: Update all timestamps to NOW and trigger the CSS Vanish sequence!
+    const now = Date.now();
+    for (let i = 0; i < state.length; i++) { 
+        if (state[i] !== 0) placedAt[i] = now; 
+    }
+    
+    if (vanishMs < 3600000) {
+        setAllPiecesVisible(false);
+    }
     
     hideOverlay();
     clearOverlayButtons();

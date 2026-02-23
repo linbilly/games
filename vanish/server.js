@@ -73,7 +73,9 @@ io.on('connection', (socket) => {
       state: new Array(size * size).fill(0),
       turn: 1, // 1 for P1 (Black), 2 for P2 (White)
       turnDeadline: Date.now() + 30000, // Exactly 30 seconds from now
-      timerInterval: null
+      timerInterval: null, 
+      swap2Phase: ruleMode === 'swap2' ? 1 : 0,
+      openingStones: []
     });
     socket.join(roomCode);
     socket.emit('room_created', roomCode);
@@ -105,48 +107,54 @@ io.on('connection', (socket) => {
 
   socket.on('submit_move', async ({ matchId, r, c }) => {
     const match = activeMatches.get(matchId);
-    if (!match) return;
+    if (!match || match.isOver) return;
 
     const playerRole = (match.host.socketId === socket.id) ? 1 : 2;
     const idx = r * match.size + c;
 
-    // --- SWAP2 SERVER OVERRIDE ---
-    if (match.ruleMode === 'swap2' && (!match.swap2Phase || match.swap2Phase > 0)) {
-        match.openingStones = match.openingStones || [];
-        
-        // Phase 1: Host places first 3 stones
-        if (match.openingStones.length < 3) {
-            if (playerRole !== 1) return; // Only host can place first 3
-            const color = (match.openingStones.length === 1) ? 2 : 1; 
-            executeServerMove(match, r, c, color, matchId);
-            match.openingStones.push({ r, c, color });
-            
-            if (match.openingStones.length === 3) {
-                match.swap2Phase = 2; // Move to Guest Choice phase
-                io.to(matchId).emit('swap2_choice_required', { phase: 2 });
-            }
-            return;
-        }
-        
-        // Phase 3: Guest places 2 more stones
-        if (match.swap2Phase === 3 && match.openingStones.length < 5) {
-            if (playerRole !== 2) return; // Only guest can place these
-            const color = (match.openingStones.length === 3) ? 2 : 1;
-            executeServerMove(match, r, c, color, matchId);
-            match.openingStones.push({ r, c, color });
-            
-            if (match.openingStones.length === 5) {
-                match.swap2Phase = 4; // Move to Host Final Choice phase
-                io.to(matchId).emit('swap2_choice_required', { phase: 4 });
-            }
-            return;
-        }
+    if (match.ruleMode === 'swap2' && (match.swap2Phase === 1 || match.swap2Phase === 3)) {
+      if (match.state[idx] !== 0) return;
+      match.openingStones = match.openingStones || [];
+      
+      if (match.swap2Phase === 1) {
+          if (playerRole !== 1) return;
+          const color = (match.openingStones.length === 1) ? 2 : 1; 
+          
+          // FIX: Pass 'false' for shouldSwitchTurn until the 3rd stone
+          const isLastStone = (match.openingStones.length === 2);
+          executeServerMove(match, r, c, color, matchId, isLastStone);
+          
+          match.openingStones.push({ r, c, color });
+          
+          if (match.openingStones.length === 3) {
+              match.swap2Phase = 2;
+              io.to(matchId).emit('swap2_choice_required', { phase: 2 });
+          }
+          return;
+      }
+      
+      if (match.swap2Phase === 3) {
+          if (playerRole !== 2) return;
+          const color = (match.openingStones.length === 3) ? 2 : 1;
+          
+          // FIX: Pass 'false' for shouldSwitchTurn until the 5th stone
+          const isLastStone = (match.openingStones.length === 4);
+          executeServerMove(match, r, c, color, matchId, isLastStone);
+          
+          match.openingStones.push({ r, c, color });
+          
+          if (match.openingStones.length === 5) {
+              match.swap2Phase = 4;
+              io.to(matchId).emit('swap2_choice_required', { phase: 4 });
+          }
+          return;
+      }
     }
 
     // --- NORMAL MOVE LOGIC ---
     if (match.turn !== playerRole || match.state[idx] !== 0) return;
     executeServerMove(match, r, c, playerRole, matchId);
-  });
+});
 
 
 
@@ -388,20 +396,30 @@ socket.on('reconnect_to_match', ({ matchId, platformId }) => {
 });
 
 
-  // Helper to keep code clean
-  function executeServerMove(match, r, c, playerRole, matchId) {
+function executeServerMove(match, r, c, playerRole, matchId, shouldSwitchTurn = true) {
     const idx = r * match.size + c;
     match.state[idx] = playerRole;
-    match.turn = playerRole === 1 ? 2 : 1;
-    match.turnDeadline = Date.now() + 30000;
-    io.to(matchId).emit('move_made', { r, c, player: playerRole, turnDeadline: match.turnDeadline });
     
-    // Win check (only if not in opening phase)
+    // Only flip the turn if we aren't in the middle of a multi-stone opening phase
+    if (shouldSwitchTurn) {
+        match.turn = playerRole === 1 ? 2 : 1;
+    }
+    
+    match.turnDeadline = Date.now() + 30000;
+    
+    // FIX: Broadcast the ACTUAL next turn so the clients stay perfectly synced
+    io.to(matchId).emit('move_made', { 
+        r, c, 
+        player: playerRole, 
+        turnDeadline: match.turnDeadline,
+        nextTurn: match.turn // <--- ADD THIS
+    });
+    
     if (!match.swap2Phase || match.swap2Phase === 0) {
         const hasWon = checkServerWin(match.state, match.size, 5, r, c, playerRole);
         if (hasWon) handleServerWin(match, playerRole, matchId);
     }
-  }
+}
 
 
   function finalizeOnlineRoles(match, matchId, newHost, newGuest) {
@@ -424,7 +442,9 @@ function startOnlineMatch(p1, p2, size, vanishMs, ruleMode) {
     id: matchId, host: p1, guest: p2, size, vanishMs, ruleMode,
     state: new Array(size * size).fill(0), turn: 1, 
     turnDeadline: Date.now() + 30000, // Exactly 30 seconds from now
-    timerInterval: null
+    timerInterval: null, 
+    swap2Phase: ruleMode === 'swap2' ? 1 : 0,
+    openingStones: []
   };
   activeMatches.set(matchId, match);
 
