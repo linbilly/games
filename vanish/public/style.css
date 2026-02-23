@@ -497,3 +497,56 @@ html, body {
     margin: 10px auto 0 auto; /* Centers it and adds a small gap below the button */
     box-sizing: border-box;
 }
+
+#game-top-bar {
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+#bottom-controls {
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+.info-card {
+    max-width: 450px;
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 207, 64, 0.3); /* Slight gold border */
+}
+
+.info-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #333;
+}
+
+.tab-btn {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #888;
+    padding: 10px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.tab-btn.active {
+    color: #ffcf40;
+    border-bottom: 2px solid #ffcf40;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px;
+    background: rgba(255,255,255,0.03);
+    margin-bottom: 5px;
+    border-radius: 8px;
+}
+
+.btn:disabled {
+    background-color: #333 !important;
+    color: #666 !important;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+    border: 1px solid #444;
+}

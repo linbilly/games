@@ -7,12 +7,14 @@
    - AI opponent for single player: Easy/Medium/Hard
 */
 
+// At the very top of main.js
+const SERVER_URL = 'https://api.bigwgames.com'; 
+const socket = io(SERVER_URL); // Use the variable here!
 
-const socket = io('https://api.bigwgames.com');
 let isOnline = false;
 let onlineMatchId = null;
 let myOnlineRole = null; // 1 (Black) or 2 (White)
-let currentAppleId = "mock_user_123"; // Update this dynamically during login
+let currentPlatformId = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -152,7 +154,7 @@ function confirmStart() {
         socket.emit('create_private_room', { size, vanishMs, ruleMode }); 
     } else if (currentMode === 'online_ladder') {
         startMatchmakingUI();
-        socket.emit('find_global_match', { vanishMs, ruleMode, appleId: currentAppleId });
+        socket.emit('find_global_match', { vanishMs, ruleMode, platformId: currentPlatformId });
     }
 }
 
@@ -344,7 +346,7 @@ function startLocalClocks() {
 
 async function updateLeaderboard() {
   try {
-    const response = await fetch('http://localhost:3000/leaderboard');
+    const response = await fetch(`${SERVER_URL}/leaderboard`);
     if (!response.ok) return;
     
     const players = await response.json();
@@ -366,65 +368,78 @@ async function updateLeaderboard() {
 
 async function initializeUser() {
   const isNative = window.Capacitor && Capacitor.isNativePlatform();
-  let userData = { playerId: "mock_user_123", displayName: "BrowserDev" };
+  const platform = isNative ? Capacitor.getPlatform() : 'web'; 
+  
+  // Default guest data
+  let userData = { 
+    playerId: "guest_" + Math.random().toString(36).substr(2, 9), 
+    displayName: "Guest",
+    platform: platform 
+  };
+
+  if (isNative) {
+    try {
+      if (platform === 'ios') {
+        const GameCenter = Capacitor.Plugins.GameServices;
+        const auth = await GameCenter.signIn();
+        userData.playerId = auth.player_id;
+        userData.displayName = auth.player_name;
+      } else if (platform === 'android') {
+        // Ensure you have @capacitor-community/google-play-games installed
+        const GPlay = Capacitor.Plugins.GooglePlayGames;
+        const auth = await GPlay.signIn();
+        userData.playerId = auth.playerId;
+        userData.displayName = auth.displayName;
+      }
+    } catch (err) { 
+      console.error("Native Auth failed, proceeding as guest:", err); 
+    }
+  }
 
   try {
-    const response = await fetch('http://localhost:3000/auth/gamecenter', {
+    const response = await fetch(`${SERVER_URL}/auth/provider`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData)
     });
 
-    // --- ADD THIS LOGGING ---
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Server Error Response:", errorText);
-      return;
-    }
+    if (!response.ok) throw new Error("Server authentication failed");
 
     const dbUser = await response.json();
+    
+    // Store globally for the "Additional Info" overlay
     currentUser = dbUser.username;
-    console.log(`Logged in as: ${currentUser}`);
-  } catch (err) {
-    console.error("Fetch failed entirely:", err);
-  }
+    currentPlatformId = dbUser.platform_id; 
+    myRating = dbUser.rating_15_standard; 
+    myWins = dbUser.wins || 0;
+    myLosses = dbUser.losses || 0;
 
-  if (isNative) {
-    try {
-      // 1. Use the correct GameServices plugin name
-      const GameCenter = Capacitor.Plugins.GameServices; 
-      
-      if (!GameCenter) {
-          throw new Error("GameServices plugin is not registered.");
-      }
-
-      // 2. The API call remains exactly the same!
-      const authResult = await GameCenter.signIn();
-      
-      userData = { 
-          playerId: authResult.player_id, 
-          displayName: authResult.player_name 
-      };
-      console.log("Native Game Center Login Success!", userData);
-
-    } catch (err) {
-      console.error("Native login failed:", err);
+    console.log(`Authenticated as ${currentUser}. Rating: ${Math.round(myRating)}`);
+    
+    // Refresh UI elements
+    const welcomeText = document.getElementById('welcome-text');
+    if (welcomeText) welcomeText.innerText = `Welcome, ${currentUser}`;
+    
+    updateLeaderboard(); 
+} catch (err) {
+    console.error("Auth fetch failed:", err);
+    document.getElementById('welcome-text').innerText = "Offline Mode";
+    
+    // Disable the online buttons when the server can't be reached
+    const privateBtn = document.getElementById('btn-online-private');
+    const ladderBtn = document.getElementById('btn-online-ladder');
+    
+    if (privateBtn) {
+        privateBtn.disabled = true;
+        privateBtn.innerText = "Private Room (Offline)";
+    }
+    
+    if (ladderBtn) {
+        ladderBtn.disabled = true;
+        ladderBtn.innerText = "Online Ladder (Offline)";
+        ladderBtn.classList.remove('highlight-btn'); // Remove the gold highlight
     }
   }
-
-  const response = await fetch('http://localhost:3000/auth/gamecenter', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userData)
-  });
-
-  const dbUser = await response.json();
-  currentUser = dbUser.username;
-  myRating = dbUser.rating; //
-  
-  // Update UI with ranking
-  console.log(`Authenticated as ${currentUser}. Rating: ${Math.round(myRating)}`);
-  updateLeaderboard(); 
 }
 
 function ensureAudio() {
@@ -1074,6 +1089,33 @@ function placePiece(r, c, player, { animate = false, sfx = false, absoluteTime =
   }
 }
 
+function openInfoOverlay() {
+    $('info-overlay').classList.remove('hidden');
+    updateLeaderboard(); // Refresh global rankings
+    updateMyStatsUI();   // Show current user's ELO and stats
+}
+
+function closeInfoOverlay() {
+    $('info-overlay').classList.add('hidden');
+}
+
+function updateMyStatsUI() {
+    // These values should be stored globally in main.js after your auth call
+    $('stat-username').innerText = currentUser || "Guest";
+    $('stat-elo').innerText = Math.round(myRating) || 1500;
+    // Assuming you update these variables when the user logs in
+    $('stat-wins').innerText = myWins || 0;
+    $('stat-losses').innerText = myLosses || 0;
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    
+    $(`tab-${tab}`).classList.remove('hidden');
+    event.currentTarget.classList.add('active');
+}
+
 function executeResume(syncTime) {
   // Prevent double-resumes if both players click at the exact same time
   if (!boardEl.classList.contains("reveal")) return; 
@@ -1427,6 +1469,10 @@ function finalizeRoles(winnerOfOpening) {
   currentPlayer = P2; 
   setPills();
   if (mode === "ai" && currentPlayer === aiPlaysAs) aiMoveSoon();
+}
+
+function tabToRules() {
+    switchTab('rules');
 }
 
 function newGame() {

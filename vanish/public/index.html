@@ -18,11 +18,14 @@
     <h2 id="welcome-text">Logging in...</h2>
 
     <div id="main-menu" class="menu-container">
-        <button class="btn" onclick="selectMode('local_pvp')">Local PvP Game</button>
-        <button class="btn" onclick="selectMode('local_ai')">Local AI Game</button>
-        <button class="btn" onclick="selectMode('online_private')">Online Private Room</button>
-        <button class="btn highlight-btn" onclick="selectMode('online_ladder')">Online Ladder</button>
-    </div>
+    <button class="btn" onclick="selectMode('local_pvp')">Local PvP Game</button>
+    <button class="btn" onclick="selectMode('local_ai')">Local AI Game</button>
+    
+    <button id="btn-online-private" class="btn" onclick="selectMode('online_private')">Online Private Room</button>
+    <button id="btn-online-ladder" class="btn highlight-btn" onclick="selectMode('online_ladder')">Online Ladder</button>
+    
+    <button class="btn ghost" onclick="openInfoOverlay()">Profile & Rankings</button>
+</div>
 
     <div id="sub-menu" class="menu-container hidden">
         <h3 id="mode-title">Settings</h3>
@@ -139,6 +142,39 @@
         <button class="btn" style="margin-bottom: 10px;" onclick="acceptOnlineMatch()">Accept Match</button>
         <button class="btn ghost" onclick="declineOnlineMatch()">Decline</button>
     </div>
+</div>
+
+<div id="info-overlay" class="modal-overlay hidden">
+    <div class="modal-content info-card">
+        <div class="info-tabs">
+            <button class="tab-btn active" onclick="switchTab('rankings')">Rankings</button>
+            <button class="tab-btn" onclick="switchTab('stats')">My Stats</button>
+            <button class="tab-btn" onclick="tabToRules()">Rules</button>
+        </div>
+
+        <div id="tab-rankings" class="tab-content">
+            <h3>World Rankings</h3>
+            <ul id="leaderboardList" class="leaderboard-list">
+                </ul>
+        </div>
+
+        <div id="tab-stats" class="tab-content hidden">
+            <h3>My Profile</h3>
+            <div class="stat-row"><span>Username:</span> <span id="stat-username">-</span></div>
+            <div class="stat-row"><span>Standard ELO:</span> <span id="stat-elo">-</span></div>
+            <div class="stat-row"><span>Wins:</span> <span id="stat-wins">0</span></div>
+            <div class="stat-row"><span>Losses:</span> <span id="stat-losses">0</span></div>
+        </div>
+
+        <button class="btn ghost" style="margin-top: 20px;" onclick="closeInfoOverlay()">Close</button>
+    </div>
+    <div id="tab-rules" class="tab-content hidden" style="text-align: left; padding: 10px;">
+    <h3>How to Play</h3>
+    <p><strong>Standard:</strong> Connect 5 stones in a row (horizontally, vertically, or diagonally) to win.</p>
+    <p><strong>Vanish:</strong> Stones disappear from sight after a few seconds. You must remember where they are!</p>
+    <p><strong>Renju:</strong> Black (P1) has restricted moves (no double-threes or double-fours) to balance the game.</p>
+    <p><strong>Swap2:</strong> A professional opening where P1 places 3 stones, and P2 chooses to stay, swap colors, or place 2 more.</p>
+</div>
 </div>
 
 <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>

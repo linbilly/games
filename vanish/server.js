@@ -36,15 +36,6 @@ app.use(express.static('public')); // Existing line
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-// Database connection (Update password to your postgres password)
-const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'vanish_db',
-  password: 'DoubleMajor', 
-  port: 8001,
-});
-
 // In-memory game state for fast validation
 const activeMatches = new Map();
 const matchmakingQueue = [];
@@ -54,8 +45,8 @@ io.on('connection', (socket) => {
   let currentUser = `Guest_${Math.floor(Math.random()*1000)}`; // Mock user auth
 
   // --- 1. GLOBAL MATCHMAKING (15x15 Only) ---
-  socket.on('find_global_match', ({ vanishMs, ruleMode, appleId }) => {
-    const request = { socketId: socket.id, username: currentUser, appleId, vanishMs, ruleMode };
+  socket.on('find_global_match', ({ vanishMs, ruleMode, platformId }) => {
+    const request = { socketId: socket.id, username: currentUser, platformId, vanishMs, ruleMode };
 
     // Look for an exact match (simplified for MVP)
     const matchIndex = matchmakingQueue.findIndex(p => p.vanishMs === vanishMs && p.ruleMode === ruleMode);
@@ -222,7 +213,7 @@ io.on('connection', (socket) => {
     matchmakingQueue.unshift({
         socketId: innocentPlayer.socketId, 
         username: innocentPlayer.username, 
-        appleId: innocentPlayer.appleId, // <--- ADD THIS LINE
+        platformId: innocentPlayer.platformId, // <--- ADD THIS LINE
         vanishMs: match.vanishMs, 
         ruleMode: match.ruleMode 
     });
@@ -404,10 +395,10 @@ function startMatchTimer(matchId) {
       io.to(matchId).emit('timeout_loss', { loserRole, winnerRole });
 
       // Update Glicko-2 ratings in DB
-      if (winner.appleId && loser.appleId) {
+      if (winner.platformId && loser.platformId) {
           // We wrap this in an async IIFE or handle the promise to avoid blocking the interval
           (async () => {
-              const ratingData = await finalizeMatchRatings(winner.appleId, loser.appleId, currentMatch.vanishMs);
+              const ratingData = await finalizeMatchRatings(winner.platformId, loser.platformId, currentMatch.vanishMs);
               
               if (ratingData) {
                   io.to(matchId).emit('match_over', {
@@ -463,9 +454,9 @@ function handleServerWin(match, winningPlayerRole, matchId) {
     const loser = loserRole === 1 ? match.host : match.guest;
 
     // 3. Process Ratings if both players are authenticated (Apple ID exists)
-    if (winner.appleId && loser.appleId) {
+    if (winner.platformId && loser.platformId) {
         (async () => {
-            const ratingData = await finalizeMatchRatings(winner.appleId, loser.appleId, match.vanishMs);
+            const ratingData = await finalizeMatchRatings(winner.platformId, loser.platformId, match.vanishMs);
             
             io.to(matchId).emit('match_over', {
                 winnerRole: winningPlayerRole,
@@ -483,9 +474,9 @@ function handleServerWin(match, winningPlayerRole, matchId) {
     }
 }
 
-async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
+async function finalizeMatchRatings(winnerplatformId, loserplatformId, vanishMs) {
     // GUARD CLAUSE: Unranked/private match
-    if (!winnerAppleId || !loserAppleId) return null;
+    if (!winnerplatformId || !loserplatformId) return null;
 
     // Map the vanish setting to your specific column
     let ratingCol = 'rating_15_standard';
@@ -493,8 +484,8 @@ async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
     if (vanishMs === 10000) ratingCol = 'rating_15_10s';
 
     try {
-        const winnerRes = await pool.query('SELECT * FROM users WHERE apple_id = $1', [winnerAppleId]);
-        const loserRes = await pool.query('SELECT * FROM users WHERE apple_id = $1', [loserAppleId]);
+        const winnerRes = await pool.query('SELECT * FROM users WHERE platform_id = $1', [winnerplatformId]);
+        const loserRes = await pool.query('SELECT * FROM users WHERE platform_id = $1', [loserplatformId]);
 
         const winner = winnerRes.rows[0];
         const loser = loserRes.rows[0];
@@ -512,7 +503,7 @@ async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
             ${ratingCol} = ${ratingCol} + $1, 
             rd = GREATEST(30, rd * 0.95), 
             wins = wins + 1 
-            WHERE apple_id = $2`, [gain, winnerAppleId]
+            WHERE platform_id = $2`, [gain, winnerplatformId]
         );
             
         // Update Loser
@@ -520,7 +511,7 @@ async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
             UPDATE users SET 
             ${ratingCol} = ${ratingCol} - $1, 
             losses = losses + 1 
-            WHERE apple_id = $2`, [gain, loserAppleId]
+            WHERE platform_id = $2`, [gain, loserplatformId]
         );
 
         // CRITICAL: Return this data so the socket can send it to the frontend!
@@ -540,9 +531,9 @@ async function finalizeMatchRatings(winnerAppleId, loserAppleId, vanishMs) {
 app.get('/leaderboard', async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT username, rating, wins, losses 
+            SELECT username, rating_15_standard, wins, losses 
             FROM users 
-            ORDER BY rating DESC 
+            ORDER BY rating_15_standard DESC 
             LIMIT 10
         `);
         res.json(result.rows);
@@ -552,11 +543,18 @@ app.get('/leaderboard', async (req, res) => {
     }
 });
 
-app.post('/auth/gamecenter', async (req, res) => {
-  const { playerId, displayName } = req.body; // main.js sends playerId
+app.post('/auth/provider', async (req, res) => {
+  const { playerId, displayName, platform } = req.body; // 'apple' or 'android'
   try {
-    let result = await pool.query('SELECT * FROM users WHERE apple_id = $1', [playerId]);
-    // ... rest of your insertion logic
+    let result = await pool.query('SELECT * FROM users WHERE platform_id = $1', [playerId]);
+    
+    if (result.rows.length === 0) {
+      // New user registration
+      result = await pool.query(
+        'INSERT INTO users (platform_id, username, platform_type) VALUES ($1, $2, $3) RETURNING *',
+        [playerId, displayName, platform]
+      );
+    }
     res.json(result.rows[0]);
   } catch (err) {
     console.error("Auth error", err);
