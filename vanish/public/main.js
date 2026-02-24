@@ -1,4 +1,4 @@
-/* Vanish - full game
+/* Memory Gomoku - full game
    - 3x3 connect 3 (tic tac toe)
    - 8x8 connect 5
    - 12x12 connect 5
@@ -10,7 +10,7 @@
 // At the very top of main.js
 // This checks if you are testing on your computer vs the live app
 const isLocal = window.location.hostname === 'localhost' || window.location.protocol === 'file:';
-const SERVER_URL = isLocal ? 'http://localhost:3000' : 'https://api.bigwgames.com'; 
+const SERVER_URL = isLocal ? 'http://localhost:3000' : 'https://playgomoku.bigwgames.com'; 
 const socket = io(SERVER_URL); // Use the variable here!
 
 let isOnline = false;
