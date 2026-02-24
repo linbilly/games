@@ -632,6 +632,27 @@ app.get('/user/stats/:platformId', async (req, res) => {
     }
 });
 
+// DELETE /user/:platformId - Wipe a user from the database
+app.delete('/user/:platformId', async (req, res) => {
+    try {
+        const platformId = req.params.platformId;
+        
+        // Delete the user from the Supabase database
+        // Note: If you have foreign keys in your 'matches' table, 
+        // you might need 'ON DELETE CASCADE' set up in Supabase.
+        const result = await pool.query('DELETE FROM users WHERE platform_id = $1', [platformId]);
+        
+        if (result.rowCount > 0) {
+            res.json({ success: true, message: "Account deleted successfully." });
+        } else {
+            res.status(404).json({ error: "User not found." });
+        }
+    } catch (err) {
+        console.error("Account deletion error:", err);
+        res.status(500).json({ error: "Failed to delete account." });
+    }
+});
+
 app.post('/auth/provider', async (req, res) => {
   const { playerId, displayName, platform } = req.body; // 'apple' or 'android'
   try {

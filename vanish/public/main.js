@@ -436,6 +436,11 @@ async function initializeUser() {
     myLosses = dbUser.losses || 0;
 
     console.log(`Authenticated as ${currentUser}. Rating: ${Math.round(myRating)}`);
+
+    const deleteBtn = document.getElementById('btn-delete-account');
+    if (deleteBtn) {
+        deleteBtn.onclick = requestAccountDeletion;
+    }
     
     // Refresh UI elements
     const welcomeText = document.getElementById('welcome-text');
@@ -475,6 +480,70 @@ function ensureAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === "suspended") audioCtx.resume();
   audioEnabled = true;
+}
+
+async function requestAccountDeletion() {
+    if (!currentPlatformId) {
+        alert("No active account found to delete.");
+        return;
+    }
+
+    // 1. Ask for confirmation using your polished overlay system
+    showOverlay(
+        "Delete Account", 
+        "Are you absolutely sure? This will permanently erase your username, Elo rating, and match history. This cannot be undone.", 
+        "Delete", 
+        "Cancel", 
+        () => { 
+            // Cancel Action
+            hideOverlay(); 
+            // Reset the primary button color just in case
+            if ($('overlayBtn')) $('overlayBtn').style.backgroundColor = ""; 
+        }
+    );
+
+    // 2. Make the Delete button red so they know it's destructive
+    const mainBtn = $('overlayBtn');
+    if (mainBtn) {
+        mainBtn.style.backgroundColor = "#ff4444"; 
+        mainBtn.style.color = "#fff";
+
+        mainBtn.onclick = async () => {
+            mainBtn.onclick = null;
+            mainBtn.style.backgroundColor = ""; // Reset for future overlays
+            hideOverlay();
+            
+            // Show a loading state
+            showOverlay("Deleting...", "Erasing your account data from the servers...");
+            if ($('overlayBtn')) $('overlayBtn').classList.add('hidden');
+
+            try {
+                // 3. Tell the server to delete the row
+                const response = await fetch(`${SERVER_URL}/user/${currentPlatformId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    // 4. Scrub the local device memory
+                    localStorage.removeItem('vanish_guest_id');
+                    localStorage.removeItem('active_match_id');
+                    localStorage.removeItem('my_platform_id');
+                    localStorage.removeItem('my_role');
+
+                    // 5. Hard reload the app to generate a fresh new Guest session
+                    alert("Your account has been successfully deleted.");
+                    window.location.reload(); 
+                } else {
+                    hideOverlay();
+                    alert("Failed to delete account. Please try again.");
+                }
+            } catch (err) {
+                console.error("Deletion failed:", err);
+                hideOverlay();
+                alert("Network error. Could not reach the server to delete your account.");
+            }
+        };
+    }
 }
 
 function tone({freq=440, type="sine", gain=0.06, dur=0.08, slideTo=null}) {
