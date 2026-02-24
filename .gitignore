@@ -2,3 +2,4 @@ node_modules
 vanish/node_modules
 vanish/node_modules/@capacitor/cli/dist/config.js
 vanish/node_modules/@capacitor/cli/assets/android-template.tar.gz
+vanish/.env
