@@ -9,9 +9,15 @@
 
 // At the very top of main.js
 // This checks if you are testing on your computer vs the live app
-const isLocal = window.location.hostname === 'localhost' || window.location.protocol === 'file:';
-const SERVER_URL = isLocal ? 'http://localhost:3000' : 'https://playgomoku.bigwgames.com'; 
-const socket = io(SERVER_URL); // Use the variable here!
+// 1. Are we running inside the iOS/Android app?
+const isNative = window.Capacitor && window.Capacitor.isNativePlatform();
+
+// 2. Are we testing in a desktop browser? (Ignore 'localhost' if on a phone)
+const isLocalDev = !isNative && (window.location.hostname === 'localhost' || window.location.protocol === 'file:');
+
+// 3. Set the URL securely
+const SERVER_URL = isLocalDev ? 'http://localhost:3000' : 'https://playgomoku.bigwgames.com'; 
+const socket = io(SERVER_URL);
 
 let isOnline = false;
 let onlineMatchId = null;
