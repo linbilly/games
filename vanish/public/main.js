@@ -83,14 +83,8 @@ function showLandingPage() {
 
 // Dynamically scale the CSS Grid board to fit the screen
 function resizeBoard() {
-    const container = $('board-container');
-    const board = $('board');
-    if (!container || !board) return;
-
-    const margin = 30; 
-    const maxSize = Math.min(container.clientWidth, container.clientHeight) - margin;
-    board.style.width = `${maxSize}px`;
-    board.style.height = `${maxSize}px`;
+    // Left intentionally blank. The CSS aspect-ratio and Flexbox 
+    // now handle all responsive scaling flawlessly!
 }
 window.addEventListener('resize', resizeBoard);
 
@@ -318,11 +312,6 @@ function startLocalClocks() {
     // Calculate time remaining
     const timeLeft = Math.max(0, turnDeadline - Date.now());
 
-    // If the board isn't currently revealed (mistake mode) and vanishing is enabled...
-    if (!boardEl.classList.contains("reveal") && vanishMs < 3600000) {
-        // Force a visibility check for all pieces based on their local timestamps
-        setAllPiecesVisible(false); 
-    }
 
     // 1. TIMEOUT LOSS LOGIC
     if (timeLeft <= 0 && !gameOver) {
@@ -755,6 +744,11 @@ function quitGame() {
     openingStones = [];
     meterPos = 0;
     boardEl.classList.remove('reveal'); // Just in case a mistake was active
+
+    // --- ADD THESE THREE LINES ---
+    hideOverlay(); 
+    const restoreBtn = $('restore-overlay-btn');
+    if (restoreBtn) restoreBtn.classList.add('hidden');
     
     showLandingPage();
 }
