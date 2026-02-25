@@ -183,14 +183,6 @@ select { background: rgba(255,255,255,.06); color: var(--text); border: 1px soli
   z-index: 9999; /* Ensure it floats above the bottom buttons */
 }
 
-/* Optional: If they are playing on a huge desktop/iPad screen, 
-   center the modal nicely instead of anchoring it to the floor */
-@media (min-width: 600px) and (min-height: 700px) {
-    .overlay {
-        align-items: center;
-        padding-bottom: 0;
-    }
-}
 
 .overlay.hidden { 
   display: none; 
