@@ -166,16 +166,25 @@ select { background: rgba(255,255,255,.06); color: var(--text); border: 1px soli
 
 /* --- Floating Bottom Overlay --- */
 .overlay { 
-  position: absolute; 
+  position: fixed; /* Breaks out of the board container to use the whole screen */
   inset: 0; 
   display: flex; 
-  align-items: flex-end; /* Push the card to the bottom of the board */
+  align-items: flex-end; /* Drops the card into the empty space at the bottom */
   justify-content: center; 
-  padding-bottom: 24px;
-  /* Gradient backdrop: completely clear at the top, dark at the bottom for text contrast */
-  background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.2) 60%, rgba(0,0,0,0.8) 100%); 
-  border-radius: 2px; 
-  z-index: 100; 
+  padding-bottom: max(24px, env(safe-area-inset-bottom)); /* iPhone safe area */
+  
+  /* Solid dimming over the whole app to focus the user on the popup */
+  background: rgba(0, 0, 0, 0.65); 
+  z-index: 9999; /* Ensure it floats above the bottom buttons */
+}
+
+/* Optional: If they are playing on a huge desktop/iPad screen, 
+   center the modal nicely instead of anchoring it to the floor */
+@media (min-width: 600px) and (min-height: 700px) {
+    .overlay {
+        align-items: center;
+        padding-bottom: 0;
+    }
 }
 
 .overlay.hidden { 
