@@ -14,9 +14,9 @@ try {
 
 // 2. ENGINE CONFIGURATION
 const AI_CONFIGS = {
-    "easy":   { depth: 2, candidates: 3,  timeMs: 400,  forgetBase: 0.30 }, 
-    "medium": { depth: 4, candidates: 6,  timeMs: 800,  forgetBase: 0.12 },
-    "hard":   { depth: 6, candidates: 10, timeMs: 2000, forgetBase: 0.04 },
+    "easy":   { depth: 2, candidates: 3,  timeMs: 400,  forgetBase: 0.12 }, 
+    "medium": { depth: 4, candidates: 6,  timeMs: 800,  forgetBase: 0.04 },
+    "hard":   { depth: 6, candidates: 10, timeMs: 2000, forgetBase: 0.02 },
     "expert": { depth: 8, candidates: 14, timeMs: 3000, forgetBase: 0.00 }
 };
 
@@ -101,7 +101,8 @@ function calculateSwap2Choice(state, config) {
     if (currentScore > 80000) return { action: 'take_black' };
     if (currentScore < -80000) return { action: 'take_white' };
 
-    let bestEval = -Infinity, bestPair = null;
+    // THE FIX: Start at Infinity and look for the score closest to 0
+    let bestEval = Infinity, bestPair = null;
     const whiteCandidates = generateCandidates(state, P2, P1, config.candidates); 
     
     for (let w of whiteCandidates) {
@@ -113,7 +114,9 @@ function calculateSwap2Choice(state, config) {
             state[idx(b.r, b.c)] = P1;
             
             const evalScore = Math.abs(evaluatePosition(state, P1)); 
-            if (evalScore > bestEval) {
+            
+            // THE FIX: Looking for the SMALLEST gap (< instead of >)
+            if (evalScore < bestEval) {
                 bestEval = evalScore;
                 bestPair = { white: w, black: b };
             }

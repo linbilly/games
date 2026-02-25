@@ -48,6 +48,13 @@ aiWorker.onmessage = function(e) {
             finalizeRoles(P2);
         } else if (data.decision.action === 'place_two') {
             const pair = data.decision.pair;
+            
+            // THE FIX: Tell the game we are now in Phase 3 so the moves aren't ignored
+            swap2Phase = 3;
+            currentPlayer = P2;
+            if (!isOnline) turnDeadline = Date.now() + 30000;
+            setPills();
+
             setTimeout(() => {
                 handleSwap2Move(pair.white.r, pair.white.c);
                 setTimeout(() => {
@@ -997,10 +1004,15 @@ function handleSwap2Move(r, c) {
 
         if (openingStones.length === 3) {
             swap2Phase = 2;
+            
+            // THE FIX: Officially pass the turn to Player 2 and reset their timer!
+            currentPlayer = P2;
+            if (!isOnline) turnDeadline = Date.now() + 30000;
+            setPills(); 
+
             inputLocked = true; // Lock while choosing!
             
             if (mode === "ai" && aiPlaysAs === P2) {
-                // THE FIX: Trigger the worker request through our new aiMoveSoon function
                 aiMoveSoon(); 
             } else {
                 showSwap2ChoiceOverlay();
@@ -1013,10 +1025,15 @@ function handleSwap2Move(r, c) {
 
         if (openingStones.length === 5) {
             swap2Phase = 4;
+            
+            // THE FIX: Officially pass the turn back to Player 1 and reset their timer!
+            currentPlayer = P1;
+            if (!isOnline) turnDeadline = Date.now() + 30000;
+            setPills();
+
             inputLocked = true; // Lock while deciding!
             
             if (mode === "ai" && aiPlaysAs === P1) {
-                // THE FIX: Send a special message to the worker to evaluate the board
                 aiWorker.postMessage({
                     type: 'request_phase4_eval',
                     state: state,
