@@ -53,11 +53,13 @@ select { background: rgba(255,255,255,.06); color: var(--text); border: 1px soli
     border-radius: 2px;
     box-shadow: var(--shadow), inset 0 0 100px rgba(0,0,0,0.3);
     
-    /* NEW: Force it to stay square and scale naturally within the container */
-    height: 100%;
-    max-height: 100%;
-    max-width: 100%;
+    /* THE FIX: Take up 100% of the width, UNLESS 60% of the screen height is smaller. */
+    /* This guarantees it never pushes the buttons off screen, and never bleeds off the sides */
+    width: min(100%, 60dvh); 
     aspect-ratio: 1 / 1;
+    
+    /* Remove any height or max-height properties you had here previously */
+    margin: 0 auto; 
 }
 
 .board-wrap.no-border { 
