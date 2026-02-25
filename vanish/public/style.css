@@ -559,3 +559,78 @@ html, body {
     transform: none;
     border: 1px solid #444;
 }
+
+/* =========================================
+   MOBILE OVERLAY & MENU OPTIMIZATIONS
+   ========================================= */
+
+/* 1. Make all menus scrollable if the screen is too short */
+.modal-content, 
+.overlay-card, 
+.menu-container {
+    max-height: 85dvh; /* Prevents it from touching the absolute top/bottom */
+    overflow-y: auto;  /* Turns on vertical scrolling if content is too tall */
+    overscroll-behavior: contain; /* Stops the background board from scrolling */
+    scrollbar-width: thin; /* Slim scrollbar for Firefox */
+}
+
+/* Custom slim scrollbar for Chrome/Safari */
+.modal-content::-webkit-scrollbar, 
+.overlay-card::-webkit-scrollbar, 
+.menu-container::-webkit-scrollbar {
+    width: 6px;
+}
+.modal-content::-webkit-scrollbar-thumb, 
+.overlay-card::-webkit-scrollbar-thumb, 
+.menu-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+}
+
+/* 2. Compact mode for very small screens (Width < 400px OR Height < 650px) */
+@media (max-width: 400px), (max-height: 650px) {
+    
+    /* Shrink the massive 24px/30px padding down to save horizontal space */
+    .modal-content, .overlay-card {
+        padding: 15px;
+        width: 95%; 
+    }
+    
+    .menu-container {
+        width: 95%;
+        gap: 10px; /* Tighter vertical spacing */
+    }
+
+    /* Make the settings rows more compact */
+    .option-group {
+        padding: 8px 10px;
+        /* If the label + dropdown is too wide, allow them to stack */
+        flex-wrap: wrap; 
+        gap: 5px;
+    }
+
+    /* Shrink the headers and text */
+    .overlay-title, #mode-title, h2, h3 {
+        font-size: 18px; 
+        margin-bottom: 8px;
+        margin-top: 0;
+    }
+
+    .overlay-body, p {
+        font-size: 14px;
+        margin-bottom: 15px;
+    }
+    
+    /* Slim down the buttons */
+    .btn {
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+    
+    /* Ensure the Rankings list doesn't blow out the height */
+    .tab-content {
+        max-height: 50dvh;
+        overflow-y: auto;
+        padding-right: 5px;
+    }
+}
