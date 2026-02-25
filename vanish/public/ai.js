@@ -1,414 +1,424 @@
-/* Vanish - AI Engine */
-
-
-  
-
+/* Vanish - Professional Gomoku AI Engine 
+ * Features: Alpha-Beta Pruning, Exact Shape Recognition, Renju Trap Awareness, Center-Bias Tiebreaking
+ */
 
 (() => {
-  'use strict';
-  const AI_CONFIGS = {
-    "easy":   { depth: 2, candidates: 2,  timeMs: 400,  forgetBase: 0.30 }, // High forgetfulness, narrow vision
-    "medium": { depth: 4, candidates: 6,  timeMs: 800,  forgetBase: 0.12 },
-    "hard":   { depth: 6, candidates: 12, timeMs: 2500, forgetBase: 0.04 },
-        // Expert: Massive depth, wide candidate net, hard capped at 3000ms. 0 forgetfulness.
-    "expert": { depth: 12, candidates: 16, timeMs: 3000, forgetBase: 0.00 }
-  };
-
-  function getAIParams() {
-    return AI_CONFIGS[window.aiLevel || "medium"] || AI_CONFIGS["medium"];
-  }
-
-  function chooseAiMove() {
+    'use strict';
     
-    if (ruleMode === "swap2" && swap2Phase === 2) {
-      return aiSwap2Choice();
-    }
-    
-    const me = aiPlaysAs;
-    const opp = (me === P1) ? P2 : P1;
+    // Engine Configuration
+    const AI_CONFIGS = {
+        // Easy: Shallow depth, forgets pieces easily, narrow vision
+        "easy":   { depth: 2, candidates: 3,  timeMs: 400,  forgetBase: 0.30 }, 
+        // Medium: Standard lookahead, forgets pieces occasionally
+        "medium": { depth: 4, candidates: 6,  timeMs: 800,  forgetBase: 0.12 },
+        // Hard: Deep calculation, rarely forgets
+        "hard":   { depth: 6, candidates: 10, timeMs: 2000, forgetBase: 0.04 },
+        // Expert: Massive depth, wide candidate net, perfect memory (0 forgetfulness)
+        "expert": { depth: 8, candidates: 14, timeMs: 3000, forgetBase: 0.00 }
+    };
 
-    const tactic = findImmediateTactic(state, me, opp);
-    if (tactic) return tactic;
+    // Professional Gomoku Shape Scores
+    const SCORES = {
+        WIN: 100000000,
+        OPEN_FOUR: 10000000,
+        CLOSED_FOUR: 100000,
+        OPEN_THREE: 50000,
+        CLOSED_THREE: 1000,
+        OPEN_TWO: 500,
+        CLOSED_TWO: 50
+    };
 
-    const best = alphaBetaBestMove(getAIParams());
-    return best || randomEmptyMove();
-  }
-
-  function aiSwap2Choice() {
-    const currentScore = evaluatePosition(state, P1); 
-    
-    if (currentScore > 1200) {
-      finalizeRoles(P1); 
-      return null; 
-    } else if (currentScore < -1200) {
-      finalizeRoles(P2); 
-      return null;
+    function getAIParams() {
+        return AI_CONFIGS[window.aiLevel || "medium"] || AI_CONFIGS["medium"];
     }
 
-    // Set the globals directly without 'window.'
-    swap2Phase = 3;
-    inputLocked = true;
+    // --- 1. MAIN ENTRY POINTS (Signatures perfectly match old ai.js) ---
 
-    const bestPair = findBestSwap2Pair();
-    
-    if (bestPair) {
-      setTimeout(() => {
-        handleSwap2Move(bestPair.white.r, bestPair.white.c);
-        setTimeout(() => {
-          handleSwap2Move(bestPair.black.r, bestPair.black.c);
-        }, 600);
-      }, 600);
-    } else {
-      // Defensive fallback if AI generator fails
-      finalizeRoles(P2);
-    }
-    
-    return null; 
-  }
-
-  function getAiPerceivedState(forgetBase){
-    if (boardEl.classList.contains("reveal") || vanishMs >= 3600000) return state;
-
-    // FIX: Match main.js by using Date.now() instead of performance.now()
-    const now = Date.now(); 
-    const dt = Math.max(0, now - lastRevealAt);
-    const t = Math.max(0, Math.min(1, dt / 15000));
-    const p = forgetBase * t;
-
-    if (p <= 0.0001) return state;
-
-    const me = aiPlaysAs;
-    const opp = (me === P1) ? P2 : P1;
-    const s = state.slice();
-
-    for (let i=0; i<s.length; i++){
-      if (s[i] === opp){
-        const age = Math.max(0, now - (placedAt[i] || 0));
-        const ageFactor = Math.max(0.35, Math.min(1, age / 8000));
-        // The AI rolls the dice to see if it forgets this opponent's piece
-        if (Math.random() < p * ageFactor) s[i] = 0; 
-      }
-    }
-    return s;
-  }
-
-  function alphaBetaBestMove({timeMs, depth, candidates, forgetBase}){
-    const me = aiPlaysAs;
-    const opp = (me === P1) ? P2 : P1;
-    const deadline = performance.now() + timeMs;
-    const rootState = getAiPerceivedState(forgetBase);
-
-    const immediate = findImmediateTactic(rootState, me, opp);
-    if (immediate) return immediate;
-
-    let bestMove = null;
-    let bestScore = -Infinity;
-    let rootMoves = generateCandidates(rootState, me, candidates);
-    if (!rootMoves.length) return randomEmptyMove();
-
-    for (let d=1; d<=depth; d++){
-      const res = negamaxRoot(rootState, d, deadline, me, opp, rootMoves, candidates);
-      if (res.timedOut) break;
-      if (res.bestMove){
-        bestMove = res.bestMove;
-        bestScore = res.bestScore;
-        if (bestScore > 900000) break;
-      }
-    }
-
-    return bestMove || {r:rootMoves[0].r, c:rootMoves[0].c} || randomEmptyMove();
-  }
-
-  function findImmediateTactic(s, me, opp){
-    const isRenju = (ruleMode === "renju" || ruleMode === "swap2");
-
-    for (let r=0; r<size; r++){
-      for (let c=0; c<size; c++){
-        const k = idx(r,c);
-        if (s[k] !== 0) continue;
-
-        if (isRenju && me === P1) {
-          s[k] = P1;
-          const res = window.violatesRenju(r, c, 1, s); 
-          s[k] = 0;
-          if (!res.isValid) continue; 
+    function chooseAiMove(currentState = state, currentPlayer = aiPlaysAs) {
+        if (ruleMode === "swap2" && swap2Phase === 2) {
+            return aiSwap2Choice();
         }
 
-        s[k] = me;
-        const w1 = checkWinFrom(r,c,me);
-        s[k] = 0;
-        if (w1) return {r,c};
+        const me = currentPlayer;
+        const opp = (me === P1) ? P2 : P1;
+        const config = getAIParams();
 
-        if (isRenju && opp === P1) {
-          s[k] = P1;
-          const res = window.violatesRenju(r, c, 1, s);
-          s[k] = 0;
-          if (!res.isValid) continue;
+        // 1. Failsafe: If the board is totally empty, play the exact center (Deterministic, no random)
+        if (!currentState.includes(1) && !currentState.includes(2)) {
+            return getCenterMove();
         }
 
-        s[k] = opp;
-        const w2 = checkWinFrom(r,c,opp);
-        s[k] = 0;
-        if (w2) return {r,c};
-      }
-    }
-    return null;
-  }
+        // 2. Check for an immediate 1-move win or forced block to save CPU time
+        const tactic = findImmediateTactic(currentState, me, opp);
+        if (tactic) return tactic;
 
-  function generateCandidates(s, player, limit){
-    const cand = [];
-    let hasAny = false;
-    for (let i=0; i<s.length; i++){ if (s[i] !== 0){ hasAny = true; break; } }
-
-    if (!hasAny){
-      const mid = (size/2)|0;
-      return [{r:mid,c:mid, quick: 0}];
+        // 3. Run the Deep Alpha-Beta Engine
+        const bestMove = runAlphaBeta(config, currentState, me, opp);
+        return bestMove || getCenterMove();
     }
 
-    const isRenju = (ruleMode === "renju" || ruleMode === "swap2");
-
-    for (let r=0; r<size; r++){
-      for (let c=0; c<size; c++){
-        const k = idx(r,c);
-        if (s[k] !== 0) continue;
-        if (!nearStone(s, r, c, 2)) continue;
-
-        if (isRenju && player === P1) {
-          s[k] = P1;
-          const res = window.violatesRenju(r, c, 1, s);
-          s[k] = 0;
-          if (!res.isValid) continue; 
-        }
-
-        const quick = quickMoveScore(s, r, c, player);
-        cand.push({r,c, quick});
-      }
-    }
-
-    cand.sort((a,b)=> b.quick - a.quick);
-    return cand.slice(0, limit);
-  }
-
-  function negamaxRoot(s, depth, deadline, me, opp, moves, maxCands){
-    let alpha = -Infinity, beta = Infinity, bestMove = null, bestScore = -Infinity;
-    const ordered = moves.slice().sort((a,b)=> b.quick - a.quick);
-
-    for (const m of ordered){
-      if (performance.now() > deadline) return {timedOut:true, bestMove, bestScore};
-      const k = idx(m.r,m.c);
-      s[k] = me;
-      let score;
-      if (checkWinFrom(m.r,m.c,me)){
-        score = 1000000;
-      } else {
-        score = -negamax(s, depth-1, -beta, -alpha, opp, me, deadline, maxCands);
-      }
-      s[k] = 0;
-
-      if (score > bestScore){ bestScore = score; bestMove = {r:m.r, c:m.c}; }
-      alpha = Math.max(alpha, score);
-      if (alpha >= beta) break;
-    }
-    return {timedOut:false, bestMove, bestScore};
-  }
-
-  function negamax(s, depth, alpha, beta, player, other, deadline, maxCands){
-    if (performance.now() > deadline || depth <= 0) return evaluatePosition(s, aiPlaysAs);
-
-    const moves = generateCandidates(s, player, maxCands);
-    if (!moves.length) return 0;
-    
-    let best = -Infinity;
-    for (const m of moves){
-      if (performance.now() > deadline) return evaluatePosition(s, aiPlaysAs);
-      const k = idx(m.r,m.c);
-      s[k] = player;
-
-      let score;
-      if (checkWinFrom(m.r,m.c,player)) score = 900000 + depth * 500;
-      else score = -negamax(s, depth-1, -beta, -alpha, other, player, deadline, maxCands);
-      
-      s[k] = 0;
-      best = Math.max(best, score);
-      alpha = Math.max(alpha, score);
-      if (alpha >= beta) break;
-    }
-    return best;
-  }
-
-  function nearStone(s, r, c, rad){
-    for (let dr=-rad; dr<=rad; dr++){
-      for (let dc=-rad; dc<=rad; dc++){
-        if (dr===0 && dc===0) continue;
-        const rr=r+dr, cc=c+dc;
-        if (rr<0||cc<0||rr>=size||cc>=size) continue;
-        if (s[idx(rr,cc)] !== 0) return true;
-      }
-    }
-    return false;
-  }
-
-  function quickMoveScore(s, r, c, player){
-    const me = player;
-    const opp = (me === P1) ? P2 : P1;
-    const off = patternScoreIfPlaced(s, r, c, me);
-    const def = patternScoreIfPlaced(s, r, c, opp) * 0.9;
-    const center = (size-1)/2;
-    const dist = Math.abs(r-center) + Math.abs(c-center);
-    return off + def + ((size*0.7 - dist) * 4);
-  }
-
-  function patternScoreIfPlaced(s, r, c, player){
-    s[idx(r,c)] = player;
-    const sc = patternScoreAt(s, r, c, player);
-    s[idx(r,c)] = 0;
-    return sc;
-  }
-
-  function patternScoreAt(s, r, c, player){
-    const dirs = [{dr:0, dc:1}, {dr:1, dc:0}, {dr:1, dc:1}, {dr:1, dc:-1}];
-    let total = 0;
-    for (const {dr,dc} of dirs){
-      const {count, openEnds} = lineInfo(s, r, c, dr, dc, player);
-      if (count >= goal) total += 200000;
-      if (count === 4 && openEnds === 2) total += 90000;
-      else if (count === 4 && openEnds === 1) total += 35000;
-      else if (count === 3 && openEnds === 2) total += 12000;
-      else if (count === 3 && openEnds === 1) total += 3500;
-      else if (count === 2 && openEnds === 2) total += 1200;
-      else if (count === 2 && openEnds === 1) total += 400;
-      else total += count * 12;
-      total += openEnds * 60;
-    }
-    return total;
-  }
-
-  function lineInfo(s, r, c, dr, dc, player){
-    let count = 1;
-    let rr=r+dr, cc=c+dc;
-    while (rr>=0 && cc>=0 && rr<size && cc<size && s[idx(rr,cc)]===player){ count++; rr+=dr; cc+=dc; }
-    let open1 = (rr>=0 && cc>=0 && rr<size && cc<size && s[idx(rr,cc)]===0) ? 1 : 0;
-    rr=r-dr; cc=c-dc;
-    while (rr>=0 && cc>=0 && rr<size && cc<size && s[idx(rr,cc)]===player){ count++; rr-=dr; cc-=dc; }
-    let open2 = (rr>=0 && cc>=0 && rr<size && cc<size && s[idx(rr,cc)]===0) ? 1 : 0;
-    return {count, openEnds: open1 + open2};
-  }
-
-  function evaluatePosition(s, perspective){
-    const me = perspective;
-    let meScore = 0, oppScore = 0;
-    const dirs = [{dr:0, dc:1}, {dr:1, dc:0}, {dr:1, dc:1}, {dr:1, dc:-1}];
-
-    for (let r=0; r<size; r++){
-      for (let c=0; c<size; c++){
-        const v = s[idx(r,c)];
-        if (v === 0) continue;
-
-        for (const {dr,dc} of dirs){
-          const {count, openEnds} = lineInfo(s, r, c, dr, dc, v);
-          let add = 0;
-          if (count >= goal) add = 500000;
-          else if (count === 4 && openEnds === 2) add = 50000;
-          else if (count === 4 && openEnds === 1) add = 18000;
-          else if (count === 3 && openEnds === 2) add = 6500;
-          else if (count === 3 && openEnds === 1) add = 1800;
-          else if (count === 2 && openEnds === 2) add = 600;
-          else if (count === 2 && openEnds === 1) add = 180;
-          else add = count * 10;
-
-          add += openEnds * 25;
-          if (v === me) meScore += add; else oppScore += add;
-        }
-      }
-    }
-
-    const baseScore = meScore - oppScore * 1.05;
-    if (ruleMode === "renju" || ruleMode === "swap2") {
-       const trapBonus = calculateRenjuTraps(s); 
-       return perspective === P1 ? baseScore - trapBonus : baseScore + trapBonus;
-    }
-    return baseScore;
-  }
-
-  function calculateRenjuTraps(s) {
-    // Easy and Medium don't understand how to weaponize Renju fouls
-    if (window.aiLevel === "easy" || window.aiLevel === "medium") return 0; 
-
-    let trapBonus = 0;
-    // The Expert AI applies a massive multiplier to trap hunting
-    const mult = window.aiLevel === "expert" ? 2.5 : 1.0; 
-    
-    // In Renju, only Black (P1) has forbidden moves. White (P2) uses them as weapons.
-    for (let r = 0; r < size; r++) {
-      for (let c = 0; c < size; c++) {
-        if (s[idx(r, c)] !== 0) continue;
+    function aiSwap2Choice() {
+        // AI analyzes the 3 stones placed by P1
+        const currentScore = evaluatePosition(state, P1); 
         
-        // 1. Is this empty square a forbidden foul for Black?
-        const res = window.violatesRenju(r, c, P1, s);
-        if (!res.isValid) {
+        // If P1 played a terrible opening, AI happily takes Black (P1)
+        if (currentScore > 80000) {
+            finalizeRoles(P1); 
+            return null; 
+        } 
+        // If P1 played a brutally strong opening, AI takes White (P2) to defend
+        else if (currentScore < -80000) {
+            finalizeRoles(P2); 
+            return null;
+        }
+
+        // If the opening is balanced, AI places 2 more stones (Phase 3)
+        swap2Phase = 3;
+        inputLocked = true;
+
+        const bestPair = findBestSwap2Pair();
+        
+        if (bestPair) {
+            setTimeout(() => {
+                handleSwap2Move(bestPair.white.r, bestPair.white.c);
+                setTimeout(() => {
+                    handleSwap2Move(bestPair.black.r, bestPair.black.c);
+                }, 600);
+            }, 600);
+        } else {
+            finalizeRoles(P2); // Defensive fallback
+        }
+        
+        return null; 
+    }
+
+    // --- 2. THE ALPHA-BETA ENGINE ---
+
+    function runAlphaBeta(config, rootState, me, opp) {
+        const deadline = performance.now() + config.timeMs;
+        const perceivedState = getAiPerceivedState(config.forgetBase, rootState);
+
+        let bestMove = null;
+        let rootMoves = generateCandidates(perceivedState, me, opp, config.candidates);
+        
+        if (!rootMoves.length) return getCenterMove();
+
+        // Iterative Deepening: Start shallow, go deeper if time allows
+        for (let d = 1; d <= config.depth; d++) {
+            let res = minimaxRoot(perceivedState, d, -Infinity, Infinity, me, opp, rootMoves, deadline);
             
-            // 2. It is forbidden! Let's see if White is attacking this exact square.
-            const dirs = [{dr:0, dc:1}, {dr:1, dc:0}, {dr:1, dc:1}, {dr:1, dc:-1}];
-            for (const {dr, dc} of dirs) {
-              
-              // lineInfo returns count = 1 (the empty square) + actual adjacent White stones
-              const {count} = lineInfo(s, r, c, dr, dc, P2);
-              
-              if (count >= 5) {
-                  // LETHAL TRAP: White has 4 stones. Black MUST block here, 
-                  // but it's a foul! This is an unblockable instant win for White.
-                  trapBonus += 500000 * mult; 
-              } 
-              else if (count === 4) {
-                  // DEADLY: White has 3 stones aiming at a foul point. 
-                  // White is one move away from creating the lethal trap above.
-                  trapBonus += 25000 * mult;
-              }
-              else if (count === 3) {
-                  // TACTICAL: White has 2 stones aiming at the foul point.
-                  // The AI will actively build its lines in this direction.
-                  trapBonus += 3000 * mult;
-              }
+            if (res.timedOut) break; // Time's up, use the best move from the LAST completed depth
+            
+            if (res.bestMove) {
+                bestMove = res.bestMove;
+                // If we found a forced win, stop thinking immediately
+                if (res.bestScore >= SCORES.WIN / 2) break; 
             }
         }
-      }
+
+        return bestMove || { r: rootMoves[0].r, c: rootMoves[0].c };
     }
-    return trapBonus;
-  }
-  
 
+    function minimaxRoot(s, depth, alpha, beta, me, opp, moves, deadline) {
+        let bestMove = null;
+        let bestScore = -Infinity;
 
-  function findBestSwap2Pair() {
-    const params = getAIParams();
-    let bestEval = -Infinity, bestPair = null;
-    const whiteCandidates = generateCandidates(state, P2, params.candidates); 
-    
-    for (let w of whiteCandidates) {
-      state[idx(w.r, w.c)] = P2;
-      const blackCandidates = generateCandidates(state, P1, params.candidates);
-      for (let b of blackCandidates) {
-        if (w.r === b.r && w.c === b.c) continue;
-        state[idx(b.r, b.c)] = P1;
-        const evalScore = Math.abs(evaluatePosition(state, P1)); 
-        if (evalScore > bestEval) {
-          bestEval = evalScore;
-          bestPair = { white: w, black: b };
+        for (const m of moves) {
+            if (performance.now() > deadline) return { timedOut: true, bestMove, bestScore };
+
+            const k = idx(m.r, m.c);
+            s[k] = me;
+            
+            let score;
+            if (checkWinFrom(m.r, m.c, me)) {
+                score = SCORES.WIN + depth; // Favor faster wins
+            } else {
+                score = -minimax(s, depth - 1, -beta, -alpha, opp, me, deadline);
+            }
+            s[k] = 0;
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestMove = { r: m.r, c: m.c };
+            }
+            alpha = Math.max(alpha, score);
         }
-        state[idx(b.r, b.c)] = 0;
-      }
-      state[idx(w.r, w.c)] = 0;
+        return { timedOut: false, bestMove, bestScore };
     }
-    return bestPair;
-  }
 
-  function randomEmptyMove(){
-    const empties = [];
-    for (let r=0; r<size; r++) for (let c=0; c<size; c++) if (state[idx(r,c)]===0) empties.push({r,c});
-    return empties.length ? empties[Math.floor(Math.random()*empties.length)] : null;
-  }
+    function minimax(s, depth, alpha, beta, currPlayer, nextPlayer, deadline) {
+        if (depth === 0 || performance.now() > deadline) {
+            // Minimax returns relative score (Positive = good for currPlayer)
+            return evaluatePosition(s, currPlayer);
+        }
 
-  window.getAIParams = getAIParams;
-  window.chooseAiMove = chooseAiMove;
-  window.aiSwap2Choice = aiSwap2Choice;
-  window.evaluatePosition = evaluatePosition;
+        // Limit candidates heavily in deep nodes to keep speed up
+        const moves = generateCandidates(s, currPlayer, nextPlayer, 8);
+        if (!moves.length) return 0; // Draw
+
+        let best = -Infinity;
+        for (const m of moves) {
+            const k = idx(m.r, m.c);
+            s[k] = currPlayer;
+
+            let score;
+            if (checkWinFrom(m.r, m.c, currPlayer)) {
+                score = SCORES.WIN + depth;
+            } else {
+                score = -minimax(s, depth - 1, -beta, -alpha, nextPlayer, currPlayer, deadline);
+            }
+            s[k] = 0;
+
+            best = Math.max(best, score);
+            alpha = Math.max(alpha, score);
+            if (alpha >= beta) break; // Prune
+        }
+        return best;
+    }
+
+    // --- 3. EXACT SHAPE EVALUATION ---
+
+    function evaluatePosition(s, perspective) {
+        const me = perspective;
+        const opp = (me === P1) ? P2 : P1;
+        
+        let meScore = scorePlayerShapes(s, me);
+        let oppScore = scorePlayerShapes(s, opp);
+
+        // Standard Gomoku bias: Defending against a threat is slightly more urgent than attacking
+        let baseScore = meScore - (oppScore * 1.1);
+
+        // Expert Renju AI actively hunts for traps
+        if (ruleMode === "renju" || ruleMode === "swap2") {
+            const trapBonus = calculateRenjuTraps(s);
+            if (perspective === P1) baseScore -= trapBonus; // Traps are bad for Black
+            else baseScore += trapBonus;                    // Traps are great for White
+        }
+
+        return baseScore;
+    }
+
+    function scorePlayerShapes(s, player) {
+        let total = 0;
+        const dirs = [{dr: 0, dc: 1}, {dr: 1, dc: 0}, {dr: 1, dc: 1}, {dr: 1, dc: -1}];
+
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                if (s[idx(r, c)] !== player) continue;
+
+                for (const {dr, dc} of dirs) {
+                    // Only evaluate the line if we are at the "start" of it, to avoid counting the same line 5 times
+                    let br = r - dr, bc = c - dc;
+                    if (br >= 0 && br < size && bc >= 0 && bc < size && s[idx(br, bc)] === player) continue;
+
+                    const { count, openEnds } = getLineDetails(s, r, c, dr, dc, player);
+
+                    if (count >= goal) total += SCORES.WIN;
+                    else if (count === 4 && openEnds === 2) total += SCORES.OPEN_FOUR;
+                    else if (count === 4 && openEnds === 1) total += SCORES.CLOSED_FOUR;
+                    else if (count === 3 && openEnds === 2) total += SCORES.OPEN_THREE;
+                    else if (count === 3 && openEnds === 1) total += SCORES.CLOSED_THREE;
+                    else if (count === 2 && openEnds === 2) total += SCORES.OPEN_TWO;
+                    else if (count === 2 && openEnds === 1) total += SCORES.CLOSED_TWO;
+                }
+            }
+        }
+        return total;
+    }
+
+    function getLineDetails(s, r, c, dr, dc, player) {
+        let count = 0;
+        let rr = r, cc = c;
+        
+        // Count stones forward
+        while (rr >= 0 && rr < size && cc >= 0 && cc < size && s[idx(rr, cc)] === player) {
+            count++;
+            rr += dr;
+            cc += dc;
+        }
+
+        // Check front end
+        let openEnds = 0;
+        if (rr >= 0 && rr < size && cc >= 0 && cc < size && s[idx(rr, cc)] === 0) openEnds++;
+
+        // Check back end
+        let br = r - dr, bc = c - dc;
+        if (br >= 0 && br < size && bc >= 0 && bc < size && s[idx(br, bc)] === 0) openEnds++;
+
+        return { count, openEnds };
+    }
+
+    // --- 4. TACTICS & GENERATORS ---
+
+    function findImmediateTactic(s, me, opp) {
+        const isRenju = (ruleMode === "renju" || ruleMode === "swap2");
+
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                const k = idx(r, c);
+                if (s[k] !== 0) continue;
+
+                // 1. Can I win right now?
+                s[k] = me;
+                if (!(isRenju && me === P1 && !window.violatesRenju(r, c, 1, s).isValid)) {
+                    if (checkWinFrom(r, c, me)) { s[k] = 0; return {r, c}; }
+                }
+                s[k] = 0;
+
+                // 2. Do I need to block an immediate win?
+                s[k] = opp;
+                if (!(isRenju && opp === P1 && !window.violatesRenju(r, c, 1, s).isValid)) {
+                    if (checkWinFrom(r, c, opp)) { s[k] = 0; return {r, c}; }
+                }
+                s[k] = 0;
+            }
+        }
+        return null;
+    }
+
+    function generateCandidates(s, currPlayer, nextPlayer, limit) {
+        const cand = [];
+        const isRenju = (ruleMode === "renju" || ruleMode === "swap2");
+        const center = Math.floor(size / 2);
+
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                const k = idx(r, c);
+                if (s[k] !== 0) continue;
+                
+                // Threat Area Filtering: Only consider moves within 2 spaces of existing stones
+                if (!isNearStone(s, r, c, 2)) continue;
+
+                // Renju Filtering: Don't evaluate illegal moves for Black
+                if (isRenju && currPlayer === P1) {
+                    s[k] = P1;
+                    const res = window.violatesRenju(r, c, 1, s);
+                    s[k] = 0;
+                    if (!res.isValid) continue; 
+                }
+
+                // Quick heuristic score: If I play here, how much does my shape score improve?
+                s[k] = currPlayer;
+                const offScore = scorePlayerShapes(s, currPlayer);
+                s[k] = nextPlayer;
+                const defScore = scorePlayerShapes(s, nextPlayer);
+                s[k] = 0;
+                
+                // NO RANDOMNESS: Center bias serves as a deterministic tie-breaker
+                const distToCenter = Math.abs(r - center) + Math.abs(c - center);
+                const score = offScore + (defScore * 0.9) - distToCenter;
+
+                cand.push({ r, c, score });
+            }
+        }
+
+        // Sort descending and slice to the limit (Pruning)
+        cand.sort((a, b) => b.score - a.score);
+        return cand.slice(0, limit);
+    }
+
+    function isNearStone(s, r, c, radius) {
+        for (let dr = -radius; dr <= radius; dr++) {
+            for (let dc = -radius; dc <= radius; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                const rr = r + dr, cc = c + dc;
+                if (rr >= 0 && rr < size && cc >= 0 && cc < size) {
+                    if (s[idx(rr, cc)] !== 0) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    function getCenterMove() {
+        const center = Math.floor(size / 2);
+        return { r: center, c: center };
+    }
+
+    // --- 5. EXPERT RENJU TRAP HUNTING ---
+
+    function calculateRenjuTraps(s) {
+        if (window.aiLevel === "easy" || window.aiLevel === "medium") return 0; 
+        let trapBonus = 0;
+        const mult = window.aiLevel === "expert" ? 2.5 : 1.0; 
+        
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                if (s[idx(r, c)] !== 0) continue;
+                
+                // Is this a foul point for Black?
+                const res = window.violatesRenju(r, c, P1, s);
+                if (!res.isValid) {
+                    const dirs = [{dr:0, dc:1}, {dr:1, dc:0}, {dr:1, dc:1}, {dr:1, dc:-1}];
+                    for (const {dr, dc} of dirs) {
+                        const {count} = getLineDetails(s, r, c, dr, dc, P2);
+                        if (count >= 5) trapBonus += (SCORES.WIN / 2) * mult; 
+                        else if (count === 4) trapBonus += SCORES.OPEN_FOUR * mult;
+                        else if (count === 3) trapBonus += SCORES.OPEN_THREE * mult;
+                    }
+                }
+            }
+        }
+        return trapBonus;
+    }
+
+    // --- 6. SWAP2 & MEMORY LOGIC ---
+
+    function findBestSwap2Pair() {
+        const params = getAIParams();
+        let bestEval = -Infinity, bestPair = null;
+        
+        // Use a wide candidate net to find 2 good spots
+        const whiteCandidates = generateCandidates(state, P2, P1, params.candidates); 
+        
+        for (let w of whiteCandidates) {
+            state[idx(w.r, w.c)] = P2;
+            const blackCandidates = generateCandidates(state, P1, P2, params.candidates);
+            
+            for (let b of blackCandidates) {
+                if (w.r === b.r && w.c === b.c) continue;
+                state[idx(b.r, b.c)] = P1;
+                
+                // Measure the tension of the board (closer to 0 is a more balanced opening)
+                const evalScore = Math.abs(evaluatePosition(state, P1)); 
+                if (evalScore > bestEval) {
+                    bestEval = evalScore;
+                    bestPair = { white: w, black: b };
+                }
+                state[idx(b.r, b.c)] = 0;
+            }
+            state[idx(w.r, w.c)] = 0;
+        }
+        return bestPair;
+    }
+
+    function getAiPerceivedState(forgetBase, actualState) {
+        if (boardEl.classList.contains("reveal") || vanishMs >= 3600000) return actualState;
+
+        const now = Date.now(); 
+        const dt = Math.max(0, now - lastRevealAt);
+        const t = Math.max(0, Math.min(1, dt / 15000));
+        const p = forgetBase * t;
+
+        if (p <= 0.0001) return actualState;
+
+        const opp = (aiPlaysAs === P1) ? P2 : P1;
+        const s = actualState.slice();
+
+        for (let i = 0; i < s.length; i++) {
+            if (s[i] === opp) {
+                const age = Math.max(0, now - (placedAt[i] || 0));
+                const ageFactor = Math.max(0.35, Math.min(1, age / 8000));
+                // RNG is ONLY used here to simulate human memory failure based on time elapsed
+                if (Math.random() < p * ageFactor) s[i] = 0; 
+            }
+        }
+        return s;
+    }
+
+    // Final Bindings to keep main.js happy
+    window.getAIParams = getAIParams;
+    window.chooseAiMove = chooseAiMove;
+    window.aiSwap2Choice = aiSwap2Choice;
+    window.evaluatePosition = evaluatePosition;
 })();

@@ -1025,12 +1025,10 @@ function showSwap2ChoiceOverlay() {
 
 function showP1FinalChoice() {
   inputLocked = true;
-  const currentScore = window.evaluatePosition ? window.evaluatePosition(state, P1) : 0;
-  const suggestion = currentScore > 0 ? "Black" : "White";
 
   showOverlay(
     "Swap2: Final Choice", 
-    `Player 2 has added two stones. Choose your final color. (AI suggests: ${suggestion})`, 
+    `Player 2 has added two stones. Choose your final color.`, 
     "Play as Black"
   );
 
@@ -1537,7 +1535,7 @@ function aiMoveSoon() {
       switchTurn();
       inputLocked = false; 
     }
-  }, 50);
+  }, 300);
 }
 
 // ---------- Setup / UI ----------
@@ -1627,6 +1625,7 @@ function newGame() {
   meterPos = 0; 
   openingStones = [];
   leftSideRole = 1;
+  aiPlaysAs = P2; //AI is always playing P2 (white)
 
   turnDeadline = Date.now() + 30000;
   startLocalClocks();
