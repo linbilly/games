@@ -557,7 +557,12 @@ html, body {
 .info-card {
     max-width: 450px;
     background: #1a1a1a;
-    border: 1px solid rgba(255, 207, 64, 0.3); /* Slight gold border */
+    border: 1px solid rgba(255, 207, 64, 0.3);
+    
+    /* THE FIX: Let it grow vertically up to 95% of the screen */
+    display: flex;
+    flex-direction: column;
+    max-height: 95dvh !important;
 }
 
 .info-tabs {
@@ -667,10 +672,11 @@ html, body {
         font-size: 14px;
     }
     
-    /* Ensure the Rankings list doesn't blow out the height */
     .tab-content {
-        max-height: 50dvh;
-        overflow-y: auto;
-        padding-right: 5px;
+      /* Let the content area stretch to fill the newly expanded card */
+      flex-grow: 1;
+      overflow-y: auto;
+      padding-right: 5px;
+      text-align: left; /* Ensures rules and text are easily readable */
     }
 }

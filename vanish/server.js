@@ -47,6 +47,14 @@ io.on('connection', (socket) => {
   let currentUser = `Guest_${Math.floor(Math.random()*1000)}`; // Mock user auth
 
   // --- 1. GLOBAL MATCHMAKING (15x15 Only) ---
+
+  //  Live Queue Polling for the UI
+  socket.on('check_queue_count', ({ vanishMs, ruleMode }) => {
+    // Count how many people are in the exact same settings bucket
+    const count = matchmakingQueue.filter(p => p.vanishMs === vanishMs && p.ruleMode === ruleMode).length;
+    socket.emit('queue_count_result', { count, vanishMs, ruleMode });
+  });
+
   socket.on('find_global_match', ({ vanishMs, ruleMode, platformId }) => {
     const request = { socketId: socket.id, username: currentUser, platformId, vanishMs, ruleMode };
 
@@ -195,6 +203,9 @@ io.on('connection', (socket) => {
     // Tell both players to start the fade-out timer right NOW
     io.to(matchId).emit('game_resumed', { resumeTimeUtc: Date.now() });
   });
+
+
+
 
 // A helper to handle forfeits cleanly
 async function handleForfeit(socket, matchId) {

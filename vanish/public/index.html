@@ -24,7 +24,10 @@
     <button id="btn-online-private" class="btn" onclick="selectMode('online_private')">Online Private Room</button>
     <button id="btn-online-ladder" class="btn highlight-btn" onclick="selectMode('online_ladder')">Online Ladder</button>
     
-    <button class="btn ghost" onclick="openInfoOverlay()">Profile & Rankings</button>
+    <div style="display: flex; gap: 10px; width: 100%;">
+        <button class="btn ghost" style="flex: 1;" onclick="openInfoOverlay()">Ranking</button>
+        <button class="btn ghost" style="flex: 1;" onclick="openRulesOverlay()">How to Play</button>
+    </div>
     <link rel="preload" href="board.jpeg" as="image">
 </div>
 
@@ -69,6 +72,9 @@
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 10px;">
+            <div id="queue-status" style="font-size: 13px; color: #ffcf40; text-align: center; display: none;">
+                Checking queue...
+            </div>
             <button id="start-btn" class="btn highlight-btn" onclick="confirmStart()">Start Match</button>
             <button id="join-btn" class="btn highlight-btn hidden" onclick="joinPrivateRoom()">Join a Room</button>
             <button class="btn ghost" onclick="backToMainMenu()">Back</button>
@@ -150,7 +156,7 @@
         <div class="info-tabs">
             <button class="tab-btn active" onclick="switchTab('rankings')">Rankings</button>
             <button class="tab-btn" onclick="switchTab('stats')">My Stats</button>
-            <button class="tab-btn" onclick="tabToRules()">Rules</button>
+            <button class="tab-btn" onclick="switchTab('rules')">Rules</button>
         </div>
 
         <div id="tab-rankings" class="tab-content">
@@ -168,11 +174,12 @@
         </div>
 
         <div id="tab-rules" class="tab-content hidden" style="text-align: left; padding: 10px;">
-            <h3>How to Play</h3>
+            <h4>Play Modes</h4>
             <p><strong>Standard:</strong> Connect 5 stones in a row (horizontally, vertically, or diagonally) to win.</p>
-            <p><strong>Vanish:</strong> Stones disappear from sight after a few seconds. You must remember where they are!</p>
-            <p><strong>Renju:</strong> Black (P1) has restricted moves (no double-threes or double-fours) to balance the game.</p>
+            <p><strong>Renju:</strong> Black (P1) has restricted moves (no double-threes, double-fours, or overlines) to balance the game.</p>
             <p><strong>Swap2:</strong> A tournament opening where P1 places 3 stones, and P2 chooses to stay, swap colors, or place 2 more and let P1 choose color.</p>
+            <h4>Vanish</h4>
+            <p>Stones disappear from sight after a set time! Remember where they are, because they are still there. Clicking on an occupied location results in a strike. 3 strikes = pentaly of skipping a turn!</p>
         </div>
 
         <button class="btn ghost" style="margin-top: 20px;" onclick="closeInfoOverlay()">Close</button>

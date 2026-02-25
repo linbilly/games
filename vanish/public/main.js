@@ -86,6 +86,8 @@ let myRating = 1500;
 let myWins = 0;
 let myLosses = 0;
 
+let queuePollInterval = null; // Add this near your other global variables
+
 const $ = (id) => document.getElementById(id);
 
 const boardEl = $("board");
@@ -154,39 +156,67 @@ function selectMode(selectedMode) {
     $('mode-title').innerText = selectedMode.replace('_', ' ').toUpperCase();
     
     const sizeSelect = $('board-size-select');
+    const ruleSelect = $('rule-set-select');
+    const vanishSelect = $('vanish-timer-select');
     const aiGroup = $('ai-level-group'); 
     const startBtn = $('start-btn');
     const joinBtn = $('join-btn');
+    const queueStatus = $('queue-status');
     
     // Toggle AI dropdown visibility
-    if (selectedMode === 'local_ai') {
-        aiGroup.style.display = 'flex';
-    } else {
-        aiGroup.style.display = 'none';
-    }
+    aiGroup.style.display = (selectedMode === 'local_ai') ? 'flex' : 'none';
 
-    // Lock board size for ladder
+    // Ladder vs Private vs Local logic
     if (selectedMode === 'online_ladder') {
+        // Force 15x15
         sizeSelect.value = "15";
         sizeSelect.disabled = true;
-    } else {
-        sizeSelect.disabled = false;
-    }
+        
+        // Beta Defaults: Renju & 10 Seconds
+        ruleSelect.value = "renju";
+        vanishSelect.value = "10000";
 
-    // Dynamic Private Room Buttons
-    if (selectedMode === 'online_private') {
-        startBtn.innerText = "Create a Room";
-        joinBtn.classList.remove('hidden');
-    } else {
         startBtn.innerText = "Start Match";
         joinBtn.classList.add('hidden');
+        
+        // Start live queue polling
+        queueStatus.style.display = "block";
+        updateQueueStatus();
+        if (queuePollInterval) clearInterval(queuePollInterval);
+        queuePollInterval = setInterval(updateQueueStatus, 3000); // Check every 3 seconds
+
+    } else if (selectedMode === 'online_private') {
+        sizeSelect.disabled = false;
+        startBtn.innerText = "Create a Room";
+        joinBtn.classList.remove('hidden');
+        queueStatus.style.display = "none";
+        if (queuePollInterval) clearInterval(queuePollInterval);
+    } else {
+        sizeSelect.disabled = false;
+        startBtn.innerText = "Start Match";
+        joinBtn.classList.add('hidden');
+        queueStatus.style.display = "none";
+        if (queuePollInterval) clearInterval(queuePollInterval);
     }
 }
 
 function backToMainMenu() {
+    if (queuePollInterval) clearInterval(queuePollInterval);
     $('sub-menu').classList.add('hidden');
     $('main-menu').classList.remove('hidden');
 }
+
+// THE NEW QUEUE CHECKER
+function updateQueueStatus() {
+    if (currentMode !== 'online_ladder') return;
+    const vanishMs = parseInt($('vanish-timer-select').value, 10);
+    const ruleMode = $('rule-set-select').value;
+    socket.emit('check_queue_count', { vanishMs, ruleMode });
+}
+
+// Add listeners so the text updates instantly when the user changes a dropdown
+document.getElementById('rule-set-select').addEventListener('change', updateQueueStatus);
+document.getElementById('vanish-timer-select').addEventListener('change', updateQueueStatus);
 
 function joinPrivateRoom() {
     const code = prompt("Enter 6-digit Room Code:");
@@ -201,6 +231,20 @@ function joinPrivateRoom() {
         
         socket.emit('join_private_room', code.toUpperCase());
     }
+}
+
+// --- NEW: Opens the overlay directly to the Rules tab ---
+function openRulesOverlay() {
+    $('info-overlay').classList.remove('hidden');
+    switchTab('rules');
+}
+
+// --- UPDATED: Also force Profile button to always open on Rankings ---
+function openInfoOverlay() {
+    $('info-overlay').classList.remove('hidden');
+    switchTab('rankings'); 
+    updateLeaderboard(); 
+    refreshMyStats();    
 }
 
 function confirmStart() {
@@ -1296,14 +1340,6 @@ async function refreshMyStats() {
     updateMyStatsUI();
 }
 
-function openInfoOverlay() {
-    $('info-overlay').classList.remove('hidden');
-    
-    // Both of these now pull fresh data directly from the PostgreSQL database!
-    updateLeaderboard(); 
-    refreshMyStats();    
-}
-
 function closeInfoOverlay() {
     $('info-overlay').classList.add('hidden');
 }
@@ -1318,11 +1354,19 @@ function updateMyStatsUI() {
 }
 
 function switchTab(tab) {
+    // 1. Hide all content and deactivate all tabs
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     
-    $(`tab-${tab}`).classList.remove('hidden');
-    event.currentTarget.classList.add('active');
+    // 2. Show the target content
+    const targetContent = document.getElementById(`tab-${tab}`);
+    if (targetContent) targetContent.classList.remove('hidden');
+    
+    // 3. Highlight the correct tab button safely
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    if (tab === 'rankings' && tabBtns[0]) tabBtns[0].classList.add('active');
+    if (tab === 'stats' && tabBtns[1]) tabBtns[1].classList.add('active');
+    if (tab === 'rules' && tabBtns[2]) tabBtns[2].classList.add('active');
 }
 
 function executeResume(syncTime) {
@@ -2123,6 +2167,17 @@ socket.on('swap2_plus2_started', () => {
     clearOverlayButtons();
     inputLocked = (myOnlineRole !== 2); // Only Player 2 (the guest) can move now
     setPills();
+});
+
+socket.on('queue_count_result', (data) => {
+    const qs = $('queue-status');
+    if (qs && currentMode === 'online_ladder') {
+        const noun = data.count === 1 ? 'player' : 'players';
+        qs.innerText = `There are currently ${data.count} ${noun} waiting to play with these settings.`;
+        
+        // Optional UX: Make it glow slightly if someone is waiting!
+        qs.style.color = data.count > 0 ? "#ffcf40" : "#9aa6d6";
+    }
 });
 
 
