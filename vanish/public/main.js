@@ -12,6 +12,56 @@
 // 1. Are we running inside the iOS/Android app?
 const isNative = window.Capacitor && window.Capacitor.isNativePlatform();
 
+// --- INITIALIZE THE AI BACKGROUND WORKER ---
+const aiWorker = new Worker('ai.js');
+
+aiWorker.onmessage = function(e) {
+    const data = e.data;
+    
+    // 1. Standard Move Received
+    if (data.type === 'move_result') {
+        const move = data.move;
+        if (!move) {
+            console.warn("AI engine failed to return a move!");
+            return;
+        }
+
+        if (isOccupied(move.r, move.c)) {
+            handleMistake("The AI tried to place a stone on an occupied square", currentPlayer);
+            return; 
+        }
+        
+        placePiece(move.r, move.c, currentPlayer, { animate: true, sfx: true });
+        
+        const win = checkWinFrom(move.r, move.c, currentPlayer);
+        if (win){ endGame(win); return; }
+        if (!state.includes(0)){ endGame({player:0, line:[]}, true); return; }
+        
+        switchTurn();
+        inputLocked = false; 
+    } 
+    // 2. Swap2 Opening Choice Received
+    else if (data.type === 'swap2_result') {
+        if (data.decision.action === 'take_black') {
+            finalizeRoles(P1);
+        } else if (data.decision.action === 'take_white') {
+            finalizeRoles(P2);
+        } else if (data.decision.action === 'place_two') {
+            const pair = data.decision.pair;
+            setTimeout(() => {
+                handleSwap2Move(pair.white.r, pair.white.c);
+                setTimeout(() => {
+                    handleSwap2Move(pair.black.r, pair.black.c);
+                }, 600);
+            }, 600);
+        }
+    }
+    else if (data.type === 'phase4_result') {
+        // AI chooses Black (P1) if score > 0, otherwise White (P2)
+        setTimeout(() => finalizeRoles(data.score > 0 ? P1 : P2), 1000);
+    }
+};
+
 // 2. Are we testing in a desktop browser? (Ignore 'localhost' if on a phone)
 const isLocalDev = !isNative && (window.location.hostname === 'localhost' || window.location.protocol === 'file:');
 
@@ -938,38 +988,46 @@ function isOccupied(r,c){
 
 // --- Swap2 Logic ---
 function handleSwap2Move(r, c) {
-  if (isOccupied(r, c)) return;
+    if (isOccupied(r, c)) return;
 
-  if (swap2Phase === 1) {
-    const color = (openingStones.length === 1) ? P2 : P1; 
-    placePiece(r, c, color, { animate: true, sfx: true });
-    openingStones.push({ r, c, color });
+    if (swap2Phase === 1) {
+        const color = (openingStones.length === 1) ? P2 : P1; 
+        placePiece(r, c, color, { animate: true, sfx: true });
+        openingStones.push({ r, c, color });
 
-    if (openingStones.length === 3) {
-      swap2Phase = 2;
-      inputLocked = true; // Lock while choosing!
-      if (mode === "ai" && aiPlaysAs === P2) {
-        setTimeout(() => { if (window.aiSwap2Choice) window.aiSwap2Choice(); }, 500);
-      } else {
-        showSwap2ChoiceOverlay();
-      }
+        if (openingStones.length === 3) {
+            swap2Phase = 2;
+            inputLocked = true; // Lock while choosing!
+            
+            if (mode === "ai" && aiPlaysAs === P2) {
+                // THE FIX: Trigger the worker request through our new aiMoveSoon function
+                aiMoveSoon(); 
+            } else {
+                showSwap2ChoiceOverlay();
+            }
+        }
+    } else if (swap2Phase === 3) {
+        const color = (openingStones.length === 3) ? P2 : P1;
+        placePiece(r, c, color, { animate: true, sfx: true });
+        openingStones.push({ r, c, color });
+
+        if (openingStones.length === 5) {
+            swap2Phase = 4;
+            inputLocked = true; // Lock while deciding!
+            
+            if (mode === "ai" && aiPlaysAs === P1) {
+                // THE FIX: Send a special message to the worker to evaluate the board
+                aiWorker.postMessage({
+                    type: 'request_phase4_eval',
+                    state: state,
+                    size: size,
+                    ruleMode: ruleMode
+                });
+            } else {
+                showP1FinalChoice();
+            }
+        }
     }
-  } else if (swap2Phase === 3) {
-    const color = (openingStones.length === 3) ? P2 : P1;
-    placePiece(r, c, color, { animate: true, sfx: true });
-    openingStones.push({ r, c, color });
-
-    if (openingStones.length === 5) {
-      swap2Phase = 4;
-      inputLocked = true; // Lock while deciding!
-      if (mode === "ai" && aiPlaysAs === P1) {
-         const currentScore = window.evaluatePosition ? window.evaluatePosition(state, P1) : 0;
-         setTimeout(() => finalizeRoles(currentScore > 0 ? P1 : P2), 1000);
-      } else {
-        showP1FinalChoice();
-      }
-    }
-  }
 }
 
 function clearOverlayButtons() {
@@ -1492,49 +1550,37 @@ function aiMoveSoon() {
     inputLocked = true;
   }
 
+  // We still wait 300ms so the CSS pop-in finishes visually before 
+  // the AI instantly responds (the worker is very fast!)
   setTimeout(() => {
-    let move = window.chooseAiMove ? window.chooseAiMove(state, currentPlayer) : null;
-    
-    // 1. TRUE FAILSAFE: Only trigger if the AI engine completely crashes and returns null
-    if (!move) {
-        console.warn("AI engine failed to return a move! Using random fallback.");
-        let emptySpots = [];
-        for (let r = 0; r < size; r++) {
-            for (let c = 0; c < size; c++) {
-                if (!isOccupied(r, c)) emptySpots.push({ r, c });
-            }
-        }
-        if (emptySpots.length > 0) {
-            move = emptySpots[Math.floor(Math.random() * emptySpots.length)];
-        }
-    }
-
-    if (move) {
-      // 2. THE FIX: If the AI forgot a piece and chose an occupied square, trigger a mistake!
-      if (isOccupied(move.r, move.c)) {
-          console.log("AI forgot a piece and triggered a mistake!");
-          // Trigger the mistake penalty specifically for the AI
-          handleMistake("The AI tried to place a stone on an occupied square", currentPlayer);
-          return; // Stop the piece placement!
+      
+      // If it's a Swap2 decision phase
+      if (ruleMode === "swap2" && swap2Phase === 2) {
+          aiWorker.postMessage({
+              type: 'request_swap2',
+              state: state,
+              aiLevel: window.aiLevel,
+              size: size,
+              aiPlaysAs: aiPlaysAs,
+              ruleMode: ruleMode
+          });
+          return;
       }
       
-      // 3. Normal placement
-      placePiece(move.r, move.c, currentPlayer, { animate: true, sfx: true });
+      // Otherwise, request a normal move
+      aiWorker.postMessage({
+          type: 'request_move',
+          state: state,
+          aiLevel: window.aiLevel,
+          size: size,
+          aiPlaysAs: aiPlaysAs,
+          ruleMode: ruleMode,
+          vanishMs: vanishMs,
+          isRevealed: boardEl.classList.contains("reveal"),
+          lastRevealAt: lastRevealAt,
+          placedAt: placedAt
+      });
       
-      const win = checkWinFrom(move.r, move.c, currentPlayer);
-      if (win){
-        endGame(win);
-        return;
-      }
-      
-      if (!state.includes(0)){
-        endGame({player:0, line:[]}, true);
-        return;
-      }
-      
-      switchTurn();
-      inputLocked = false; 
-    }
   }, 300);
 }
 
@@ -2062,11 +2108,6 @@ socket.on('swap2_plus2_started', () => {
     setPills();
 });
 
-// Final assignments
-window.handleSwap2Move = handleSwap2Move;
-window.showOverlay = showOverlay;
-window.overlayBtn = overlayBtn;
-window.finalizeRoles = finalizeRoles;
 
 applySettingsFromUI();
 // Manually trigger the login sequence on load
