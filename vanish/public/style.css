@@ -395,6 +395,7 @@ html, body {
 }
 
 #landing-page { 
+  max-width: 1000px; /* Reasonable cap for wide screens */
   position: relative;
   display: flex;
   flex-direction: column;
@@ -402,12 +403,13 @@ html, body {
   align-items: center; 
   height: 100dvh; /* THE MAGIC FIX: Forces the container to fill the screen */
   width: 100%;
+  margin: 0 auto;    /* Centers the container */
 }
 
 #landing-page .brand {
     position: absolute;
     top: max(40px, env(safe-area-inset-top));
-    left: 20px; /* Matches the 20px padding from the game screen */
+    left: max(20px, calc((100% - 1200px) / 2 + 20px));
     display: flex;
     align-items: center; /* Keeps the V logo and the text horizontally level */
     gap: 15px; /* Adds breathing room between the logo and the text */
@@ -428,19 +430,50 @@ html, body {
     font-size: 15px;
 }
 
+
+/* Centering the app container for wide screens */
+#game-top-bar, #game-hud, #board-container {
+    max-width: 800px; /* Adjust this to your preferred wide-screen cap */
+    margin: 0 auto;
+    width: 100%;
+}
+
+#board-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    /* Max width matches the board's dynamic height to keep HUD aligned */
+    max-width: min(100%, 60dvh); 
+    margin: 0 auto;
+}
 #game-top-bar {
-  display: flex; 
-  justify-content: space-between; 
-  align-items: center; 
-  padding: 12px 15px;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px 20px; /* The 20px provides the exact side padding you are looking for */
-  
-  /* The new background styles */
-  background: rgba(255, 255, 255, 0.08); /* Soft, slightly transparent grey */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4); /* Drops a shadow onto the board area */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: transparent; /* Cleaner look since info moved down */
+    border-bottom: none;
+    padding: 10px 20px;
+}
+
+#game-hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 0 10px 5px 10px;
+}
+
+#timer-container {
+    flex: 0 0 80px;
+    text-align: center;
+}
+
+.timer {
+    font-family: monospace;
+    font-weight: 800;
+    font-size: 1.2rem;
+    color: var(--text);
 }
 
 #board-container {
@@ -468,22 +501,23 @@ html, body {
 .spinner { border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #ffcf40; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-/* --- Dynamic Player Display --- */
 .player-info {
+    flex: 1;
     display: flex;
     align-items: center;
     gap: 8px;
-    font-weight: 600;
-    font-size: 14px;
-    color: #888; /* Dimmed when not their turn */
-    transition: color 0.3s ease;
-    max-width: 110px;
+    overflow: hidden;
+}
+
+.player-info-right {
+    justify-content: flex-end;
 }
 
 .player-info span {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 120px; /* Increased from 110px for better visibility */
 }
 
 .player-info.active {
@@ -719,4 +753,32 @@ html, body {
       padding-right: 5px;
       text-align: left; /* Ensures rules and text are easily readable */
     }
+}
+
+.emoji-bubble {
+    position: absolute;
+    top: 40px; /* Adjust based on your layout to float above the name */
+    font-size: 2rem;
+    opacity: 0;
+    transform: translateY(10px) scale(0.5);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none; /* So it doesn't block clicks */
+    z-index: 100;
+    text-shadow: 0px 4px 10px rgba(0,0,0,0.5);
+}
+
+.emoji-bubble.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.emoji-btn {
+    font-size: 2.5rem;
+    cursor: pointer;
+    transition: transform 0.1s;
+    user-select: none;
+}
+
+.emoji-btn:active {
+    transform: scale(0.8);
 }

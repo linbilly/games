@@ -262,7 +262,7 @@ function openRulesOverlay() {
 // --- UPDATED: Also force Profile button to always open on Rankings ---
 function openInfoOverlay() {
     $('info-overlay').classList.remove('hidden');
-    switchTab('rankings'); 
+    switchTab('stats'); 
     updateLeaderboard(); 
     refreshMyStats();    
 }
@@ -359,6 +359,9 @@ function setupOnlineGame(data) {
     if ($('overlayBtn')) $('overlayBtn').onclick = null;
     if ($('overlayBtn2')) $('overlayBtn2').onclick = null;
 
+    if($('btn-chat')) $('btn-chat').classList.remove('hidden'); 
+    if($('btn-surrender')) $('btn-surrender').classList.remove('hidden'); 
+
     isOnline = true;
     mode = 'pvp';
     onlineMatchId = data.matchId;
@@ -393,6 +396,8 @@ function setupOnlineGame(data) {
     // Set names for online play
     $('p1-name').innerText = data.settings.host.username;
     $('p2-name').innerText = data.settings.guest ? data.settings.guest.username : "Opponent";
+
+    console.log("Host:", data.settings.host.username, "; Guest:",data.settings.guest.username);
     
     showGamePage(); // Ensure we are on the game page
     buildBoard();
@@ -498,6 +503,47 @@ async function updateLeaderboard() {
   }
 }
 
+async function changeUsername() {
+    // 1. Ask the user for a new name using the native OS prompt
+    const newName = prompt("Enter your new display name (max 15 characters):", currentUser);
+    
+    // 2. Validate it isn't empty or identical
+    if (!newName || newName.trim() === "" || newName === currentUser) return;
+    
+    const trimmedName = newName.trim().substring(0, 15);
+
+    // 3. Save it to local memory so it survives app restarts
+    localStorage.setItem('vanish_custom_name', trimmedName);
+    
+    // 4. Update the UI instantly (Optimistic UI update)
+    currentUser = trimmedName;
+    if ($('stat-username')) $('stat-username').innerText = currentUser;
+
+    const welcomeText = $('welcome-text');
+    if (welcomeText) welcomeText.innerText = `Welcome, ${currentUser}`;
+
+    socket.emit('set_user_data', { username: currentUser, platformId: currentPlatformId });
+
+    // 5. Send it to the server!
+    if (currentPlatformId) {
+        try {
+            const response = await fetch(`${SERVER_URL}/user/${currentPlatformId}/name`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUser })
+            });
+            
+            if (!response.ok) throw new Error("Server rejected name change");
+            
+            // Refresh the leaderboard in case they are already on it!
+            updateLeaderboard(); 
+        } catch (err) {
+            console.error(err);
+            alert("Name changed locally, but couldn't sync with the server.");
+        }
+    }
+}
+
 async function initializeUser() {
   const isNative = window.Capacitor && window.Capacitor.isNativePlatform();
   const platform = isNative ? Capacitor.getPlatform() : 'web'; 
@@ -508,23 +554,35 @@ async function initializeUser() {
   if (welcomeText) welcomeText.innerText = "Connecting to server...";
   if (retryBtn) retryBtn.classList.add('hidden');
   
+  // 2. Setup or retrieve Guest ID
   let savedGuestId = localStorage.getItem('vanish_guest_id');
   if (!savedGuestId) {
       savedGuestId = "guest_" + Math.random().toString(36).substr(2, 9);
       localStorage.setItem('vanish_guest_id', savedGuestId);
   }
 
+  // 3. Look for a saved custom name, otherwise default to "Guest"
+  let savedGuestName = localStorage.getItem('vanish_custom_name') || "Guest";
+  currentUser = savedGuestName; // Force global sync
+
+  // 4. Create the SINGLE userData object
   let userData = { 
     playerId: savedGuestId, 
-    displayName: "Guest",
+    displayName: savedGuestName, 
     platform: platform 
   };
+
+      // Tell the live socket exactly who we are!
+    socket.emit('set_user_data', { username: currentUser, platformId: currentPlatformId });
+
 
   if (isNative) {
     try {
       if (platform === 'ios') {
-        const GameCenter = Capacitor.Plugins.GameServices;
+        // Go back to the direct property access (matching your exact Swift class name)
+        const GameCenter = Capacitor.Plugins.GameCenterPlugin; 
         const auth = await GameCenter.signIn();
+        
         userData.playerId = auth.player_id;
         userData.displayName = auth.player_name;
       } else if (platform === 'android') {
@@ -551,6 +609,8 @@ async function initializeUser() {
     
     currentUser = dbUser.username;
     currentPlatformId = dbUser.platform_id; 
+
+
     myRating = dbUser.rating_15_standard; 
     myWins = dbUser.wins || 0;
     myLosses = dbUser.losses || 0;
@@ -611,6 +671,75 @@ function ensureAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === "suspended") audioCtx.resume();
   audioEnabled = true;
+}
+
+// --- EMOJI CHAT SYSTEM ---
+
+function openEmojiMenu() {
+    if (!isOnline || gameOver) return;
+    
+    // 1. Use your existing overlay system
+    showOverlay("Send Emoji", "", "Close");
+    
+    // 2. Inject our custom emoji buttons into the body
+    const bodyEl = $('overlayBody');
+    bodyEl.innerHTML = `
+        <div style="display: flex; justify-content: space-around; margin-top: 15px;">
+            <span class="emoji-btn" onclick="sendEmoji('😀')">😀</span>
+            <span class="emoji-btn" onclick="sendEmoji('😢')">😢</span>
+            <span class="emoji-btn" onclick="sendEmoji('😡')">😡</span>
+            <span class="emoji-btn" onclick="sendEmoji('👍')">👍</span>
+        </div>
+    `;
+    
+    $('overlayBtn').onclick = hideOverlay;
+}
+
+function sendEmoji(emoji) {
+    hideOverlay();
+    
+    // 1. Show it locally immediately
+    animateEmojiBubble(myOnlineRole, emoji);
+    
+    // 2. Tell the server to broadcast it
+    socket.emit('send_emoji', { 
+        matchId: onlineMatchId, 
+        emoji: emoji, 
+        role: myOnlineRole 
+    });
+}
+
+// 3. Listen for incoming emojis from the opponent
+socket.on('receive_emoji', ({ emoji, role }) => {
+    animateEmojiBubble(role, emoji);
+});
+
+// 4. The Animation Logic
+function animateEmojiBubble(role, emoji) {
+    // Figure out if this role belongs to the left side or right side of the screen
+    const isLeftSide = (role === leftSideRole); 
+    const bubbleId = isLeftSide ? 'p1-emoji' : 'p2-emoji';
+    const bubbleEl = $(bubbleId);
+    
+    if (!bubbleEl) return;
+    
+    // Set the emoji
+    bubbleEl.innerText = emoji;
+    
+    // Pop it in
+    bubbleEl.classList.remove('show');
+    // Tiny delay ensures the CSS transition resets if they spam it
+    setTimeout(() => {
+        bubbleEl.classList.add('show');
+    }, 10);
+    
+    // Clear any existing fade-out timer
+    if (bubbleEl.hideTimer) clearTimeout(bubbleEl.hideTimer);
+    
+    // Fade it out after 3 seconds
+    bubbleEl.hideTimer = setTimeout(() => {
+        bubbleEl.classList.remove('show');
+    }, 3000);
 }
 
 async function requestAccountDeletion() {
@@ -865,10 +994,13 @@ function hideOverlay() {
 }
 
 function quitGame() {
-    if (isOnline && onlineMatchId && !gameOver) {
+    if (isOnline && onlineMatchId) {
         socket.emit('leave_room', { matchId: onlineMatchId });
     }
-    
+
+    if ($('btn-chat')) $('btn-chat').classList.add('hidden');
+    if ($('btn-surrender')) $('btn-surrender').classList.add('hidden');
+
     localStorage.removeItem('active_match_id');
     gameOver = true;
     if (localTickInterval) clearInterval(localTickInterval);
@@ -1386,6 +1518,9 @@ function updateMyStatsUI() {
     // Assuming you update these variables when the user logs in
     $('stat-wins').innerText = myWins || 0;
     $('stat-losses').innerText = myLosses || 0;
+
+    const editBtn = $('btn-edit-name');
+    if (editBtn) editBtn.onclick = changeUsername;
 }
 
 function switchTab(tab) {
@@ -1399,8 +1534,8 @@ function switchTab(tab) {
     
     // 3. Highlight the correct tab button safely
     const tabBtns = document.querySelectorAll('.tab-btn');
-    if (tab === 'rankings' && tabBtns[0]) tabBtns[0].classList.add('active');
-    if (tab === 'stats' && tabBtns[1]) tabBtns[1].classList.add('active');
+    if (tab === 'stats' && tabBtns[1]) tabBtns[0].classList.add('active');
+    if (tab === 'rankings' && tabBtns[0]) tabBtns[1].classList.add('active');
     if (tab === 'rules' && tabBtns[2]) tabBtns[2].classList.add('active');
 }
 
@@ -1769,6 +1904,9 @@ function newGame() {
   leftSideRole = 1;
   aiPlaysAs = P2; //AI is always playing P2 (white)
 
+  if ($('btn-chat')) $('btn-chat').classList.add('hidden');
+  if ($('btn-surrender')) $('btn-surrender').classList.add('hidden');
+
   turnDeadline = Date.now() + 30000;
   startLocalClocks();
   
@@ -1820,6 +1958,31 @@ function clearSelection() {
     
     // THE FIX: Recalculate button state instead of hiding it
     updatePlaceButton();
+}
+
+function surrender() {
+    if (gameOver) return;
+
+    // 1. Confirm with the player to prevent accidental clicks
+    showOverlay(
+        "Surrender?", 
+        "Are you sure you want to concede this match?", 
+        "Yes, Surrender", 
+        "Cancel", 
+        hideOverlay
+    );
+
+    $('overlayBtn').onclick = () => {
+        hideOverlay();
+        if (isOnline) {
+            // 2. Tell the server we give up
+            socket.emit('surrender_match', { matchId: onlineMatchId });
+        } else {
+            // 3. Local logic: The other player wins
+            const winner = (currentPlayer === P1) ? P2 : P1;
+            endGame({ player: winner, line: [] });
+        }
+    };
 }
 
 function updatePlaceButton() {
@@ -1983,6 +2146,9 @@ socket.on('rematch_requested', () => {
 });
 
 socket.on('opponent_left', () => {
+    // Stop local clocks if they were still running
+    if (localTickInterval) clearInterval(localTickInterval);
+
     showOverlay("Room Closed", "Your opponent left the room.", "Main Menu");
     overlayBtn.onclick = () => {
         hideOverlay();
@@ -2002,7 +2168,7 @@ socket.on('timeout_loss', ({ loserRole, winnerRole }) => {
   const winnerText = (winnerRole === myOnlineRole) ? "You win by timeout!" : "You lost by timeout.";
   const loserColor = (loserRole === 1) ? "Black" : "White";
   
-  showOverlay("Time's Up!", `${loserColor} ran out of time. ${winnerText}`, "New Game", "Main Menu", () => {
+  showOverlay("Time's Up!", `${loserColor} ran out of time. ${winnerText}`, "Rematch", "Main Menu", () => {
     hideOverlay();
     quitGame();
   });
@@ -2059,8 +2225,21 @@ socket.on('match_over', ({ winnerRole, ratings, reason }) => {
       msg = `Opponent quit the match. You win by forfeit!`; 
       primaryBtnText = "Main Menu";
     }
+    if (reason === 'surrender') {
+        const winnerName = (winnerRole === myOnlineRole) ? "You" : "Opponent";
+        msg = `${winnerName} won by surrender. Play again?`;
+    }
 
-    showOverlay(title, msg, primaryBtnText, null, null);
+    showOverlay(
+        title, 
+        msg, 
+        primaryBtnText, 
+        "Main Menu", 
+        () => {
+            hideOverlay();
+            quitGame();
+        }
+    );
 
     const mainBtn = $('overlayBtn');
     const bodyEl = $('overlayBody');

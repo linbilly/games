@@ -81,7 +81,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('find_global_match', ({ vanishMs, ruleMode, platformId }) => {
-    const request = { socketId: socket.id, username: currentUser, platformId, vanishMs, ruleMode };
+    const request = { socketId: socket.id, username: socket.username||"Guest", platformId, vanishMs, ruleMode };
 
     // Look for an exact match (simplified for MVP)
     const matchIndex = matchmakingQueue.findIndex(p => p.vanishMs === vanishMs && p.ruleMode === ruleMode);
@@ -100,7 +100,7 @@ io.on('connection', (socket) => {
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     activeMatches.set(roomCode, {
       id: roomCode,
-      host: { socketId: socket.id, username: currentUser },
+      host: { socketId: socket.id, username: socket.username || "Guest" },
       guest: null,
       size, vanishMs, ruleMode,
       state: new Array(size * size).fill(0),
@@ -190,6 +190,14 @@ io.on('connection', (socket) => {
 });
 
 
+// --- LIVE SESSION UPDATES ---
+    socket.on('set_user_data', (data) => {
+        // Update the server's memory for this specific socket
+        socket.username = data.username;
+        socket.platformId = data.platformId;
+        console.log(`Socket ${socket.id} updated name to: ${data.username}`);
+    });
+
 
   // --- HANDLE MISTAKES ---
   socket.on('commit_mistake', ({ matchId }) => {
@@ -272,6 +280,18 @@ async function handleForfeit(socket, matchId) {
 // Updated Listeners
 socket.on('leave_room', ({ matchId }) => {
     handleForfeit(socket, matchId); // Trigger the loss immediately
+    const match = activeMatches.get(matchId);
+    if (match) {
+        // Notify the other player that the room is now closed
+        socket.to(matchId).emit('opponent_left');
+        
+        // Stop any active server-side timers
+        if (match.timerInterval) {
+            clearInterval(match.timerInterval);
+        }
+        
+        activeMatches.delete(matchId);
+    }
     socket.leave(matchId);
 });
 
@@ -363,6 +383,8 @@ socket.on('reconnect_to_match', ({ matchId, platformId }) => {
         match.turnDeadline = Date.now() + 30000;
         match.rematchRequests.clear();
 
+        match.meterPos = 0;
+
         // --- ADD THESE TWO LINES TO RESET SWAP2 ---
         match.swap2Phase = (match.ruleMode === 'swap2') ? 1 : 0;
         match.openingStones = [];
@@ -400,6 +422,22 @@ socket.on('reconnect_to_match', ({ matchId, platformId }) => {
     }
   });
 
+  // --- SURRENDER LOGIC ---
+    socket.on('surrender_match', async ({ matchId }) => {
+        const match = activeMatches.get(matchId);
+        if (!match || match.isOver) return;
+
+        // Identify the winner (the player who DID NOT click surrender)
+        const isHost = (match.host.socketId === socket.id);
+        const winnerRole = isHost ? 2 : 1;
+
+        console.log(`Match ${matchId}: ${socket.username} surrendered.`);
+
+        // Reuse your existing win handler to process Elo and broadcast the result
+        // We pass 'surrender' as an optional reason to customize the message
+        handleServerWin(match, winnerRole, matchId, 'surrender');
+    });
+
   // --- DRAW LOGIC ---
     socket.on('offer_draw', ({ matchId }) => {
         const match = activeMatches.get(matchId);
@@ -410,6 +448,12 @@ socket.on('reconnect_to_match', ({ matchId, platformId }) => {
         if (opponent) {
             io.to(opponent.socketId).emit('draw_offered');
         }
+    });
+
+    // --- EMOJI CHAT ---
+    socket.on('send_emoji', ({ matchId, emoji, role }) => {
+        // Broadcast the emoji to the opponent in the room
+        socket.to(matchId).emit('receive_emoji', { emoji, role });
     });
 
     socket.on('draw_response', ({ matchId, accepted }) => {
@@ -570,31 +614,26 @@ function checkServerWin(state, size, goal, r, c, player) {
   return false;
 }
 
-function handleServerWin(match, winningPlayerRole, matchId) {
-    // 1. Stop the game and clear timers
+function handleServerWin(match, winningPlayerRole, matchId, reason = 'win') {
     match.isOver = true;
     if (match.timerInterval) clearInterval(match.timerInterval);
 
-    // 2. Identify the winner and loser
-    const loserRole = winningPlayerRole === 1 ? 2 : 1;
     const winner = winningPlayerRole === 1 ? match.host : match.guest;
-    const loser = loserRole === 1 ? match.host : match.guest;
+    const loser = winningPlayerRole === 1 ? match.guest : match.host;
 
-    // 3. Process Ratings if both players are authenticated (Apple ID exists)
     if (winner.platformId && loser.platformId) {
         (async () => {
             const ratingData = await finalizeMatchRatings(winner.platformId, loser.platformId, match.vanishMs);
-            
             io.to(matchId).emit('match_over', {
                 winnerRole: winningPlayerRole,
-                ratings: ratingData // Send the whole object, let the client sort it out!
+                ratings: ratingData,
+                reason: reason // Now includes 'surrender' if applicable
             });
         })();
     } else {
-        // Unranked/Guest match: Just broadcast the win without Elo changes
         io.to(matchId).emit('match_over', {
             winnerRole: winningPlayerRole,
-            reason: 'win'
+            reason: reason
         });
     }
 }
@@ -686,6 +725,28 @@ app.delete('/user/:platformId', async (req, res) => {
     } catch (err) {
         console.error("Account deletion error:", err);
         res.status(500).json({ error: "Failed to delete account." });
+    }
+});
+
+// --- UPDATE USERNAME ---
+app.put('/user/:platformId/name', async (req, res) => {
+    const { platformId } = req.params;
+    const { username } = req.body;
+
+    // Basic validation to prevent blank names or massive strings
+    if (!username || username.trim().length === 0 || username.length > 15) {
+        return res.status(400).json({ error: "Invalid username length" });
+    }
+
+    try {
+        await pool.query(
+            'UPDATE users SET username = $1 WHERE platform_id = $2',
+            [username.trim(), platformId]
+        );
+        res.json({ success: true, username: username.trim() });
+    } catch (err) {
+        console.error("Failed to update username:", err);
+        res.status(500).json({ error: "Database error" });
     }
 });
 

@@ -26,7 +26,7 @@
     <button id="btn-online-ladder" class="btn highlight-btn" onclick="selectMode('online_ladder')">Online Ladder</button>
     
     <div style="display: flex; gap: 10px; width: 100%;">
-        <button class="btn ghost" style="flex: 1;" onclick="openInfoOverlay()">Ranking</button>
+        <button class="btn ghost" style="flex: 1;" onclick="openInfoOverlay()">Profile</button>
         <button class="btn ghost" style="flex: 1;" onclick="openRulesOverlay()">How to Play</button>
     </div>
     <link rel="preload" href="board.jpeg" as="image">
@@ -85,27 +85,42 @@
 
 <div id="game-page" class="hidden">
     <div id="game-top-bar">
-        <button class="btn ghost" onclick="quitGame()">Quit</button>
-        <button id="draw-btn" class="btn ghost" onclick="offerDraw()">Draw</button>
-        
-        <div id="players-display" style="display: flex; flex-grow: 1; justify-content: space-evenly; align-items: center; padding: 0 10px;">
-            <div id="p1-info" class="player-info">
-                <span id="p1-name">P1</span>
-                <div id="p1-pill" class="turn-piece hidden"></div>
-            </div>
-            
-            <div id="timerP1" class="timer" style="font-family: monospace; font-size: 18px; font-weight: bold;">00:30</div>
-            
-            <div id="p2-info" class="player-info">
-                <div id="p2-pill" class="turn-piece hidden"></div>
-                <span id="p2-name">P2</span>
-            </div>
+        <div class="top-bar-left">
+            <button class="btn ghost small" onclick="quitGame()">Quit</button>
+
+        </div>
+        <div class="top-bar-center">
+            <span class="title"></span>
+        </div>
+        <div class="top-bar-right" style="display: flex; gap: 8px;">
+            <button id="btn-chat" class="btn ghost small hidden" onclick="openEmojiMenu()">💬</button>
+            <button class="btn ghost small" onclick="offerDraw()">Draw</button>
+            <button id="btn-surrender" class="btn ghost small" onclick="surrender()">🏳️ Surrender</button>
         </div>
     </div>
 
-    <div id="board-container">
-        <div id="boardWrap" class="board-wrap">
-            <div id="board" class="board"></div>
+    <div id="board-area">
+        <div id="game-hud">
+            <div id="p1-info" class="player-info">
+                <div id="p1-pill" class="turn-piece p1 hidden"></div>
+                <span id="p1-name">handsome guy</span>
+                <div id="p1-emoji" class="emoji-bubble"></div>
+            </div>
+
+            <div id="timer-container">
+                <span id="timerP1" class="timer">00:30</span>
+            </div>
+
+            <div id="p2-info" class="player-info player-info-right">
+                <div id="p2-emoji" class="emoji-bubble"></div>
+                <span id="p2-name">Guest</span>
+                <div id="p2-pill" class="turn-piece p2 hidden"></div>
+            </div>
+        </div>
+
+        <div id="board-container">
+            <div id="board-wrap" class="board-wrap">
+                <div id="board" class="board"></div>
             <div id="overlay" class="overlay hidden">
               <div class="overlay-card">
                 <div id="overlayTitle" class="overlay-title">Message</div>
@@ -155,8 +170,8 @@
 <div id="info-overlay" class="modal-overlay hidden">
     <div class="modal-content info-card">
         <div class="info-tabs">
-            <button class="tab-btn active" onclick="switchTab('rankings')">Rankings</button>
-            <button class="tab-btn" onclick="switchTab('stats')">My Stats</button>
+            <button class="tab-btn active" onclick="switchTab('stats')">Profile</button>
+            <button class="tab-btn" onclick="switchTab('rankings')">Rankings</button>            
             <button class="tab-btn" onclick="switchTab('rules')">Rules</button>
         </div>
 
@@ -168,7 +183,13 @@
 
         <div id="tab-stats" class="tab-content hidden">
             <h3>My Profile</h3>
-            <div class="stat-row"><span>Username:</span> <span id="stat-username">-</span></div>
+            <div class="stat-row">
+              <span>Username:</span>
+              <span style="display: flex; align-items: center; gap: 10px;">
+                <strong id="stat-username">Guest</strong>
+                <button id="btn-edit-name" class="btn small ghost" style="padding: 2px 8px; font-size: 0.8rem;">✏️ Edit</button>
+              </span>
+            </div>
             <div class="stat-row"><span>Standard ELO:</span> <span id="stat-elo">-</span></div>
             <div class="stat-row"><span>Wins:</span> <span id="stat-wins">0</span></div>
             <div class="stat-row"><span>Losses:</span> <span id="stat-losses">0</span></div>
