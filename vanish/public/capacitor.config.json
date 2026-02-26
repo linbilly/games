@@ -1,6 +1,5 @@
 {
-  "appId": "com.vanish.game",
-  "appName": "Vanish",
+  "appId": "com.bigwgames.vanish",
+  "appName": "Vanish Gomoku",
   "webDir": "public",
-  "bundledWebRuntime": false
 }

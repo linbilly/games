@@ -1,4 +1,4 @@
-/* Memory Gomoku - full game
+/* Vanish Gomoku - full game
    - 3x3 connect 3 (tic tac toe)
    - 8x8 connect 5
    - 12x12 connect 5

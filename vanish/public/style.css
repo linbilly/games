@@ -387,7 +387,20 @@ html, body {
   overflow: hidden;
 }
 
-#landing-page { justify-content: center; align-items: center; gap: 30px; }
+#landing-page { 
+  position: relative; /* Creates an anchor point for the absolute positioning below */
+  justify-content: center; 
+  align-items: center; 
+  gap: 20px; 
+}
+
+/* Pin the logo and title to the absolute top of the screen */
+#landing-page .brand {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top));
+  left: 25px;
+  right: 25px; /* Prevents long titles from bleeding off the edge on tiny screens */
+}
 
 #game-top-bar {
   display: flex; 
