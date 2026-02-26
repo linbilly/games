@@ -151,6 +151,8 @@ let selectedC = null;
 function showGamePage() {
     $('landing-page').classList.add('hidden');
     $('game-page').classList.remove('hidden');
+
+    if ($('info-overlay')) $('info-overlay').classList.add('hidden');
     resizeBoard(); 
 }
 

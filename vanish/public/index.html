@@ -87,7 +87,6 @@
     <div id="game-top-bar">
         <div class="top-bar-left">
             <button class="btn ghost small" onclick="quitGame()">Quit</button>
-
         </div>
         <div class="top-bar-center">
             <span class="title"></span>
@@ -121,51 +120,28 @@
         <div id="board-container">
             <div id="board-wrap" class="board-wrap">
                 <div id="board" class="board"></div>
-            <div id="overlay" class="overlay hidden">
-              <div class="overlay-card">
-                <div id="overlayTitle" class="overlay-title">Message</div>
-                <div id="overlayBody" class="overlay-body" style="white-space: pre-wrap;">...</div>
                 
-                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
-                    <button id="overlayBtn" class="btn">New Game</button>
-                    <button id="overlayBtn2" class="btn ghost hidden">Main Menu</button>
-                    <button id="minimize-overlay-btn" class="icon-btn hidden" onclick="minimizeOverlay()" title="Minimize to view board">▼</button>
-
-                    <button id="restore-overlay-btn" class="restore-btn hidden" onclick="restoreOverlay()">▲ Show Menu</button>
+                <div id="overlay" class="overlay hidden">
+                  <div class="overlay-card">
+                    <div id="overlayTitle" class="overlay-title">Message</div>
+                    <div id="overlayBody" class="overlay-body" style="white-space: pre-wrap;">...</div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                        <button id="overlayBtn" class="btn">New Game</button>
+                        <button id="overlayBtn2" class="btn ghost hidden">Main Menu</button>
+                        <button id="minimize-overlay-btn" class="icon-btn hidden" onclick="minimizeOverlay()" title="Minimize to view board">▼</button>
+                        <button id="restore-overlay-btn" class="restore-btn hidden" onclick="restoreOverlay()">▲ Show Menu</button>
+                    </div>
+                  </div>
                 </div>
                 
-              </div>
-            </div>
-        </div>
-    </div>
-    
-    <div id="bottom-controls" style="width: 100%; text-align: center; padding-bottom: 10px;">
+            </div> </div> </div> <div id="bottom-controls" style="width: 100%; text-align: center; padding-bottom: 10px;">
         <button id="btn-place" onclick="confirmPlacement()" disabled>Confirm Move</button>
-        
         <div id="mistakeMeter" class="meter"></div>
     </div>
-</div>
+</div> 
 
-<div id="matchmaking-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-        <h2 id="matchmaking-text">Searching for opponent...</h2>
-        <div id="matchmaking-spinner" class="spinner"></div>
-        <div id="matchmaking-actions" class="hidden" style="flex-direction: column; gap: 10px; margin-top: 20px;">
-            <button class="btn" onclick="playAIWhileWaiting()">Play AI While Waiting</button>
-            <button class="btn ghost" onclick="cancelMatchmaking()">Cancel Search</button>
-        </div>
-        <button id="matchmaking-cancel-initial" class="btn ghost" style="margin-top: 20px;" onclick="cancelMatchmaking()">Cancel</button>
-    </div>
-</div>
 
-<div id="match-found-modal" class="modal-overlay hidden" style="z-index: 2000;">
-    <div class="modal-content">
-        <h2 style="color: #ffcf40;">Opponent Found!</h2>
-        <p>Accept match and quit AI game?</p>
-        <button class="btn" style="margin-bottom: 10px;" onclick="acceptOnlineMatch()">Accept Match</button>
-        <button class="btn ghost" onclick="declineOnlineMatch()">Decline</button>
-    </div>
-</div>
 
 <div id="info-overlay" class="modal-overlay hidden">
     <div class="modal-content info-card">
@@ -207,6 +183,27 @@
         <button class="btn ghost" style="margin-top: 20px;" onclick="closeInfoOverlay()">Close</button>
     </div>
 
+</div>
+
+<div id="matchmaking-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <h2 id="matchmaking-text">Searching for opponent...</h2>
+        <div id="matchmaking-spinner" class="spinner"></div>
+        <div id="matchmaking-actions" class="hidden" style="flex-direction: column; gap: 10px; margin-top: 20px;">
+            <button class="btn" onclick="playAIWhileWaiting()">Play AI While Waiting</button>
+            <button class="btn ghost" onclick="cancelMatchmaking()">Cancel Search</button>
+        </div>
+        <button id="matchmaking-cancel-initial" class="btn ghost" style="margin-top: 20px;" onclick="cancelMatchmaking()">Cancel</button>
+    </div>
+</div>
+
+<div id="match-found-modal" class="modal-overlay hidden" style="z-index: 2000;">
+    <div class="modal-content">
+        <h2 style="color: #ffcf40;">Opponent Found!</h2>
+        <p>Accept match and quit AI game?</p>
+        <button class="btn" style="margin-bottom: 10px;" onclick="acceptOnlineMatch()">Accept Match</button>
+        <button class="btn ghost" onclick="declineOnlineMatch()">Decline</button>
+    </div>
 </div>
 
 <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
