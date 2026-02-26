@@ -379,12 +379,19 @@ html, body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-#landing-page, #game-page {
-  display: flex;
-  flex-direction: column;
-  width: 100vw;
-  height: 100dvh; 
-  overflow: hidden;
+#game-page {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* Pushes top bar up, and bottom controls down */
+    box-sizing: border-box;
+    padding-top: max(10px, env(safe-area-inset-top)); /* Clears the iOS Notch */
+    padding-bottom: max(15px, env(safe-area-inset-bottom)); /* Clears the iOS Home Bar */
+    background: #121212; /* Prevents seeing the menu behind it during transitions */
 }
 
 #landing-page { 
@@ -398,11 +405,27 @@ html, body {
 }
 
 #landing-page .brand {
-  position: absolute;
-  top: max(40px, env(safe-area-inset-top)); /* Pushed to 40px to ensure it clears the notch */
-  left: 0;
-  width: 100%;
-  text-align: center; /* Centers the logo nicely */
+    position: absolute;
+    top: max(40px, env(safe-area-inset-top));
+    left: 20px; /* Matches the 20px padding from the game screen */
+    display: flex;
+    align-items: center; /* Keeps the V logo and the text horizontally level */
+    gap: 15px; /* Adds breathing room between the logo and the text */
+    text-align: left; /* Forces the text block to left-align */
+}
+
+#landing-page .brand .subtitle {
+    /* This gradient mask starts 100% solid black (visible), 
+      holds it until 45% of the way across, 
+      and then smoothly fades to 5% opacity at the very end. 
+    */
+    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,1) 45%, rgba(0,0,0,0.05) 100%);
+    mask-image: linear-gradient(to right, rgba(0,0,0,1) 45%, rgba(0,0,0,0.05) 100%);
+    
+    /* Optional: Give it a nice color and a tiny bit of breathing room */
+    color: #9aa6d6; 
+    margin-top: 4px;
+    font-size: 15px;
 }
 
 #game-top-bar {
@@ -410,6 +433,9 @@ html, body {
   justify-content: space-between; 
   align-items: center; 
   padding: 12px 15px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 20px; /* The 20px provides the exact side padding you are looking for */
   
   /* The new background styles */
   background: rgba(255, 255, 255, 0.08); /* Soft, slightly transparent grey */
@@ -563,9 +589,7 @@ html, body {
     box-sizing: border-box;
 }
 
-#game-top-bar {
-  padding-top: max(12px, env(safe-area-inset-top));
-}
+
 #bottom-controls {
   padding-bottom: max(10px, env(safe-area-inset-bottom));
 }
