@@ -75,7 +75,27 @@ const isLocalDev = !isNative && (window.location.hostname === 'localhost' || win
 // 3. Set the URL securely
 const SERVER_URL = isLocalDev ? 'http://localhost:3000' : 'https://playgomoku.bigwgames.com'; 
 const socket = io(SERVER_URL);
+// --- AUTO-RECOVERY HOOKS ---
 
+// 1. Socket Auto-Reconnect: 
+// Socket.io automatically constantly pings the server in the background. 
+// If it successfully reconnects, and we are currently stuck offline, auto-login!
+socket.on('connect', () => {
+    if (!currentPlatformId) {
+        console.log("Socket connected! Auto-retrying login...");
+        initializeUser();
+    }
+});
+
+// 2. Foreground Auto-Reconnect:
+// If the user minimizes the app to go log into Game Center in their iOS settings,
+// this fires the exact millisecond they bring your app back to the screen.
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === 'visible' && !currentPlatformId) {
+        console.log("App returned to foreground! Auto-retrying login...");
+        initializeUser();
+    }
+});
 let isOnline = false;
 let onlineMatchId = null;
 let myOnlineRole = null; // 1 (Black) or 2 (White)
@@ -479,8 +499,14 @@ async function updateLeaderboard() {
 }
 
 async function initializeUser() {
-  const isNative = window.Capacitor && Capacitor.isNativePlatform();
+  const isNative = window.Capacitor && window.Capacitor.isNativePlatform();
   const platform = isNative ? Capacitor.getPlatform() : 'web'; 
+  
+  // 1. Reset UI to a loading state
+  const welcomeText = document.getElementById('welcome-text');
+  const retryBtn = document.getElementById('retry-auth-btn');
+  if (welcomeText) welcomeText.innerText = "Connecting to server...";
+  if (retryBtn) retryBtn.classList.add('hidden');
   
   let savedGuestId = localStorage.getItem('vanish_guest_id');
   if (!savedGuestId) {
@@ -502,14 +528,13 @@ async function initializeUser() {
         userData.playerId = auth.player_id;
         userData.displayName = auth.player_name;
       } else if (platform === 'android') {
-        // Ensure you have @capacitor-community/google-play-games installed
         const GPlay = Capacitor.Plugins.GooglePlayGames;
         const auth = await GPlay.signIn();
         userData.playerId = auth.playerId;
         userData.displayName = auth.displayName;
       }
     } catch (err) { 
-      console.error("Native Auth failed, proceeding as guest:", err); 
+      console.warn("Native Auth failed, proceeding as guest:", err); 
     }
   }
 
@@ -524,30 +549,41 @@ async function initializeUser() {
 
     const dbUser = await response.json();
     
-    // Store globally for the "Additional Info" overlay
     currentUser = dbUser.username;
     currentPlatformId = dbUser.platform_id; 
     myRating = dbUser.rating_15_standard; 
     myWins = dbUser.wins || 0;
     myLosses = dbUser.losses || 0;
 
-    console.log(`Authenticated as ${currentUser}. Rating: ${Math.round(myRating)}`);
-
     const deleteBtn = document.getElementById('btn-delete-account');
-    if (deleteBtn) {
-        deleteBtn.onclick = requestAccountDeletion;
-    }
+    if (deleteBtn) deleteBtn.onclick = requestAccountDeletion;
     
-    // Refresh UI elements
-    const welcomeText = document.getElementById('welcome-text');
+    // SUCCESS: Restore the UI!
     if (welcomeText) welcomeText.innerText = `Welcome, ${currentUser}`;
     
-    updateLeaderboard(); 
-} catch (err) {
-    console.error("Auth fetch failed:", err);
-    document.getElementById('welcome-text').innerText = "Offline Mode";
+    const privateBtn = document.getElementById('btn-online-private');
+    const ladderBtn = document.getElementById('btn-online-ladder');
     
-    // Disable the online buttons when the server can't be reached
+    if (privateBtn) {
+        privateBtn.disabled = false;
+        privateBtn.innerText = "Online Private Room";
+    }
+    if (ladderBtn) {
+        ladderBtn.disabled = false;
+        ladderBtn.innerText = "Online Ladder";
+        ladderBtn.classList.add('highlight-btn');
+    }
+    
+    updateLeaderboard(); 
+    checkActiveMatch(); // Attempt to rejoin if we crashed mid-game
+    
+  } catch (err) {
+    console.error("Auth fetch failed:", err);
+    
+    // FAIL: Show Offline UI and Retry Button
+    if (welcomeText) welcomeText.innerText = "Offline Mode";
+    if (retryBtn) retryBtn.classList.remove('hidden');
+    
     const privateBtn = document.getElementById('btn-online-private');
     const ladderBtn = document.getElementById('btn-online-ladder');
     
@@ -555,11 +591,10 @@ async function initializeUser() {
         privateBtn.disabled = true;
         privateBtn.innerText = "Private Room (Offline)";
     }
-    
     if (ladderBtn) {
         ladderBtn.disabled = true;
         ladderBtn.innerText = "Online Ladder (Offline)";
-        ladderBtn.classList.remove('highlight-btn'); // Remove the gold highlight
+        ladderBtn.classList.remove('highlight-btn'); 
     }
   }
 }
