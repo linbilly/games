@@ -508,7 +508,7 @@ html, body {
     aspect-ratio: 1 / 1; 
 }
 
-.menu-container { display: flex; flex-direction: column; gap: 15px; width: 85%; max-width: 350px; }
+.menu-container { display: flex; flex-direction: column; gap: 15px; width: 85%; max-width: 350px; padding-bottom: 4px;}
 .option-group { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; }
 
 /* Matchmaking UI */
@@ -745,6 +745,7 @@ html, body {
     .menu-container {
         width: 95%;
         gap: 10px; /* Tighter vertical spacing */
+        padding-bottom: 4px;
     }
 
     /* Make the settings rows more compact */
