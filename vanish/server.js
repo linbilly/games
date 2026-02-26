@@ -3,6 +3,8 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors'); // 1. Import cors
 
+
+
 require('dotenv').config();
 
 const { Server } = require('socket.io');
@@ -34,9 +36,32 @@ app.use(express.json());
 
 app.use(express.static('public')); // Existing line
 
+const corsOptions = {
+    origin: [
+        "https://playgomoku.bigwgames.com", // Live Web App
+        "http://localhost:3000",            // Local Web Testing
+        "capacitor://localhost",            // Native iOS App
+        "http://localhost"                  // Native Android App
+    ],
+    methods: ["GET", "POST", "DELETE", "PUT"],
+    credentials: true
+};
+
+app.use(cors(corsOptions));
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, {
+    cors: {
+        origin: [
+            "https://playgomoku.bigwgames.com", 
+            "http://localhost:3000",
+            "capacitor://localhost",
+            "http://localhost"
+        ],
+        methods: ["GET", "POST"],
+        credentials: true
+    }
+});
 
 // In-memory game state for fast validation
 const activeMatches = new Map();
