@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAC: March and Chomp Rules</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #00BCD4; padding: 10px; text-align: left; }
+        th { background-color: #e0f7fa; color: #00BCD4; }
+    </style>
+
+    <link rel="icon" type="image/png" href="wmeeple.png">
+</head>
+<body class="theme-mac">
+    <header>
+        <h1>MAC: March and Chomp</h1>
+    </header>
+    <div class="container">
+        <a href="index.html" class="back-link">&lt; Back to Home</a>
+
+        <div class="section">
+            <h2>Game Overview</h2>
+            <img src="mac.jpeg" alt="MAC Game Board and Tokens" class="rules-hero-img">
+            <p>
+                MAC: March and Chomp is an abstract strategy game for two players. The objective is to strategically maneuver your pieces to capture all of your opponent’s pieces or force them into a position where they cannot make a legal move.
+            </p>
+        </div>
+
+        <div class="section">
+            <h2>Components</h2>
+            <ul class="rule-list">
+                <li><strong>Game Board:</strong> One 4×8 grid (32 squares).</li>
+                <li><strong>Game Pieces:</strong> 30 numbered pieces (15 Red, 15 Blue). Numbered: 0, 0, 1, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10.</li>
+                <li><strong>Portal Tiles:</strong> 2 special movement tiles.</li>
+                <li><strong>Power Tokens:</strong> Optional for more complex gameplay.</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Standard Mode Rules</h2>
+            <h3>Setup</h3>
+            <ul class="rule-list">
+                <li>Each player chooses a color (Red/Blue) and receives 15 pieces and one Portal Tile.</li>
+                <li>Determine who goes first.</li>
+                <li>Players take turns placing one of their pieces or their Portal Tile onto their 4×4 starting half of the board. All pieces and the portal must be placed.</li>
+                <li>The player who placed the very first piece of the game will make the first move after all setup is complete.</li>
+            </ul>
+
+            <h3>Gameplay & Movement Restrictions</h3>
+            <p>Players alternate turns. On your turn, you must move one of your pieces one square orthogonally (up, down, left, or right).</p>
+            <p>A piece may <strong>not</strong>:</p>
+            <ul class="rule-list">
+                <li>Move off the board.</li>
+                <li>Move onto a square occupied by a friendly piece.</li>
+                <li>Move onto a square occupied by an opposing piece of higher strength.</li>
+            </ul>
+
+            <h3>Capture Rules</h3>
+            <ul class="rule-list">
+                <li>A piece captures an opposing piece by moving onto its square (equal or lower strength only).</li>
+                <li><strong>Special Hierarchy Rule:</strong> A Strength 1 piece defeats a Strength 10 piece. A Strength 10 piece cannot capture a Strength 1 piece.</li>
+            </ul>
+
+            <h3>Cannon (Strength 0) Rules</h3>
+            <ul class="rule-list">
+                <li><strong>Standard Move/Capture:</strong> Moves one square orthogonally. Can capture an opponent piece of Strength 0 by moving one step.</li>
+                <li><strong>Jump Capture:</strong> Can capture an opponent's piece of <em>any</em> strength by jumping over exactly one piece in a straight orthogonal line. The piece being jumped over (the "screen") is not captured.</li>
+                <li>A Cannon cannot jump into a Portal.</li>
+            </ul>
+
+            <h3>Portal Rules</h3>
+            <ul class="rule-list">
+                <li>A game piece can move one step into a Portal Tile.</li>
+                <li>It immediately exits through the other Portal Tile and takes one additional, immediate orthogonal step (capturing an enemy on this final step is allowed).</li>
+                <li>If no legal exit square is available, the piece cannot enter the first Portal.</li>
+                <li>A Portal Tile can act as a screen piece for a Cannon's Jump Capture.</li>
+            </ul>
+
+            <h3>End of Game and Draw Conditions</h3>
+            <ul class="rule-list">
+                <li><strong>You lose if:</strong> All of your game pieces are captured, or you cannot make a legal move on your turn.</li>
+                <li><strong>Draw if:</strong> The exact same board state is repeated three times, or 20 consecutive turns pass without a capture.</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Optional Power Token Mode</h2>
+            <p>This mode uses Power tokens to add tactical depth. Whenever one of your pieces is captured, you draw one Power token. You may play one Power token at the start of your turn before moving.</p>
+            <table>
+                <tr>
+                    <th>Power Token</th>
+                    <th>Effect</th>
+                    <th>Special Rules</th>
+                </tr>
+                <tr>
+                    <td><strong>+1</strong></td>
+                    <td>Increases a piece's strength by 1.</td>
+                    <td>A piece can only receive one +1 power up.<br>Strength 9 becomes 10 (now capturable by 1).<br>Strength 10 becomes 11 (still capturable by 1).<br>Cannon (0) keeps Jump Capture, but can now also capture a 0 or 1 with a single step.</td>
+                </tr>
+                <tr>
+                    <td><strong>Double Step</strong></td>
+                    <td>Choose a piece to take 2 orthogonal steps.</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td><strong>Push</strong></td>
+                    <td>Move one opponent's piece 1 step orthogonally.</td>
+                    <td>You may Push an opponent’s piece into a Portal and decide where it exits.</td>
+                </tr>
+                <tr>
+                    <td><strong>Peek</strong></td>
+                    <td>(Dark Chess Mode only). Secretly look at up to 3 covered pieces.</td>
+                    <td>Remove this token from the pile if playing Standard or Light Chess.</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Variant Modes</h2>
+            <h3>Dark Chess</h3>
+            <ul class="rule-list">
+                <li>Shuffle all 30 game pieces face down. Place Portal Tiles face up on agreed squares.</li>
+                <li>Randomly arrange pieces face down. On your turn, either flip over one down-facing piece OR move one up-facing piece.</li>
+                <li>The first player to flip a piece determines which color they control.</li>
+                <li>A down-facing piece cannot be captured, but a Cannon can use it as a screen to jump over.</li>
+            </ul>
+
+            <h3>Light Chess</h3>
+            <ul class="rule-list">
+                <li>Shuffle and randomly place all 30 pieces and 2 Portals face down.</li>
+                <li>Players choose their color before play begins.</li>
+                <li>All pieces are flipped over at the same time, and the game is played normally with all pieces uncovered.</li>
+            </ul>
+        </div>
+
+    </div>
+</body>
+</html>

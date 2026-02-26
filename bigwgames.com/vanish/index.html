@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vanish Gomoku - Connect 5... that you can't see!</title>
+  <meta name="description" content="Vanish Gomoku is a fast, tactical multiplayer strategy game where your pieces turn invisible but stay on the board. Built by Big W Games." />
+
+  <meta property="og:title" content="Vanish Gomoku" />
+  <meta property="og:description" content="Fast, tactical multiplayer strategy where your moves fade from sight." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://bigwgames.com/vanish/" />
+
+  <meta name="theme-color" content="#0b0f19" />
+  <style>
+    :root{
+      --bg:#0b0f19;
+      --panel:#111a2e;
+      --panel2:#0f1628;
+      --text:#eaf0ff;
+      --muted:#b5c0e0;
+      --brand:#8ee6ff;
+      --brand2:#a2ffcf;
+      --line: rgba(255,255,255,.14);
+      --shadow: 0 12px 40px rgba(0,0,0,.45);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:var(--sans); color:var(--text); background:
+        radial-gradient(1200px 600px at 20% 10%, rgba(142,230,255,.18), transparent 60%),
+        radial-gradient(900px 600px at 85% 15%, rgba(162,255,207,.12), transparent 55%),
+        radial-gradient(900px 900px at 45% 95%, rgba(142,230,255,.08), transparent 55%),
+        var(--bg);
+      min-height:100vh;
+    }
+    a{color:inherit}
+    .wrap{max-width:980px;margin:0 auto;padding:28px 18px 48px}
+    header{
+      display:flex; align-items:center; justify-content:space-between; gap:14px;
+      padding:14px 0 22px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:12px; text-decoration:none;
+    }
+    .logo{
+      width:40px;height:40px;border-radius:12px;
+      background: linear-gradient(135deg, rgba(142,230,255,.9), rgba(162,255,207,.85));
+      box-shadow: 0 10px 30px rgba(142,230,255,.18);
+      position:relative; overflow:hidden;
+    }
+    .logo::after{
+      content:""; position:absolute; inset:-20%;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.55), transparent 40%),
+                  radial-gradient(circle at 70% 60%, rgba(255,255,255,.25), transparent 45%);
+      transform: rotate(18deg);
+    }
+    .brand h1{margin:0;font-size:16px;letter-spacing:.3px}
+    .brand span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+    nav{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:10px 12px; border:1px solid var(--line);
+      border-radius:999px; text-decoration:none; color:var(--text);
+      background: rgba(255,255,255,.03);
+      transition: background 0.2s;
+    }
+    .pill:hover{background: rgba(255,255,255,.08)}
+    .hero{
+      margin-top:10px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .heroInner{
+      display:grid; grid-template-columns: 1.2fr .8fr; gap:0;
+    }
+    @media (max-width:860px){
+      .heroInner{grid-template-columns:1fr}
+    }
+    .heroText{padding:30px 26px 26px}
+    .kicker{
+      display:inline-flex; gap:8px; align-items:center;
+      font-family:var(--mono);
+      font-size:12px; color:var(--muted);
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:8px 10px;
+      background: rgba(255,255,255,.03);
+    }
+    .title{
+      margin:14px 0 8px;
+      font-size:44px; line-height:1.05;
+      letter-spacing:-.8px;
+    }
+    @media (max-width:520px){ .title{font-size:36px} }
+    .subtitle{
+      margin:0 0 18px;
+      color:var(--muted);
+      font-size:16px;
+      line-height:1.6;
+      max-width:58ch;
+    }
+    .ctaRow{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px}
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      text-decoration:none;
+      font-weight:650;
+      letter-spacing:.2px;
+      background: rgba(255,255,255,.03);
+      min-width: 150px;
+      transition: filter 0.2s;
+    }
+    .btnPrimary{
+      border-color: rgba(142,230,255,.45);
+      background: linear-gradient(135deg, rgba(142,230,255,.22), rgba(162,255,207,.14));
+      color: #fff;
+    }
+    .btn:hover{filter:brightness(1.15)}
+    .heroArt{
+      border-left:1px solid var(--line);
+      background:
+        radial-gradient(380px 220px at 65% 35%, rgba(142,230,255,.20), transparent 60%),
+        radial-gradient(420px 280px at 35% 60%, rgba(162,255,207,.14), transparent 55%),
+        linear-gradient(180deg, rgba(15,22,40,.92), rgba(15,22,40,.55));
+      padding:22px;
+      position:relative;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    @media (max-width:860px){ .heroArt{border-left:none;border-top:1px solid var(--line)} }
+    
+    .cardGrid{
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:12px;
+      margin-top:22px;
+    }
+    @media (max-width:860px){ .cardGrid{grid-template-columns:1fr} }
+    .card{
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:16px;
+      background: rgba(255,255,255,.03);
+    }
+    .card h3{margin:0 0 8px; font-size:15px; color: var(--brand);}
+    .card p{margin:0; color:var(--muted); font-size:13px; line-height:1.55}
+    .tag{
+      display:inline-flex;
+      font-family:var(--mono);
+      font-size:11px;
+      padding:6px 8px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      color:var(--muted);
+      background: rgba(255,255,255,.02);
+      margin-bottom:10px;
+    }
+    .panel{
+      margin-top:18px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: rgba(255,255,255,.03);
+      padding:24px;
+    }
+    .panel h2{margin:0 0 12px; font-size:18px; color: var(--brand2);}
+    .panel p {margin:0 0 12px; color:var(--muted); line-height:1.7; font-size:15px;}
+    .panel ul{margin:0; padding-left:20px; color:var(--muted); line-height:1.7; font-size:15px}
+    .panel li{margin-bottom: 6px;}
+    
+    footer{
+      margin-top:32px;
+      color:var(--muted);
+      font-size:12px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:space-between;
+      align-items:center;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+    footer a{color:var(--muted); text-decoration:none}
+    footer a:hover{text-decoration:underline; color: var(--text);}
+    .mono{font-family:var(--mono)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="https://bigwgames.com/">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>Big W Games</h1>
+          <span>Indie games • digital & board</span>
+        </div>
+      </a>
+      <nav>
+        <a class="pill" href="#how-to-play">How to Play</a>
+        <a class="pill" href="#features">Features</a>
+        <a class="pill" href="#support">Support</a>
+      </nav>
+    </header>
+
+    <section class="hero" id="top">
+      <div class="heroInner">
+        <div class="heroText">
+          <div class="kicker">⚡ Connect 5 • 🧠 Memory Tactics • 🏆 Ranked</div>
+          <h2 class="title">Vanish Gomoku</h2>
+          <p class="subtitle">
+            A fast-paced, tactical twist on classic Gomoku. Connect five in a row to win, but beware—your pieces fade into invisibility after a few seconds! They are still on the board, so memorize their locations to build your trap and avoid penalties.
+          </p>
+
+          <div class="ctaRow">
+            <a class="btn btnPrimary" href="https://playgomoku.bigwgames.com/" rel="noopener">Play Now (Web)</a>
+            <a class="btn" href="#how-to-play">Read the Rules</a>
+          </div>
+
+          <div class="cardGrid" id="features" aria-label="Game highlights">
+            <div class="card">
+              <div class="tag">Ranked Ladder</div>
+              <h3>Climb the Ranks</h3>
+              <p>Test your memory against the world. Every online match updates your Elo utilizing a unified Glicko-style rating system.</p>
+            </div>
+            <div class="card">
+              <div class="tag">Pro Rulesets</div>
+              <h3>Swap2 & Renju</h3>
+              <p>Play with standard rules or toggle on competitive Swap2 openings and Renju restrictions for perfectly balanced matches.</p>
+            </div>
+            <div class="card">
+              <div class="tag">Real-Time</div>
+              <h3>Lightning Fast</h3>
+              <p>Powered by Socket.io with a strict 30-second shot clock per turn, punishing rage-quits, and seamless auto-reconnects.</p>
+            </div>
+          </div>
+        </div>
+
+        <aside class="heroArt" aria-label="Artwork and screenshots">
+          <div class="card" style="height:100%; display:flex; flex-direction:column; gap:10px; background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.08);">
+            <div class="tag" style="align-self: flex-start;">Gameplay Preview</div>
+            <div style="margin: 0 0 12px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+              <img src="vanish.gif" alt="Vanish Gomoku gameplay showing fading pieces" style="width: 100%; height: auto; display: block;" />
+            </div>
+            <p style="margin:0; color:var(--muted); font-size:13px; line-height:1.55;">
+              You can set the Vanish timer to 3s, 10s, or turn it off for a normal Gomoku game. 
+            </p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="panel" id="how-to-play">
+      <h2>How to Play: The Invisible Board</h2>
+      <p>The game is based on Gomoku (also known as Five in a Row), but introduces a hardcore memory element that completely changes your strategy.</p>
+      
+      <ul>
+        <li><strong>The Goal:</strong> Be the first player to get an unbroken row of five pieces horizontally, vertically, or diagonally.</li>
+        <li><strong>The Twist:</strong> After a piece is placed, it has a strict countdown (e.g., 10 seconds). When time is up, the piece turns completely invisible.</li>
+        <li><strong>The Trap:</strong> Invisible pieces are <em>still on the board</em>! If you try to place a new piece on an occupied square, you commit a "Mistake."</li>
+        <li><strong>The Penalty:</strong> Committing a mistake briefly reveals the entire board to both players and adds a strike to your penalty meter. Collect 3 strikes, and you forfeit your turn.</li>
+        <li><strong>The Strategy:</strong> You must memorize the board state. Track your hidden lines to build an unstoppable Connect 5, and try to force your opponent into clicking your invisible pieces!</li>
+        <li><strong>The Rules:</strong> Choose 'Standard' play for a casual Gomoku game without forbidden moves. Choose 'Renju' to forbid 3-3, 4-4, or overlines for the first player. Choose the tournament-style <a href="https://www.renju.net/rule/11/">'Swap2' rule</a> for ultimate complexity and balance.  
+      </ul>
+    </section>
+
+    <section class="panel" id="support">
+      <h2>Support & Community</h2>
+      <p>Having trouble connecting or found a bug? We want to hear from you.</p>
+      <ul>
+        <li><strong>Email:</strong> <a href="mailto:playbigwgames@gmail.com">playbigwgames@gmail.com</a></li>
+        <li><strong>Bug Reports:</strong> Please include your device/OS, browser version, and the steps to reproduce the issue.</li>
+        <li><strong>Server Status:</strong> Check the <a href="https://playgomoku.bigwgames.com/" target="_blank">Server</a> if you are experiencing disconnects. <em>Note: Networking uses WebSockets; expect occasional brief maintenance windows during active development.</em></li>
+      </ul>
+    </section>
+
+    <footer>
+      <div>© <span id="year"></span> Big W Games • Vanish Gomoku</div>
+      <div>
+        <a href="privacy.html">Privacy Policy</a>
+        <span aria-hidden="true"> • </span>
+        <a href="https://bigwgames.com/">BigWGames.com</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

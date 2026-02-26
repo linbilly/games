@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy — Memory Gomoku</title>
+  <meta name="description" content="Privacy Policy for Vanish by Big W Games." />
+
+  <meta name="theme-color" content="#0b0f19" />
+  <style>
+    /* Using the exact same styling from MemoryGomoku.html */
+    :root{
+      --bg:#0b0f19;
+      --panel:#111a2e;
+      --text:#eaf0ff;
+      --muted:#b5c0e0;
+      --brand:#8ee6ff;
+      --brand2:#a2ffcf;
+      --line: rgba(255,255,255,.14);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:var(--sans); color:var(--text); background:
+        radial-gradient(1200px 600px at 20% 10%, rgba(142,230,255,.18), transparent 60%),
+        radial-gradient(900px 600px at 85% 15%, rgba(162,255,207,.12), transparent 55%),
+        var(--bg);
+      min-height:100vh;
+    }
+    a{color:var(--brand); text-decoration:none}
+    a:hover{text-decoration:underline}
+    .wrap{max-width:800px;margin:0 auto;padding:28px 18px 48px}
+    header{
+      display:flex; align-items:center; justify-content:space-between; gap:14px;
+      padding:14px 0 22px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:12px; text-decoration:none; color:var(--text);
+    }
+    .logo{
+      width:40px;height:40px;border-radius:12px;
+      background: linear-gradient(135deg, rgba(142,230,255,.9), rgba(162,255,207,.85));
+      box-shadow: 0 10px 30px rgba(142,230,255,.18);
+      position:relative; overflow:hidden;
+    }
+    .logo::after{
+      content:""; position:absolute; inset:-20%;
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.55), transparent 40%),
+                  radial-gradient(circle at 70% 60%, rgba(255,255,255,.25), transparent 45%);
+      transform: rotate(18deg);
+    }
+    .brand h1{margin:0;font-size:16px;letter-spacing:.3px}
+    .brand span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+    nav{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:10px 12px; border:1px solid var(--line);
+      border-radius:999px; text-decoration:none; color:var(--text);
+      background: rgba(255,255,255,.03);
+      transition: background 0.2s;
+    }
+    .pill:hover{background: rgba(255,255,255,.08); text-decoration:none;}
+    
+    .panel{
+      margin-top:18px;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: rgba(255,255,255,.03);
+      padding:32px;
+      line-height: 1.6;
+    }
+    .panel h2{margin:32px 0 12px; font-size:22px; color: var(--brand2);}
+    .panel h2:first-child{margin-top:0;}
+    .panel h3{margin:24px 0 8px; font-size:18px; color: var(--brand);}
+    .panel p {margin:0 0 16px; color:var(--muted); font-size:15px;}
+    .panel ul{margin:0 0 16px; padding-left:20px; color:var(--muted); font-size:15px}
+    .panel li{margin-bottom: 8px;}
+    .last-updated { font-size: 13px; color: var(--muted); margin-bottom: 24px; font-family: var(--mono); }
+    
+    footer{
+      margin-top:32px;
+      color:var(--muted);
+      font-size:12px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:space-between;
+      align-items:center;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+    footer a{color:var(--muted);}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="https://bigwgames.com/">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>Big W Games</h1>
+          <span>Indie games • digital & board</span>
+        </div>
+      </a>
+      <nav>
+        <a class="pill" href="index.html">Back to Game</a>
+      </nav>
+    </header>
+
+    <section class="panel">
+      <h2>Privacy Policy</h2>
+      <div class="last-updated">Last Updated: February 23, 2026</div>
+      
+      <p>At Big W Games, we believe games should be fun, fair, and respect your privacy. This Privacy Policy explains how we collect, use, and protect your information when you play <strong>Memory Gomoku</strong> via our website, the Apple App Store, or the Google Play Store.</p>
+      
+      <p><strong>The short version:</strong> We only collect the data necessary to make multiplayer and global ranked play work. We do not sell your data, and we do not use it for targeted advertising.</p>
+
+      <h3>1. Information We Collect</h3>
+      <p>To provide real-time multiplayer features and maintain the integrity of our global ranked leaderboards, we collect the following limited information:</p>
+      <ul>
+        <li><strong>Account & Profile Data:</strong> When you create an account, we may store your chosen username, an anonymous internal user ID, and your current global rating (e.g., ELO score).</li>
+        <li><strong>Gameplay & Match Data:</strong> We record the outcomes of your matches (wins, losses, draws) and your match history to calculate your rank and maintain leaderboards.</li>
+        <li><strong>Technical & Connection Data:</strong> To facilitate real-time gameplay via WebSockets, our servers temporarily process your IP address. We also collect basic, non-personally identifiable device information (like OS version or browser type) and crash logs to help us fix bugs and improve performance.</li>
+      </ul>
+
+      <h3>2. How We Use Your Information</h3>
+      <p>We use the data we collect exclusively to operate the game. Specifically, we use it to:</p>
+      <ul>
+        <li>Connect you with other players for private or ranked matches.</li>
+        <li>Calculate and display your rank on global leaderboards.</li>
+        <li>Maintain server stability, detect game-breaking bugs, and prevent cheating.</li>
+        <li>Respond to your customer support inquiries.</li>
+      </ul>
+
+      <h3>3. How We Share Your Information</h3>
+      <p><strong>We do not sell your personal information to third parties.</strong> We only share information with trusted third-party service providers (such as cloud hosting providers like AWS or Google Cloud) strictly for the purpose of running our game servers and databases. These providers are legally obligated to protect your data and may only use it to provide services to Big W Games.</p>
+
+      <h3>4. Data Deletion & Your Rights</h3>
+      <p>You have the right to request the deletion of your account and associated data at any time. Because we care about your privacy (and to comply with App Store and Google Play guidelines), you can delete your data by:</p>
+      <ul>
+        <li><strong>In-App:</strong> Navigating to the Settings menu within the Vanish app and selecting "Delete Account".</li>
+        <li><strong>By Email:</strong> Contacting us directly at <a href="mailto:playbigwgames@gmail.com">playbigwgames@gmail.com</a> with the subject line "Account Deletion Request". Please include your exact username.</li>
+      </ul>
+      <p>Upon request, your user profile, rank, and personal history will be permanently erased from our active databases.</p>
+
+      <h3>5. Children's Privacy</h3>
+      <p>While Big W Games builds family-friendly experiences, the global ranked multiplayer features of Memory Gomoku are not directed at children under the age of 13. We do not have a free-text chat function so players cannot communicate with each other through our app. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us so we can delete it immediately.</p>
+
+      <h3>6. Changes to This Policy</h3>
+      <p>We may occasionally update this policy as we add new features or as laws change. If we make significant changes, we will notify you within the game or by updating the date at the top of this page.</p>
+
+      <h3>7. Contact Us</h3>
+      <p>If you have any questions, concerns, or feedback regarding this Privacy Policy, please reach out to us at:</p>
+      <p><strong>Email:</strong> <a href="mailto:playbigwgames@gmail.com">playbigwgames@gmail.com</a></p>
+    </section>
+
+    <footer>
+      <div>© <span id="year"></span> Big W Games • Memory Gomoku</div>
+      <div>
+        <a href="https://bigwgames.com/">BigWGames.com</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
