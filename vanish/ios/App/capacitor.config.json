@@ -1,8 +1,0 @@
-{
-  "appId": "com.vanish.game",
-  "appName": "vanish",
-  "webDir": "com.vanish.game",
-  "server": {
-    "androidScheme": "https"
-  }
-}
