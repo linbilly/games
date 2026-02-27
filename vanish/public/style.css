@@ -810,3 +810,13 @@ html, body {
 .emoji-btn:active {
     transform: scale(0.8);
 }
+
+/* White inner ring for Black pieces */
+.piece.p1.last-move {
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.9), 3px 6px 10px rgba(0,0,0,0.6);
+}
+
+/* Dark inner ring for White pieces */
+.piece.p2.last-move {
+    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.7), 3px 6px 10px rgba(0,0,0,0.6);
+}

@@ -81,7 +81,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('find_global_match', ({ vanishMs, ruleMode, platformId }) => {
-    const request = { socketId: socket.id, username: socket.username||"Guest", platformId, vanishMs, ruleMode };
+    const request = { socketId: socket.id, username: socket.username||"Guest", rating: socket.rating || 1500, platformId, vanishMs, ruleMode };
 
     // Look for an exact match (simplified for MVP)
     const matchIndex = matchmakingQueue.findIndex(p => p.vanishMs === vanishMs && p.ruleMode === ruleMode);
@@ -100,7 +100,7 @@ io.on('connection', (socket) => {
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     activeMatches.set(roomCode, {
       id: roomCode,
-      host: { socketId: socket.id, username: socket.username || "Guest" },
+      host: { socketId: socket.id, username: socket.username || "Guest", rating: socket.rating || 1500 },
       guest: null,
       size, vanishMs, ruleMode,
       state: new Array(size * size).fill(0),
@@ -195,6 +195,7 @@ io.on('connection', (socket) => {
         // Update the server's memory for this specific socket
         socket.username = data.username;
         socket.platformId = data.platformId;
+        socket.rating = data.rating || 1500;
         console.log(`Socket ${socket.id} updated name to: ${data.username}`);
     });
 

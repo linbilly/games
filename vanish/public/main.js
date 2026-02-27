@@ -124,6 +124,10 @@ const modePill = $("modePill");
 
 const mistakeMeterEl = $("mistakeMeter");
 
+let moveHistory = [];
+let replayStep = 0;
+let isReplaying = false;
+
 
 // ---------- Audio ----------
 let audioCtx = null;
@@ -255,6 +259,16 @@ function joinPrivateRoom() {
     }
 }
 
+function getRankTier(elo) {
+    const rating = Math.round(elo || 1500);
+    if (rating < 1600) return { name: "Rookie", tag: "Rk" };
+    if (rating < 1800) return { name: "Intermediate", tag: "In" };
+    if (rating < 2000) return { name: "Advanced", tag: "Ad" };
+    if (rating < 2200) return { name: "Pro", tag: "Pro" };
+    if (rating < 2400) return { name: "Master", tag: "M" };
+    return { name: "Grandmaster", tag: "GM" };
+}
+
 // --- NEW: Opens the overlay directly to the Rules tab ---
 function openRulesOverlay() {
     $('info-overlay').classList.remove('hidden');
@@ -355,8 +369,10 @@ function declineOnlineMatch() {
     inputLocked = false; // Resume AI game
 }
 
+// new online game
 function setupOnlineGame(data) {
     hideOverlay();
+    moveHistory = [];
 
     if ($('overlayBtn')) $('overlayBtn').onclick = null;
     if ($('overlayBtn2')) $('overlayBtn2').onclick = null;
@@ -395,11 +411,11 @@ function setupOnlineGame(data) {
         swap2Phase = 0;
     }
 
-    // Set names for online play
-    $('p1-name').innerText = data.settings.host.username;
-    $('p2-name').innerText = data.settings.guest ? data.settings.guest.username : "Opponent";
+    const hostTier = getRankTier(data.settings.host.rating);
+    const guestTier = getRankTier(data.settings.guest ? data.settings.guest.rating : 1500);
 
-    console.log("Host:", data.settings.host.username, "; Guest:",data.settings.guest.username);
+    $('p1-name').innerText = `[${hostTier.tag}] ${data.settings.host.username}`;
+    $('p2-name').innerText = data.settings.guest ? `[${guestTier.tag}] ${data.settings.guest.username}` : "Opponent";
     
     showGamePage(); // Ensure we are on the game page
     buildBoard();
@@ -575,7 +591,7 @@ async function initializeUser() {
   };
 
       // Tell the live socket exactly who we are!
-    socket.emit('set_user_data', { username: currentUser, platformId: currentPlatformId });
+    socket.emit('set_user_data', { username: currentUser, platformId: currentPlatformId, rating: myRating });
 
 
   if (isNative) {
@@ -1452,12 +1468,19 @@ function confirmPlacement() {
 function placePiece(r, c, player, { animate = false, sfx = false, absoluteTime = null } = {}) {
   const _k = idx(r, c);
 
+  // Clear previous last-move highlights
+  document.querySelectorAll('.piece.last-move').forEach(el => el.classList.remove('last-move'));
+
   if (state[_k] !== 0) {
       console.error("FATAL: Attempted to overwrite an existing piece at", r, c);
       return; 
   }
 
   state[_k] = player;
+  // Record the move for the replay engine
+  if (!isReplaying) {
+      moveHistory.push({ r, c, player });
+  }
   
   // Use server time if online, otherwise local performance time
   placedAt[_k] = absoluteTime || Date.now(); 
@@ -1465,7 +1488,7 @@ function placePiece(r, c, player, { animate = false, sfx = false, absoluteTime =
   if (sfx) sfxPlace();
   
   const piece = pieceEls[_k];
-  piece.className = `piece ${player === P1 ? "p1" : "p2"} pop-in`;
+  piece.className = `piece ${player === P1 ? "p1" : "p2"} pop-in last-move`; // ADD LAST-MOVE HERE
   piece.style.opacity = "1";
 
   if (ruleMode === "swap2" && swap2Phase > 0) return;
@@ -1485,6 +1508,94 @@ function placePiece(r, c, player, { animate = false, sfx = false, absoluteTime =
       }
     }, vanishMs);
   }
+}
+
+// --- REPLAY ENGINE ---
+
+function startReplay() {
+    hideOverlay();
+    isReplaying = true;
+    replayStep = 0;
+
+    // 1. FREE THE OPPONENT: Instantly leave the room if online
+    if (isOnline && onlineMatchId) {
+        socket.emit('leave_room', { matchId: onlineMatchId });
+        isOnline = false;
+        onlineMatchId = null;
+        localStorage.removeItem('active_match_id');
+    }
+
+    // 2. Swap the UI controls at the bottom
+    $('bottom-controls').classList.add('hidden');
+    $('replay-controls').classList.remove('hidden');
+    
+    // Hide top bar buttons that don't apply anymore
+    if ($('btn-surrender')) $('btn-surrender').classList.add('hidden');
+    if ($('btn-chat')) $('btn-chat').classList.add('hidden');
+
+    // 3. Visually wipe the board clean
+    pieceEls.forEach(p => { 
+        p.className = "piece"; 
+        p.style.opacity = "0"; 
+    });
+    
+    document.querySelectorAll('.piece.last-move').forEach(el => el.classList.remove('last-move'));
+
+    document.querySelectorAll('.cell.win-line').forEach(cell => cell.classList.remove('win-line'));
+
+    // Force the board to reveal all placed pieces permanently during the replay
+    boardEl.classList.add('reveal'); 
+}
+
+function nextReplayMove() {
+    if (replayStep < moveHistory.length) {
+        const move = moveHistory[replayStep];
+        const k = idx(move.r, move.c);
+        const piece = pieceEls[k];
+        
+        // Show the piece
+        piece.className = `piece ${move.player === P1 ? "p1" : "p2"} pop-in last-move`;
+        piece.style.opacity = "1";
+
+        // Remove the 'last-move' highlight from the previous piece
+        if (replayStep > 0) {
+            const prevMove = moveHistory[replayStep - 1];
+            pieceEls[idx(prevMove.r, prevMove.c)].classList.remove('last-move');
+        }
+        
+        replayStep++;
+    }
+}
+
+function prevReplayMove() {
+    if (replayStep > 0) {
+        replayStep--;
+        const move = moveHistory[replayStep];
+        const k = idx(move.r, move.c);
+        const piece = pieceEls[k];
+        
+        // Hide the current piece
+        piece.className = "piece"; 
+        piece.style.opacity = "0";
+
+        // Restore the 'last-move' highlight to the piece before it
+        if (replayStep > 0) {
+            const prevMove = moveHistory[replayStep - 1];
+            pieceEls[idx(prevMove.r, prevMove.c)].classList.add('last-move');
+        }
+    }
+}
+
+function endReplay() {
+    isReplaying = false;
+    
+    // Restore UI
+    $('replay-controls').classList.add('hidden');
+    $('bottom-controls').classList.remove('hidden');
+    boardEl.classList.remove('reveal');
+    
+    // Use your existing robust quit function to clean up and go home
+    quitGame(); 
 }
 
 async function refreshMyStats() {
@@ -1516,7 +1627,8 @@ function closeInfoOverlay() {
 function updateMyStatsUI() {
     // These values should be stored globally in main.js after your auth call
     $('stat-username').innerText = currentUser || "Guest";
-    $('stat-elo').innerText = Math.round(myRating) || 1500;
+    const tier = getRankTier(myRating);
+    $('stat-elo').innerText = `${Math.round(myRating)} (${tier.name})`;
     // Assuming you update these variables when the user logs in
     $('stat-wins').innerText = myWins || 0;
     $('stat-losses').innerText = myLosses || 0;
@@ -1713,6 +1825,20 @@ function endGame(winObj, isDraw = false) {
   // 2. Determine Text and Title dynamically
   let overlayTitle = "Winner!";
 
+  // Reveal the Replay button if there is history to watch
+    const replayBtn = $('overlayBtnReplay');
+    if (replayBtn) {
+        if (moveHistory.length > 0) {
+            replayBtn.classList.remove('hidden');
+            replayBtn.onclick = () => {
+                replayBtn.classList.add('hidden'); 
+                startReplay();
+            };
+        } else {
+            replayBtn.classList.add('hidden');
+        }
+    }
+
   if (isDraw) {
       overlayTitle = "Draw";
   } else if (isOnline) {
@@ -1899,12 +2025,15 @@ function tabToRules() {
     switchTab('rules');
 }
 
+//new local game
 function newGame() {
   clearSelection();
   meterPos = 0; 
   openingStones = [];
   leftSideRole = 1;
   aiPlaysAs = P2; //AI is always playing P2 (white)
+
+  moveHistory = [];
 
   if ($('btn-chat')) $('btn-chat').classList.add('hidden');
   if ($('btn-surrender')) $('btn-surrender').classList.add('hidden');

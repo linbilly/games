@@ -128,6 +128,7 @@
                     
                     <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
                         <button id="overlayBtn" class="btn">New Game</button>
+                        <button id="overlayBtnReplay" class="btn ghost hidden">Watch Replay</button>
                         <button id="overlayBtn2" class="btn ghost hidden">Main Menu</button>
                         <button id="minimize-overlay-btn" class="icon-btn hidden" onclick="minimizeOverlay()" title="Minimize to view board">▼</button>
                         <button id="restore-overlay-btn" class="restore-btn hidden" onclick="restoreOverlay()">▲ Show Menu</button>
@@ -135,10 +136,17 @@
                   </div>
                 </div>
                 
-            </div> </div> </div> <div id="bottom-controls" style="width: 100%; text-align: center; padding-bottom: 10px;">
-        <button id="btn-place" onclick="confirmPlacement()" disabled>Confirm Move</button>
-        <div id="mistakeMeter" class="meter"></div>
-    </div>
+            </div> </div> </div> 
+            <div id="bottom-controls" style="width: 100%; text-align: center; padding-bottom: 10px;">
+                <button id="btn-place" onclick="confirmPlacement()" disabled>Confirm Move</button>
+                <div id="mistakeMeter" class="meter"></div>
+            </div>
+
+            <div id="replay-controls" class="hidden" style="width: 100%; padding-bottom: 10px; display: flex; justify-content: center; gap: 10px; padding-top: 10px;">
+                <button class="btn ghost" style="min-width: 80px;" onclick="prevReplayMove()">◀ Prev</button>
+                <button class="btn highlight-btn" style="min-width: 80px;" onclick="nextReplayMove()">Next ▶</button>
+                <button class="btn ghost" style="margin-left: 10px;" onclick="endReplay()">End</button>
+            </div>
 </div> 
 
 
