@@ -9,7 +9,18 @@
 </head>
 <body>
     <div id="game-container">
-        <header>
+        <div id="header-titles">
+            <h1 id="game-title">Make 50</h1>
+            <p id="game-desc">Use the math operators to combine the numbers to make 50</p>
+        </div>
+
+        <div id="mode-selector">
+            <button class="mode-btn" data-mode="easy">Easy</button>
+            <button class="mode-btn" data-mode="medium">Medium</button>
+            <button class="mode-btn active" data-mode="normal">Normal</button>
+        </div>
+
+        <header id="game-stats">
             <div id="timer">100s</div>
             <div id="score">Score: 0</div>
         </header>
@@ -19,8 +30,8 @@
         <div id="controls">
             <button class="op-btn" data-op="+">+</button>
             <button class="op-btn" data-op="-">−</button>
-            <button class="op-btn" data-op="*">×</button>
-            <button class="op-btn" data-op="/">÷</button>
+            <button class="op-btn" id="op-mul" data-op="*">×</button>
+            <button class="op-btn" id="op-div" data-op="/">÷</button>
             <button id="undo-btn">Undo</button>
         </div>
     </div>
@@ -29,9 +40,17 @@
         <div class="modal-content">
             <h2>Time's Up!</h2>
             <p>Final Score: <span id="final-score">0</span></p>
-            <h3>Leaderboard</h3>
-            <ul id="leaderboard-list"></ul>
-            <button id="restart-btn">Play Again</button>
+            
+            <div id="score-submission">
+                <input type="text" id="player-name" placeholder="Enter nickname..." maxlength="12" autocomplete="off">
+                <button id="submit-score-btn">Save Score</button>
+            </div>
+
+            <div id="leaderboard-view" class="hidden">
+                <h3 id="leaderboard-title">Leaderboard</h3>
+                <ul id="leaderboard-list"></ul>
+                <button id="restart-btn">Play Again</button>
+            </div>
         </div>
     </div>
 

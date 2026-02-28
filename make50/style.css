@@ -163,3 +163,80 @@ button:active { background: #e2e8f0; }
     padding: 5px 0;
     border-bottom: 1px solid #eee;
 }
+
+/* --- New Styles for Headers & Modes --- */
+#game-container {
+    height: auto; /* Allow container to grow with new content */
+    min-height: 600px;
+}
+
+#header-titles {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+#header-titles h1 {
+    margin: 0 0 5px 0;
+    font-size: clamp(1.8rem, 6vw, 2.2rem);
+    color: var(--text-dark);
+}
+
+#header-titles p {
+    margin: 0;
+    font-size: clamp(0.85rem, 3vw, 1rem);
+    color: #666;
+}
+
+#mode-selector {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.mode-btn {
+    padding: 8px 16px;
+    font-size: clamp(0.8rem, 3vw, 0.9rem);
+    border-radius: 20px;
+    background: #e2e8f0;
+    color: var(--text-dark);
+    border: 2px solid transparent;
+}
+
+.mode-btn.active {
+    background: var(--blue);
+    color: var(--text-light);
+    border-color: #5c85b5;
+    transform: scale(1.05);
+}
+
+/* --- New Styles for Score Submission --- */
+#score-submission {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+#player-name {
+    padding: 12px;
+    border-radius: 12px;
+    border: 2px solid var(--gray);
+    font-family: inherit;
+    font-size: 1rem;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+#player-name:focus {
+    border-color: var(--blue);
+}
+
+#submit-score-btn {
+    background: var(--green);
+    color: white;
+}
+#submit-score-btn:active {
+    background: #3a7a4d;
+}
