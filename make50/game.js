@@ -65,6 +65,7 @@ function playWinSound() {
     });
 }
 
+
 // --- Game State ---
 const MODES = {
     easy:   { tiles: 3, target: 10, ops: ['+', '-'] },
@@ -78,13 +79,20 @@ let timeLeft = 100;
 let timerInterval;
 let activeTiles = [];
 let history = []; 
+let currentSolutionStr = ""; // Tracks the solution equation
 
 let selectedTileId = null;
 let selectedOp = null;
 
-// --- Logic: Math Solver ---
-function canReachTarget(arr, target, allowedOps) {
-    if (arr.length === 1) return Math.abs(arr[0] - target) < 0.001;
+let lastTapTime = 0;      // NEW: Tracks double-taps
+let lastTapTileId = null; // NEW: Tracks double-taps
+
+// --- Logic: Math Solver (Now returns the equation string) ---
+function findSolution(arr, target, allowedOps) {
+    if (arr.length === 1) {
+        if (Math.abs(arr[0].val - target) < 0.001) return arr[0].exp;
+        return null; // Return null if not a match
+    }
     
     for (let i = 0; i < arr.length; i++) {
         for (let j = 0; j < arr.length; j++) {
@@ -94,17 +102,19 @@ function canReachTarget(arr, target, allowedOps) {
             let a = arr[i], b = arr[j];
             let results = [];
             
-            if (allowedOps.includes('+')) results.push(a + b);
-            if (allowedOps.includes('-')) results.push(a - b);
-            if (allowedOps.includes('*')) results.push(a * b);
-            if (allowedOps.includes('/') && b !== 0) results.push(a / b);
+            // Build the expression strings using proper math symbols
+            if (allowedOps.includes('+')) results.push({ val: a.val + b.val, exp: `(${a.exp} + ${b.exp})` });
+            if (allowedOps.includes('-')) results.push({ val: a.val - b.val, exp: `(${a.exp} − ${b.exp})` });
+            if (allowedOps.includes('*')) results.push({ val: a.val * b.val, exp: `(${a.exp} × ${b.exp})` });
+            if (allowedOps.includes('/') && Math.abs(b.val) > 0.001) results.push({ val: a.val / b.val, exp: `(${a.exp} ÷ ${b.exp})` });
             
             for (let res of results) {
-                if (canReachTarget([...remaining, res], target, allowedOps)) return true;
+                let solution = findSolution([...remaining, res], target, allowedOps);
+                if (solution) return solution; // Bubble the successful string up
             }
         }
     }
-    return false;
+    return null;
 }
 
 // --- Logic: Question Generation ---
@@ -113,6 +123,7 @@ function generateTiles() {
     const pool = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10];
     let validSet = false;
     let numbers = [];
+    let foundSolution = null;
 
     while (!validSet) {
         numbers = [];
@@ -124,8 +135,17 @@ function generateTiles() {
             numbers.push(num);
         }
 
-        if (onesAndTwos <= 3 && canReachTarget(numbers, params.target, params.ops)) {
+        // Prepare objects for the solver: { val: 5, exp: "5" }
+        let testArr = numbers.map(n => ({ val: n, exp: n.toString() }));
+        foundSolution = findSolution(testArr, params.target, params.ops);
+
+        if (onesAndTwos <= 3 && foundSolution) {
             validSet = true;
+            // Clean up the outer parentheses for cleaner display
+            if (foundSolution.startsWith('(') && foundSolution.endsWith(')')) {
+                foundSolution = foundSolution.slice(1, -1);
+            }
+            currentSolutionStr = `${foundSolution} = ${params.target}`;
         }
     }
 
@@ -141,6 +161,12 @@ function generateTiles() {
     selectedTileId = null;
     selectedOp = null;
 }
+// --- Logic: Math Solver ---
+function canReachTarget(arr, target, allowedOps) {
+    return false;
+}
+
+
 
 // --- UI & Interactions ---
 function updateUIForMode() {
@@ -177,12 +203,23 @@ function render() {
         el.className = `tile ${comboClass} ${isGold ? 'gold' : ''} ${tile.id === selectedTileId ? 'selected' : ''}`;
         el.innerText = Number.isInteger(tile.value) ? tile.value : parseFloat(tile.value.toFixed(2));
         
-        el.onclick = () => handleTileClick(tile.id);
+        // REPLACE your old el.onclick and el.ondblclick with this:
         
-        // Double Click to Undo (Break apart tile)
-        el.ondblclick = (e) => { 
-            e.preventDefault(); 
-            breakUpTile(tile.id); 
+        el.onclick = (e) => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTapTime;
+            
+            // If tapped twice within 300 milliseconds on the same tile
+            if (tapLength < 300 && tapLength > 0 && lastTapTileId === tile.id) {
+                e.preventDefault(); 
+                breakUpTile(tile.id);
+                lastTapTime = 0; // Reset the timer
+            } else {
+                // Otherwise, treat it as a single tap
+                lastTapTime = currentTime;
+                lastTapTileId = tile.id;
+                handleTileClick(tile.id);
+            }
         };
         
         stage.appendChild(el);
@@ -305,9 +342,11 @@ function startGame() {
     score = 0;
     timeLeft = 100;
     
+    // Hide Modals and Solution
     document.getElementById('game-over-modal').classList.add('hidden');
     document.getElementById('score-submission').classList.remove('hidden');
     document.getElementById('leaderboard-view').classList.add('hidden');
+    document.getElementById('solution-display').classList.add('hidden'); // NEW
     document.getElementById('player-name').value = '';
 
     updateUIForMode();
@@ -324,6 +363,11 @@ function startGame() {
 function endGame() {
     clearInterval(timerInterval);
     document.getElementById('final-score').innerText = score;
+    
+    // NEW: Inject the solution string and show the box
+    document.getElementById('solution-text').innerText = currentSolutionStr;
+    document.getElementById('solution-display').classList.remove('hidden');
+    
     document.getElementById('game-over-modal').classList.remove('hidden');
 }
 
@@ -340,26 +384,71 @@ document.getElementById('submit-score-btn').onclick = () => {
     renderLeaderboard();
 };
 
+// Add a temporary memory fallback at the top of this section
+let fallbackLeaderboard = {};
+
+document.getElementById('submit-score-btn').onclick = () => {
+    let name = document.getElementById('player-name').value.trim();
+    if (!name) name = "Anonymous";
+    
+    saveToLeaderboard(name, score);
+    
+    document.getElementById('score-submission').classList.add('hidden');
+    document.getElementById('leaderboard-view').classList.remove('hidden');
+    
+    renderLeaderboard();
+};
+
 function saveToLeaderboard(name, newScore) {
     const boardKey = `math50Leaderboard_${currentMode}`;
-    let board = JSON.parse(localStorage.getItem(boardKey) || '[]');
+    let board = [];
+    
+    // Try to read from localStorage safely
+    try {
+        board = JSON.parse(localStorage.getItem(boardKey) || '[]');
+    } catch (error) {
+        board = fallbackLeaderboard[boardKey] || [];
+    }
     
     board.push({ name: name, score: newScore });
     board.sort((a, b) => b.score - a.score); 
     board = board.slice(0, 5); 
     
-    localStorage.setItem(boardKey, JSON.stringify(board));
+    // Try to save safely
+    try {
+        localStorage.setItem(boardKey, JSON.stringify(board));
+    } catch (error) {
+        fallbackLeaderboard[boardKey] = board; // Save to temporary memory instead
+    }
 }
 
 function renderLeaderboard() {
     const boardKey = `math50Leaderboard_${currentMode}`;
-    let board = JSON.parse(localStorage.getItem(boardKey) || '[]');
+    let board = [];
+    
+    try {
+        board = JSON.parse(localStorage.getItem(boardKey) || '[]');
+    } catch (error) {
+        board = fallbackLeaderboard[boardKey] || [];
+    }
+    
     const list = document.getElementById('leaderboard-list');
-    
     document.getElementById('leaderboard-title').innerText = `${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} Leaderboard`;
-    
     list.innerHTML = board.map((entry, i) => `<li>#${i+1} - <strong>${entry.name}</strong>: ${entry.score} pts</li>`).join('');
 }
+
+// --- Info Modal Logic ---
+document.getElementById('info-btn').onclick = () => {
+    document.getElementById('info-modal').classList.remove('hidden');
+};
+
+document.getElementById('close-info-btn').onclick = () => {
+    document.getElementById('info-modal').classList.add('hidden');
+    
+    // Optional: Unlock audio context if they click "Got it!" 
+    // This helps browsers that require interaction before playing sound
+    if (audioCtx.state === 'suspended') audioCtx.resume(); 
+};
 
 document.getElementById('restart-btn').onclick = startGame;
 
