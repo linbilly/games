@@ -1,0 +1,165 @@
+:root {
+    --bg-color: #fcf9f2;
+    --text-dark: #4a4a4a;
+    --text-light: #ffffff;
+    
+    /* Progressively Darker Palette */
+    --gray:   #d1d8e0; /* Level 1: Light pastel gray */
+    --blue:   #7da2ce; /* Level 2: Medium-light blue */
+    --green:  #4a9b63; /* Level 3: Distinct, darker green */
+    --red:    #c44949; /* Level 4: Deep pastel red */
+    --yellow: #b07d1a; /* Level 5: Dark yellow / ochre (not 50) */
+    
+    --gold: linear-gradient(135deg, #ffd700, #ffec8b, #ffd700);
+}
+
+body {
+    background-color: var(--bg-color);
+    font-family: 'Quicksand', sans-serif;
+    color: var(--text-dark);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    user-select: none;
+}
+
+#game-container {
+    background: white;
+    width: 480px; /* Wider to fit 5 tiles natively */
+    max-width: 95vw; /* Shrinks to fit mobile screens */
+    height: 550px;
+    max-height: 95vh; /* Prevents vertical overflow on short screens */
+    border-radius: 24px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    box-sizing: border-box; /* Ensures padding doesn't break the width */
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    font-size: clamp(1rem, 4vw, 1.25rem); /* Shrinks text on small screens */
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+#stage {
+    flex-grow: 1;
+    display: flex;
+    flex-wrap: nowrap; /* Forces a single line */
+    align-items: center;
+    justify-content: center;
+    gap: 10px; /* Gap reduction to help fitting */
+}
+
+.tile {
+    width: 70px;
+    height: 70px;
+    flex-shrink: 1; /* Allows tiles to shrink if the screen is narrow */
+    aspect-ratio: 1 / 1; /* Keeps them perfectly square while shrinking */
+    border-radius: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: clamp(1.2rem, 5vw, 1.5rem); /* Responsive font size */
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    box-sizing: border-box;
+}
+
+.tile:active { transform: scale(0.95); }
+.tile.selected { outline: 3px solid #777; transform: scale(1.05); }
+
+/* Combo Colors (Levels 1 through 5) */
+.combo-1 { background-color: var(--gray); color: var(--text-dark); }
+.combo-2 { background-color: var(--blue); color: var(--text-dark); }
+.combo-3 { background-color: var(--green); color: var(--text-light); }
+.combo-4 { background-color: var(--red); color: var(--text-light); }
+.combo-5 { background-color: var(--yellow); color: var(--text-light); }
+
+/* The Solution Tile (Level 5 + Equals 50) */
+.gold { 
+    background: var(--gold); 
+    background-size: 200% 200%;
+    animation: shine 2s infinite linear, pulse 1s infinite alternate;
+    color: #8b6508; /* Dark gold text for contrast */
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8), inset 0 0 10px rgba(255, 255, 255, 0.5);
+    border: 2px solid #fff;
+}
+
+@keyframes shine {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.05); }
+}
+
+#controls {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2%; /* Percentage based gap for better shrinking */
+    margin-top: 20px;
+}
+
+button {
+    font-family: inherit;
+    font-size: clamp(1rem, 4vw, 1.25rem); /* Responsive button text */
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    background: #f1f5f9;
+    color: var(--text-dark);
+    padding: 15px 0;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+button.selected-op { background: #cbd5e1; outline: 2px solid #94a3b8; }
+button:active { background: #e2e8f0; }
+#undo-btn { font-size: clamp(0.8rem, 3vw, 1rem); background: #ffe4e6; }
+
+/* Modal Settings */
+.hidden { display: none !important; }
+
+#game-over-modal {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(255,255,255,0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+    z-index: 100;
+}
+
+.modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    width: 250px;
+    max-width: 80vw;
+}
+
+.modal-content ul { 
+    list-style: none; 
+    padding: 0; 
+    margin-bottom: 20px; 
+    text-align: left;
+}
+
+.modal-content li {
+    padding: 5px 0;
+    border-bottom: 1px solid #eee;
+}
