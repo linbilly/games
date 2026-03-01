@@ -1,0 +1,23 @@
+{
+  "name": "Make 50",
+  "short_name": "Make 50",
+  "description": "Combine the numbers using math to make 50!",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fcf9f2",
+  "theme_color": "#7da2ce",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

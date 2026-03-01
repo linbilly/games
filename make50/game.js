@@ -1,6 +1,11 @@
 // --- Audio System (Web Audio API) ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
+// --- Supabase Setup ---
+const SUPABASE_URL = 'https://dxnxwwgamfylqcjahtzv.supabase.co'; // Replace with your URL
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_VRwl-Fna636SBgiGpF-yGw_pGqe0VrS'; // Use your new publishable key
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
 function playComboSound(level) {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     const osc = audioCtx.createOscillator();
@@ -371,70 +376,69 @@ function endGame() {
     document.getElementById('game-over-modal').classList.remove('hidden');
 }
 
-// --- Leaderboard & Nickname Submit ---
-document.getElementById('submit-score-btn').onclick = () => {
+// --- Leaderboard & Nickname Submit (Supabase) ---
+document.getElementById('submit-score-btn').onclick = async () => {
+    const btn = document.getElementById('submit-score-btn');
     let name = document.getElementById('player-name').value.trim();
     if (!name) name = "Anonymous";
     
-    saveToLeaderboard(name, score);
+    // Disable button to prevent double-submits
+    btn.disabled = true;
+    btn.innerText = "Saving...";
+    
+    await saveToLeaderboard(name, score);
     
     document.getElementById('score-submission').classList.add('hidden');
     document.getElementById('leaderboard-view').classList.remove('hidden');
     
-    renderLeaderboard();
+    await renderLeaderboard();
+    
+    // Reset button
+    btn.disabled = false;
+    btn.innerText = "Save Score";
 };
 
-// Add a temporary memory fallback at the top of this section
-let fallbackLeaderboard = {};
-
-document.getElementById('submit-score-btn').onclick = () => {
-    let name = document.getElementById('player-name').value.trim();
-    if (!name) name = "Anonymous";
-    
-    saveToLeaderboard(name, score);
-    
-    document.getElementById('score-submission').classList.add('hidden');
-    document.getElementById('leaderboard-view').classList.remove('hidden');
-    
-    renderLeaderboard();
-};
-
-function saveToLeaderboard(name, newScore) {
-    const boardKey = `math50Leaderboard_${currentMode}`;
-    let board = [];
-    
-    // Try to read from localStorage safely
+async function saveToLeaderboard(name, newScore) {
     try {
-        board = JSON.parse(localStorage.getItem(boardKey) || '[]');
+        const { error } = await supabase
+            .from('leaderboard')
+            .insert([{ 
+                player_name: name, 
+                score: newScore, 
+                game_mode: currentMode 
+            }]);
+            
+        if (error) throw error;
     } catch (error) {
-        board = fallbackLeaderboard[boardKey] || [];
-    }
-    
-    board.push({ name: name, score: newScore });
-    board.sort((a, b) => b.score - a.score); 
-    board = board.slice(0, 5); 
-    
-    // Try to save safely
-    try {
-        localStorage.setItem(boardKey, JSON.stringify(board));
-    } catch (error) {
-        fallbackLeaderboard[boardKey] = board; // Save to temporary memory instead
+        console.error("Supabase Error:", error.message);
+        alert("Couldn't save to the online leaderboard. Check your connection.");
     }
 }
 
-function renderLeaderboard() {
-    const boardKey = `math50Leaderboard_${currentMode}`;
-    let board = [];
-    
-    try {
-        board = JSON.parse(localStorage.getItem(boardKey) || '[]');
-    } catch (error) {
-        board = fallbackLeaderboard[boardKey] || [];
-    }
-    
+async function renderLeaderboard() {
     const list = document.getElementById('leaderboard-list');
     document.getElementById('leaderboard-title').innerText = `${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} Leaderboard`;
-    list.innerHTML = board.map((entry, i) => `<li>#${i+1} - <strong>${entry.name}</strong>: ${entry.score} pts</li>`).join('');
+    list.innerHTML = '<li>Loading scores...</li>';
+    
+    try {
+        const { data, error } = await supabase
+            .from('leaderboard')
+            .select('player_name, score')
+            .eq('game_mode', currentMode)
+            .order('score', { ascending: false })
+            .limit(5); // Get top 5
+            
+        if (error) throw error;
+        
+        if (data.length === 0) {
+            list.innerHTML = '<li>No scores yet. Be the first!</li>';
+        } else {
+            list.innerHTML = data.map((entry, i) => `<li>#${i+1} - <strong>${entry.player_name}</strong>: ${entry.score} pts</li>`).join('');
+        }
+    } catch (error) {
+        console.error("Supabase Error:", error.message);
+        list.innerHTML = '<li>Failed to load leaderboard.</li>';
+    }
 }
 
 // --- Info Modal Logic ---

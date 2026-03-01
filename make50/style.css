@@ -22,7 +22,13 @@ body {
     align-items: center;
     height: 100vh;
     margin: 0;
-    user-select: none;
+    user-select: none; /* Prevents text highlighting */
+    
+    /* NEW: App-like mobile locking */
+    overflow: hidden; /* Stops vertical/horizontal scrolling */
+    touch-action: none; /* Disables native browser zoom/pan gestures */
+    overscroll-behavior: none; /* Stops pull-to-refresh */
+    -webkit-tap-highlight-color: transparent; /* Removes blue flash on buttons on iOS */
 }
 
 #game-container {
