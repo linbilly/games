@@ -303,3 +303,30 @@ body.theme-newsletter {
 body.theme-newsletter .container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
 body.theme-newsletter .hero { padding: 40px 30px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
 body.theme-newsletter .back-link { display: block; margin-bottom: 20px; text-decoration: none; color: #4CAF50; font-weight: bold; text-align: left; }
+
+/* ===== Homepage Local Announcement Card ===== */
+body.theme-home .announcement-card {
+    background-color: white;
+    padding: 30px 40px;
+    border-radius: 20px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1); /* Matches your hero drop shadow */
+    margin-bottom: 40px;
+    border: 3px solid #FFC107; /* A friendly yellow border to make it pop */
+}
+
+body.theme-home .announcement-card h3 {
+    color: #FF9800; /* Matches the 'Where to Buy' button */
+    font-size: 1.6em;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+body.theme-home .announcement-card a {
+    color: #4CAF50; /* Green link text to match your newsletter button */
+    font-weight: bold;
+    text-decoration: none;
+}
+
+body.theme-home .announcement-card a:hover {
+    text-decoration: underline;
+}
