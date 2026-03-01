@@ -15,41 +15,59 @@
 
 body {
     background-color: var(--bg-color);
+    transition: background-color 1s ease;
     font-family: 'Quicksand', sans-serif;
     color: var(--text-dark);
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    margin: 0;
-    user-select: none; /* Prevents text highlighting */
     
-    /* NEW: App-like mobile locking */
-    overflow: hidden; /* Stops vertical/horizontal scrolling */
-    touch-action: none; /* Disables native browser zoom/pan gestures */
-    overscroll-behavior: none; /* Stops pull-to-refresh */
-    -webkit-tap-highlight-color: transparent; /* Removes blue flash on buttons on iOS */
-
-    transition: background-color 1s ease;
+    /* CHANGE: 100vh to 100dvh to fix iOS Safari */
+    height: 100dvh; 
+    
+    margin: 0;
+    user-select: none;
+    overflow: hidden;
+    touch-action: none;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #game-container {
-    position: relative; /* NEW: Anchors the absolute positioned info button */
+    position: relative; 
     background: white;
     width: 480px; 
     max-width: 95vw; 
-    height: 550px;
-    max-height: 95vh; 
+    
+    /* CHANGE: Use dvh and remove the rigid 600px min-height */
+    height: auto;
+    max-height: 95dvh; 
+    min-height: auto; 
+    
     border-radius: 24px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.05);
     display: flex;
     flex-direction: column;
     padding: 20px;
     box-sizing: border-box; 
-    height: auto; 
-    min-height: 600px;
 }
 
+.reward-float {
+    position: absolute;
+    
+    /* CHANGE: Force the text to center across the whole width */
+    width: 100%;
+    left: 0;
+    text-align: center;
+    
+    color: #000000;
+    font-weight: 900;
+    font-size: 1.1rem;
+    pointer-events: none;
+    animation: floatUp 1.5s ease-out forwards;
+    z-index: 1000;
+    text-shadow: 1px 1px 0px rgba(255,255,255,0.7);
+}
 
 header {
     /* Switch from flex to grid */
@@ -416,17 +434,6 @@ footer {
     background: #5c85b5;
 }
 
-/* Floating Reward Animation */
-.reward-float {
-    position: absolute;
-    color: #000000; /* Black text */
-    font-weight: 900;
-    font-size: 1.1rem;
-    pointer-events: none;
-    animation: floatUp 1.5s ease-out forwards;
-    z-index: 1000;
-    text-shadow: 1px 1px 0px rgba(255,255,255,0.7); /* Adds slight readability */
-}
 
 @keyframes floatUp {
     0% { transform: translateY(0); opacity: 1; }

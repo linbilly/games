@@ -254,18 +254,21 @@ function showRewardText() {
     if (solveTime < 30) messages.push("Speed Solve!");
     if (!usedUndoThisRound) messages.push("Perfect!");
 
-    messages.forEach((text, i) => {
-        const el = document.createElement('div');
-        el.className = 'reward-float';
-        el.innerText = text;
-        
-        // Position near the score header
-        const scoreRect = document.getElementById('score').getBoundingClientRect();
-        el.style.left = `${scoreRect.left - 20}px`;
-        el.style.top = `${scoreRect.top + 30 + (i * 20)}px`;
-        
-        document.body.appendChild(el);
-    });
+    // Combine all earned messages into one single string separated by bullets
+    const combinedText = messages.join(" • ");
+
+    const goldTile = document.querySelector('.tile.gold');
+    const referenceRect = goldTile ? goldTile.getBoundingClientRect() : document.getElementById('stage').getBoundingClientRect();
+
+    // Create just ONE element
+    const el = document.createElement('div');
+    el.className = 'reward-float';
+    el.innerText = combinedText;
+    
+    // Add +20px to push the starting position down directly into the tile
+    el.style.top = `${referenceRect.top + 20}px`;
+    
+    document.body.appendChild(el);
 }
 
 // Mode Selection Buttons
