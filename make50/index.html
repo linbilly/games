@@ -15,7 +15,7 @@
 </head>
 <body>
     <div id="game-container">
-        <button id="info-btn" title="How to Play">ⓘ</button>
+        <button id="menu-btn" title="Menu">☰</button>
 
         <div id="header-titles">
             <h1 id="game-title">Make 50</h1>
@@ -42,22 +42,24 @@
             <button class="op-btn" id="op-div" data-op="/">÷</button>
             <button id="undo-btn">Undo</button>
         </div>
-    </div>
-
-    <footer>
+    </div> <footer>
         Copyright &copy; Big W Games and Charlie Lin
     </footer>
 
     <div id="info-modal" class="hidden">
         <div class="modal-content info-content">
-            <h2>How to Play</h2>
+            <h2>Menu & Rules</h2>
             <p><strong>Goal:</strong> Combine all the tiles to reach the target number!</p>
             <ul>
                 <li>Tap a number, tap an operator (+, −, ×, ÷), then tap another number to merge them.</li>
                 <li><strong>Double-tap</strong> a combined tile to break it apart and undo the move.</li>
                 <li>Clear the board by combining all starting tiles into a single shiny gold tile!</li>
             </ul>
-            <button id="close-info-btn">Got it!</button>
+            
+            <div class="menu-actions">
+                <button id="close-info-btn">Resume Game</button>
+                <button id="quit-save-btn">Quit & Save Score</button>
+            </div>
         </div>
     </div>
 

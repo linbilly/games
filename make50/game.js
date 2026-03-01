@@ -441,20 +441,30 @@ async function renderLeaderboard() {
     }
 }
 
-// --- Info Modal Logic ---
-document.getElementById('info-btn').onclick = () => {
+
+
+document.getElementById('restart-btn').onclick = startGame;
+
+// --- Menu Modal Logic ---
+document.getElementById('menu-btn').onclick = () => {
     document.getElementById('info-modal').classList.remove('hidden');
 };
 
 document.getElementById('close-info-btn').onclick = () => {
     document.getElementById('info-modal').classList.add('hidden');
     
-    // Optional: Unlock audio context if they click "Got it!" 
-    // This helps browsers that require interaction before playing sound
+    // Resume audio if needed
     if (audioCtx.state === 'suspended') audioCtx.resume(); 
 };
 
-document.getElementById('restart-btn').onclick = startGame;
+// NEW: Quit and Save early
+document.getElementById('quit-save-btn').onclick = () => {
+    // Hide the menu modal
+    document.getElementById('info-modal').classList.add('hidden');
+    
+    // Trigger the exact same Game Over flow as the timer running out
+    endGame(); 
+};
 
 // Initialize
 startGame();

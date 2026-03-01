@@ -270,14 +270,14 @@ button:active { background: #e2e8f0; }
 }
 
 
-/* --- Info Button Styles --- */
-#info-btn {
-    position: absolute; /* NEW: Pins it to the top right */
+/* --- Menu Button & Footer Styles --- */
+#menu-btn {
+    position: absolute; 
     top: 20px;
     right: 20px;
     background: none;
     border: none;
-    font-size: 1.5rem;
+    font-size: 1.8rem; /* Slightly larger for the menu icon */
     color: var(--gray);
     cursor: pointer;
     padding: 5px;
@@ -287,9 +287,40 @@ button:active { background: #e2e8f0; }
     z-index: 10;
 }
 
-#info-btn:hover {
+#menu-btn:hover {
     transform: scale(1.15);
     color: var(--blue);
+}
+
+/* --- Menu Modal Specifics --- */
+.menu-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 25px;
+}
+
+#close-info-btn {
+    width: 100%;
+    background: var(--blue);
+    color: white;
+}
+
+#close-info-btn:active {
+    background: #5c85b5;
+}
+
+#quit-save-btn {
+    width: 100%;
+    background: #fff0f0;
+    color: var(--red);
+    border: 2px solid var(--red);
+    font-size: 1rem;
+}
+
+#quit-save-btn:active {
+    background: var(--red);
+    color: white;
 }
 
 footer {
