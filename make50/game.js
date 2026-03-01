@@ -4,7 +4,7 @@ const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 // --- Supabase Setup ---
 const SUPABASE_URL = 'https://dxnxwwgamfylqcjahtzv.supabase.co'; // Replace with your URL
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_VRwl-Fna636SBgiGpF-yGw_pGqe0VrS'; // Use your new publishable key
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 function playComboSound(level) {
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -400,7 +400,7 @@ document.getElementById('submit-score-btn').onclick = async () => {
 
 async function saveToLeaderboard(name, newScore) {
     try {
-        const { error } = await supabase
+        const { error } = await supabaseClient
             .from('leaderboard')
             .insert([{ 
                 player_name: name, 
@@ -421,7 +421,7 @@ async function renderLeaderboard() {
     list.innerHTML = '<li>Loading scores...</li>';
     
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('leaderboard')
             .select('player_name, score')
             .eq('game_mode', currentMode)
