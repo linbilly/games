@@ -73,10 +73,17 @@ function playWinSound() {
 
 // --- Game State ---
 const MODES = {
-    easy:   { tiles: 3, target: 10, ops: ['+', '-'] },
-    medium: { tiles: 3, target: 20, ops: ['+', '-', '*', '/'] },
-    make50: { tiles: 5, target: 50, ops: ['+', '-', '*', '/'] }
+    practice1: { name: 'Practice 1', tiles: 3, target: 10, ops: ['+', '-'], instr: 'Make 10 using all numbers' },
+    practice2: { name: 'Practice 2', tiles: 3, target: 20, ops: ['+', '-', '*', '/'], instr: 'Make 20 using all numbers' },
+    practice3: { name: 'Practice 3', tiles: 4, target: 50, ops: ['+', '-', '*', '/'], instr: 'Make 50 using all numbers', pool: [1, 2, 5, 10] },
+    make50:    { name: 'Make 50', tiles: 5, target: 50, ops: ['+', '-', '*', '/'], instr: 'Make 50 using all numbers shown' }
 };
+
+// State trackers
+let consecutiveSolves = 0;
+let usedUndoThisRound = false;
+let roundStartTime = 0;
+let gameStarted = false;
 
 let currentMode = 'make50';
 let score = 0;
@@ -125,7 +132,8 @@ function findSolution(arr, target, allowedOps) {
 // --- Logic: Question Generation ---
 function generateTiles() {
     const params = MODES[currentMode];
-    const pool = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10];
+    // Use the mode's pool if it exists, otherwise default
+    const pool = params.pool || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10];
     let validSet = false;
     let numbers = [];
     let foundSolution = null;
@@ -140,13 +148,11 @@ function generateTiles() {
             numbers.push(num);
         }
 
-        // Prepare objects for the solver: { val: 5, exp: "5" }
         let testArr = numbers.map(n => ({ val: n, exp: n.toString() }));
         foundSolution = findSolution(testArr, params.target, params.ops);
 
         if (onesAndTwos <= 3 && foundSolution) {
             validSet = true;
-            // Clean up the outer parentheses for cleaner display
             if (foundSolution.startsWith('(') && foundSolution.endsWith(')')) {
                 foundSolution = foundSolution.slice(1, -1);
             }
@@ -165,10 +171,10 @@ function generateTiles() {
     history = [];
     selectedTileId = null;
     selectedOp = null;
-}
-// --- Logic: Math Solver ---
-function canReachTarget(arr, target, allowedOps) {
-    return false;
+    
+    // Reset round-specific trackers
+    usedUndoThisRound = false; 
+    roundStartTime = Date.now(); 
 }
 
 
@@ -234,6 +240,34 @@ function render() {
     });
 }
 
+function updateBackground() {
+    // Math logic: Increase saturation over 10 solves
+    const saturation = Math.min(consecutiveSolves * 10, 100);
+    const lightness = 97 - (saturation * 0.47); // Transitions from off-white (97%) to gold (50%)
+    document.body.style.backgroundColor = `hsl(45, ${saturation}%, ${lightness}%)`;
+}
+
+function showRewardText() {
+    const solveTime = (Date.now() - roundStartTime) / 1000;
+    let messages = [];
+    
+    if (solveTime < 30) messages.push("Speed Solve!");
+    if (!usedUndoThisRound) messages.push("Perfect!");
+
+    messages.forEach((text, i) => {
+        const el = document.createElement('div');
+        el.className = 'reward-float';
+        el.innerText = text;
+        
+        // Position near the score header
+        const scoreRect = document.getElementById('score').getBoundingClientRect();
+        el.style.left = `${scoreRect.left - 20}px`;
+        el.style.top = `${scoreRect.top + 30 + (i * 20)}px`;
+        
+        document.body.appendChild(el);
+    });
+}
+
 // Mode Selection Buttons
 document.querySelectorAll('.mode-btn').forEach(btn => {
     btn.onclick = () => {
@@ -247,7 +281,19 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 });
 
 function handleTileClick(id) {
-    if (audioCtx.state === 'suspended') audioCtx.resume(); // Unlock audio on first interaction
+    if (audioCtx.state === 'suspended') audioCtx.resume(); 
+
+    // Start timer & hide instructions on first interaction
+    if (!gameStarted) {
+        gameStarted = true;
+        roundStartTime = Date.now();
+        document.getElementById('instruction-overlay').classList.add('hidden');
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = `${timeLeft}s`;
+            if (timeLeft <= 0) endGame();
+        }, 1000);
+    }
     
     if (!selectedOp) {
         selectedTileId = selectedTileId === id ? null : id;
@@ -310,7 +356,8 @@ function breakUpTile(id) {
     selectedTileId = null;
     selectedOp = null;
     
-    playUndoSound(); // Play breaking apart sound
+    usedUndoThisRound = true; // Track undo
+    playUndoSound();
     render();
 }
 
@@ -320,6 +367,7 @@ document.getElementById('undo-btn').onclick = () => {
         activeTiles = history.pop();
         selectedTileId = null;
         selectedOp = null;
+        usedUndoThisRound = true; // Track undo
         playUndoSound();
         render();
     }
@@ -329,16 +377,28 @@ document.getElementById('undo-btn').onclick = () => {
 function checkWinCondition() {
     const params = MODES[currentMode];
     if (activeTiles.length === 1 && activeTiles[0].value === params.target && activeTiles[0].comboCount === params.tiles) {
+        
+        // Calculations
         score += params.target + timeLeft; 
-        playWinSound(); // Play sparkly win sound!
+        consecutiveSolves++;
+        
+        // Triggers
+        document.getElementById('solve-count').innerText = `Solves: ${consecutiveSolves}`;
+        updateBackground();
+        showRewardText();
+        playWinSound(); 
         render(); 
         
+        // Pause to let the player read the reward text before clearing
         setTimeout(() => {
+            // Clean up old floating text
+            document.querySelectorAll('.reward-float').forEach(el => el.remove());
+            
             timeLeft = 100; 
             document.getElementById('timer').innerText = `${timeLeft}s`; 
             generateTiles(); 
             render(); 
-        }, 800); 
+        }, 1200); 
     }
 }
 
@@ -346,33 +406,39 @@ function startGame() {
     clearInterval(timerInterval);
     score = 0;
     timeLeft = 100;
+    consecutiveSolves = 0; // Reset consecutive count
+    gameStarted = false;   // Wait for first tap to start timer
     
-    // Hide Modals and Solution
+    // Reset UI
+    document.body.style.backgroundColor = '#fcf9f2'; // Reset background to initial white/off-white
+    document.getElementById('timer').innerText = `100s`;
+    document.getElementById('solve-count').innerText = `Solves: 0`;
+    
+    // Set Instructions
+    const instr = MODES[currentMode].instr;
+    document.getElementById('instruction-overlay').innerText = instr;
+    document.getElementById('instruction-overlay').classList.remove('hidden');
+
     document.getElementById('game-over-modal').classList.add('hidden');
     document.getElementById('score-submission').classList.remove('hidden');
     document.getElementById('leaderboard-view').classList.add('hidden');
-    document.getElementById('solution-display').classList.add('hidden'); // NEW
+    document.getElementById('solution-display').classList.add('hidden');
     document.getElementById('player-name').value = '';
 
     updateUIForMode();
     generateTiles();
     render();
-
-    timerInterval = setInterval(() => {
-        timeLeft--;
-        document.getElementById('timer').innerText = `${timeLeft}s`;
-        if (timeLeft <= 0) endGame();
-    }, 1000);
 }
+
+
 
 function endGame() {
     clearInterval(timerInterval);
     document.getElementById('final-score').innerText = score;
+    document.body.style.backgroundColor = '#fcf9f2'; // Reset background on end
     
-    // NEW: Inject the solution string and show the box
     document.getElementById('solution-text').innerText = currentSolutionStr;
     document.getElementById('solution-display').classList.remove('hidden');
-    
     document.getElementById('game-over-modal').classList.remove('hidden');
 }
 
@@ -405,6 +471,7 @@ async function saveToLeaderboard(name, newScore) {
             .insert([{ 
                 player_name: name, 
                 score: newScore, 
+                solves: consecutiveSolves, // NEW: Sending the solves
                 game_mode: currentMode 
             }]);
             
@@ -417,31 +484,33 @@ async function saveToLeaderboard(name, newScore) {
 
 async function renderLeaderboard() {
     const list = document.getElementById('leaderboard-list');
-    const displayTitle = currentMode === 'make50' ? 'Make 50' : currentMode.charAt(0).toUpperCase() + currentMode.slice(1);
+    const displayTitle = MODES[currentMode].name; // Use mode name dynamically
     document.getElementById('leaderboard-title').innerText = `${displayTitle} Leaderboard`;
     list.innerHTML = '<li>Loading scores...</li>';
     
     try {
         const { data, error } = await supabaseClient
             .from('leaderboard')
-            .select('player_name, score')
+            .select('player_name, score, solves') // NEW: Select solves
             .eq('game_mode', currentMode)
             .order('score', { ascending: false })
-            .limit(5); // Get top 5
+            .limit(5); 
             
         if (error) throw error;
         
         if (data.length === 0) {
             list.innerHTML = '<li>No scores yet. Be the first!</li>';
         } else {
-            list.innerHTML = data.map((entry, i) => `<li>#${i+1} - <strong>${entry.player_name}</strong>: ${entry.score} pts</li>`).join('');
+            list.innerHTML = data.map((entry, i) => {
+                const solveText = entry.solves ? `(${entry.solves} solves)` : '';
+                return `<li>#${i+1} - <strong>${entry.player_name}</strong>: ${entry.score} pts ${solveText}</li>`;
+            }).join('');
         }
     } catch (error) {
         console.error("Supabase Error:", error.message);
         list.innerHTML = '<li>Failed to load leaderboard.</li>';
     }
 }
-
 
 
 document.getElementById('restart-btn').onclick = startGame;

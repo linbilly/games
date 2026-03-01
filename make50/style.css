@@ -29,6 +29,8 @@ body {
     touch-action: none; /* Disables native browser zoom/pan gestures */
     overscroll-behavior: none; /* Stops pull-to-refresh */
     -webkit-tap-highlight-color: transparent; /* Removes blue flash on buttons on iOS */
+
+    transition: background-color 1s ease;
 }
 
 #game-container {
@@ -50,11 +52,27 @@ body {
 
 
 header {
-    display: flex;
-    justify-content: space-between;
-    font-size: clamp(1rem, 4vw, 1.25rem); /* Shrinks text on small screens */
+    /* Switch from flex to grid */
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr; /* 3 equal columns */
+    align-items: center;
+    
+    font-size: clamp(1rem, 4vw, 1.25rem);
     font-weight: 700;
     margin-bottom: 20px;
+}
+
+/* Explicitly align the text inside each column */
+#timer {
+    text-align: left;
+}
+
+#solve-count {
+    text-align: center;
+}
+
+#score {
+    text-align: right;
 }
 
 #stage {
@@ -396,4 +414,29 @@ footer {
 
 #close-info-btn:active {
     background: #5c85b5;
+}
+
+/* Floating Reward Animation */
+.reward-float {
+    position: absolute;
+    color: #000000; /* Black text */
+    font-weight: 900;
+    font-size: 1.1rem;
+    pointer-events: none;
+    animation: floatUp 1.5s ease-out forwards;
+    z-index: 1000;
+    text-shadow: 1px 1px 0px rgba(255,255,255,0.7); /* Adds slight readability */
+}
+
+@keyframes floatUp {
+    0% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(-50px); opacity: 0; }
+}
+
+#instruction-overlay {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--blue);
+    text-align: center;
+    margin-bottom: 10px;
 }
