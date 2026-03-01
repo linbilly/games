@@ -60,27 +60,46 @@ header {
 #stage {
     flex-grow: 1;
     display: flex;
-    flex-wrap: nowrap; /* Forces a single line */
-    align-items: center;
     justify-content: center;
-    gap: 10px; /* Gap reduction to help fitting */
+    align-items: center;
+    gap: 10px;
+    
+    /* Default to NO WRAP so the tiles are forced to shrink as the screen gets smaller */
+    flex-wrap: nowrap; 
 }
 
 .tile {
+    /* Ideal starting size */
     width: 70px;
     height: 70px;
-    flex-shrink: 1; /* Allows tiles to shrink if the screen is narrow */
-    aspect-ratio: 1 / 1; /* Keeps them perfectly square while shrinking */
+    
+    /* Yes, you are allowed to shrink to fit the row */
+    flex-shrink: 1; 
+    
+    /* But DO NOT shrink smaller than 60px */
+    min-width: 60px;
+    min-height: 60px; 
+    
     border-radius: 16px;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: clamp(1.2rem, 5vw, 1.5rem); /* Responsive font size */
+    font-size: clamp(1.2rem, 5vw, 1.5rem); 
     font-weight: 700;
     cursor: pointer;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     transition: transform 0.1s ease, box-shadow 0.1s ease;
     box-sizing: border-box;
+}
+
+/* --- THE THRESHOLD TRIGGER --- */
+/* When the screen is 380px or smaller, 60px tiles no longer fit on one line */
+@media (max-width: 380px) {
+    #stage {
+        /* Flip the switch to let them break into 2 rows */
+        flex-wrap: wrap; 
+        align-content: center;
+    }
 }
 
 .tile:active { transform: scale(0.95); }
