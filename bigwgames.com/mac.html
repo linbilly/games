@@ -14,10 +14,18 @@
     <link rel="icon" type="image/png" href="wmeeple.png">
 </head>
 <body class="theme-mac">
-    <header>
-        <h1>MAC: March and Chomp</h1>
+<header class="site-header">
+        <a href="index.html" class="logo-link">
+            <img src="horizontal banner.png" alt="Big W Games Banner" class="banner-img">
+        </a>
+        <nav class="main-nav">
+            <a href="shop.html" class="button-link" style="background-color: #FF9800;">Where to Buy</a>
+            <a href="about.html" class="button-link">About Us</a>
+            <a href="newsletter.html" class="button-link" style="background-color: #4CAF50;">Join Newsletter</a>
+        </nav>
     </header>
     <div class="container">
+        <h1>MAC: March and Chomp </h1>
         <a href="index.html" class="back-link">&lt; Back to Home</a>
 
         <div class="section">
@@ -39,13 +47,13 @@
         </div>
 
         <div class="section">
-            <h2>Standard Mode Rules</h2>
+            <h2>Rules</h2>
             <h3>Setup</h3>
             <ul class="rule-list">
                 <li>Each player chooses a color (Red/Blue) and receives 15 pieces and one Portal Tile.</li>
-                <li>Determine who goes first.</li>
-                <li>Players take turns placing one of their pieces or their Portal Tile onto their 4×4 starting half of the board. All pieces and the portal must be placed.</li>
-                <li>The player who placed the very first piece of the game will make the first move after all setup is complete.</li>
+                <li>Flip a game piece to see who goes first.</li>
+                <li>Placement phase: players take turns placing one of their pieces or their Portal Tile onto their 4×4 starting half of the board. The pieces are visible to the opponent.</li>
+                <li>The player who placed the first piece of the game will make the first move after the placement phase is complete.</li>
             </ul>
 
             <h3>Gameplay & Movement Restrictions</h3>
@@ -63,16 +71,17 @@
                 <li><strong>Special Hierarchy Rule:</strong> A Strength 1 piece defeats a Strength 10 piece. A Strength 10 piece cannot capture a Strength 1 piece.</li>
             </ul>
 
-            <h3>Cannon (Strength 0) Rules</h3>
+            <h4>Special piece: Cannon (Strength 0)</h4>
             <ul class="rule-list">
                 <li><strong>Standard Move/Capture:</strong> Moves one square orthogonally. Can capture an opponent piece of Strength 0 by moving one step.</li>
-                <li><strong>Jump Capture:</strong> Can capture an opponent's piece of <em>any</em> strength by jumping over exactly one piece in a straight orthogonal line. The piece being jumped over (the "screen") is not captured.</li>
-                <li>A Cannon cannot jump into a Portal.</li>
+                <li><strong>Jump Capture:</strong> Can capture an opponent's piece of <em>any</em> strength by jumping over exactly one piece in a straight orthogonal line. The piece being jumped over (the "screen") is not captured. </li> 
+                <li>A Cannon can only jump if there's an opponent piece that can be captured this way. It cannot jump over a screen without capturing.</li>
+                <li>A Cannon cannot jump into a Portal, but it can use a Portal as a screen.</li>
             </ul>
 
             <h3>Portal Rules</h3>
             <ul class="rule-list">
-                <li>A game piece can move one step into a Portal Tile.</li>
+                <li>The only way a game piece can enter a Portal is by moving one step onto a Portal Tile.</li>
                 <li>It immediately exits through the other Portal Tile and takes one additional, immediate orthogonal step (capturing an enemy on this final step is allowed).</li>
                 <li>If no legal exit square is available, the piece cannot enter the first Portal.</li>
                 <li>A Portal Tile can act as a screen piece for a Cannon's Jump Capture.</li>
@@ -82,6 +91,7 @@
             <ul class="rule-list">
                 <li><strong>You lose if:</strong> All of your game pieces are captured, or you cannot make a legal move on your turn.</li>
                 <li><strong>Draw if:</strong> The exact same board state is repeated three times, or 20 consecutive turns pass without a capture.</li>
+                <li>Tip: do not give up even if your remaining pieces are all weaker than your opponents! You can often force a draw using the infinite loop created by the two Portals.</li>
             </ul>
         </div>
 
@@ -101,7 +111,7 @@
                 </tr>
                 <tr>
                     <td><strong>Double Step</strong></td>
-                    <td>Choose a piece to take 2 orthogonal steps.</td>
+                    <td>Choose a piece to take 2 orthogonal steps instead of 1 step.</td>
                     <td>-</td>
                 </tr>
                 <tr>
@@ -111,7 +121,7 @@
                 </tr>
                 <tr>
                     <td><strong>Peek</strong></td>
-                    <td>(Dark Chess Mode only). Secretly look at up to 3 covered pieces.</td>
+                    <td>(Dark Chess Mode only). Secretly look at up to 2 covered pieces.</td>
                     <td>Remove this token from the pile if playing Standard or Light Chess.</td>
                 </tr>
             </table>
@@ -121,16 +131,17 @@
             <h2>Variant Modes</h2>
             <h3>Dark Chess</h3>
             <ul class="rule-list">
-                <li>Shuffle all 30 game pieces face down. Place Portal Tiles face up on agreed squares.</li>
-                <li>Randomly arrange pieces face down. On your turn, either flip over one down-facing piece OR move one up-facing piece.</li>
-                <li>The first player to flip a piece determines which color they control.</li>
+                <li>Shuffle all 30 game pieces face down. Place the two Portal Tiles face up on two squares where both players agree.</li>
+                <li>Randomly arrange pieces face down to fill the board. </li> 
+                <li>On your turn, either flip over one down-facing piece OR move one up-facing piece.</li>
+                <li>The player who flips the first piece controls all pieces of that color.</li>
                 <li>A down-facing piece cannot be captured, but a Cannon can use it as a screen to jump over.</li>
             </ul>
 
-            <h3>Light Chess</h3>
+            <h3>Random Light Chess</h3>
             <ul class="rule-list">
+                <li>Flip a game piece to decide who goes first and what color they will play.</li>
                 <li>Shuffle and randomly place all 30 pieces and 2 Portals face down.</li>
-                <li>Players choose their color before play begins.</li>
                 <li>All pieces are flipped over at the same time, and the game is played normally with all pieces uncovered.</li>
             </ul>
         </div>

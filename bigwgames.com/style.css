@@ -10,9 +10,7 @@ body.theme-home {
 font-family: 'Arial', sans-serif; background-color: #f0f8ff; color: #333; text-align: center; margin: 0; padding: 0;
 }
 
-body.theme-home header {
-background-color: white; padding: 15px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
+
 
 body.theme-home header h1 {
 margin: 0; font-size: 2.5em;
@@ -155,7 +153,27 @@ body.theme-home .feature-list,
 body.theme-home .rule-list { text-align: left; margin: 10px auto 0; max-width: 520px; padding-left: 18px; }
 body.theme-home .feature-list li,
 body.theme-home .rule-list li { margin: 6px 0; }
-body.theme-home .button-link {
+
+/* ===== Page Title (H1) Styling ===== */
+.container h1 {
+    text-align: center;
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-top: 10px;
+    margin-bottom: 25px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    text-shadow: 1px 2px 3px rgba(0,0,0,0.1); /* Adds a soft, polished drop shadow */
+}
+
+/* Automatically color-coordinate the H1 to match the specific page theme! */
+body.theme-mac h1 { color: #00BCD4; }
+body.theme-robomissions h1 { color: #E91E63; }
+body.theme-about h1 { color: #4CAF50; }
+body.theme-shop h1 { color: #FF9800; }
+body.theme-newsletter h1 { color: #4CAF50; }
+
+.button-link {
   display: inline-block;
   margin-top: 10px;
   padding: 10px 14px;
@@ -165,7 +183,8 @@ body.theme-home .button-link {
   color: #fff;
   font-weight: 700;
 }
-body.theme-home .button-link:hover { opacity: 0.92; }
+
+.button-link:hover { opacity: 0.92; }
 body.theme-home .site-footer { margin-top: 34px; padding: 16px 0; color: #555; }
 
 /* ===== Game Image Styles ===== */
@@ -187,3 +206,100 @@ body.theme-home .site-footer { margin-top: 34px; padding: 16px 0; color: #555; }
     margin: 0 auto 25px auto;
     box-shadow: 0 5px 15px rgba(0,0,0,0.15);
 }
+
+/* ===== about.html (theme-about) ===== */
+body.theme-about {
+    font-family: 'Arial', sans-serif; background-color: #e8f5e9; color: #333; margin: 0; padding: 0;
+}
+body.theme-about header {
+    background-color: #90EE90; color: white; padding: 20px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center;
+}
+body.theme-about header h1 { margin: 0; font-size: 2.5em; }
+body.theme-about .container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+body.theme-about .section { background-color: white; padding: 30px; border-radius: 15px; margin-bottom: 30px; box-shadow: 0 5px 10px rgba(0,0,0,0.05); }
+body.theme-about h2 { color: #4CAF50; border-bottom: 3px solid #4CAF50; padding-bottom: 10px; margin-top: 0; }
+body.theme-about .back-link { display: block; margin-bottom: 20px; text-decoration: none; color: #4CAF50; font-weight: bold; }
+
+/* Testimonial Styling */
+.testimonial {
+    background-color: #f9f9f9;
+    border-left: 5px solid #FFC107;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    border-radius: 0 10px 10px 0;
+    font-size: 1.1em;
+    color: #555;
+}
+.testimonial-author {
+    text-align: right;
+    font-weight: bold;
+    color: #333;
+    margin-top: 10px;
+    font-size: 0.9em;
+}
+
+/* ===== shop.html (theme-shop) ===== */
+body.theme-shop {
+    font-family: 'Arial', sans-serif; background-color: #fffde7; color: #333; margin: 0; padding: 0; text-align: center;
+}
+body.theme-shop header {
+    background-color: #FFC107; color: #333; padding: 20px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+body.theme-shop header h1 { margin: 0; font-size: 2.5em; }
+body.theme-shop .container { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
+body.theme-shop .back-link { display: block; margin-bottom: 20px; text-decoration: none; color: #FF9800; font-weight: bold; text-align: left; }
+body.theme-shop .hero { background-color: white; padding: 40px 30px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); margin-bottom: 40px; }
+body.theme-shop .hero h2 { color: #FF9800; margin-top: 0; }
+
+/* ===== New Grid Header Layout (Center Logo, Right Nav) ===== */
+.site-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr; /* Creates 3 invisible columns */
+    align-items: center;
+    padding: 15px 30px;
+    background-color: white;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.site-header .logo-link {
+    grid-column: 2; /* Locks the logo into the exact center column */
+    display: flex;
+    justify-content: center;
+}
+
+.site-header .banner-img {
+    max-height: 120px; /* 150% of the original 80px size! */
+    width: auto;
+    margin: 0;
+}
+
+.site-header .main-nav {
+    grid-column: 3; /* Locks the buttons into the right column */
+    display: flex;
+    justify-content: flex-end; /* Pushes the buttons to the far right edge */
+    gap: 15px;
+}
+
+/* Make it mobile-friendly! Stacks beautifully on small screens */
+@media (max-width: 850px) {
+    .site-header {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 15px;
+        padding: 15px;
+    }
+    
+    .site-header .main-nav {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+/* ===== newsletter.html (theme-newsletter) ===== */
+body.theme-newsletter {
+    font-family: 'Arial', sans-serif; background-color: #f4fbf5; color: #333; margin: 0; padding: 0; text-align: center;
+}
+body.theme-newsletter .container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+body.theme-newsletter .hero { padding: 40px 30px; border-radius: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+body.theme-newsletter .back-link { display: block; margin-bottom: 20px; text-decoration: none; color: #4CAF50; font-weight: bold; text-align: left; }
