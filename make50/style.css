@@ -169,12 +169,7 @@ header {
     100% { transform: scale(1.05); }
 }
 
-#controls {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 2%; /* Percentage based gap for better shrinking */
-    margin-top: 20px;
-}
+
 
 button {
     font-family: inherit;
@@ -207,14 +202,51 @@ button:active { background: #e2e8f0; }
     z-index: 100;
 }
 
-.modal-content {
-    background: white;
-    padding: 30px;
-    border-radius: 20px;
-    text-align: center;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    width: 250px;
-    max-width: 80vw;
+/* --- Restored Controls Grid --- */
+#controls {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* Back to 5 equal columns */
+    gap: 2%; 
+    margin-top: 20px;
+}
+
+/* --- Top Corner Buttons (Menu & Skip) --- */
+#menu-btn, #skip-btn {
+    position: absolute; 
+    top: 20px;
+    background: none;
+    border: none;
+    font-size: 1.8rem;
+    color: var(--gray);
+    cursor: pointer;
+    padding: 5px;
+    transition: transform 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    z-index: 10;
+}
+
+/* Pin to opposite sides */
+#menu-btn { right: 20px; }
+#skip-btn { 
+    left: 20px; 
+    font-weight: 700; 
+    letter-spacing: -2px; /* Pulls the >> characters slightly closer together */
+}
+
+/* Hover & Active States */
+#menu-btn:hover {
+    transform: scale(1.15);
+    color: var(--blue);
+}
+
+#skip-btn:hover {
+    transform: scale(1.15);
+    color: var(--red); /* Red on hover to warn them it's a penalty */
+}
+
+#skip-btn:active, #menu-btn:active {
+    transform: scale(0.95);
 }
 
 .modal-content ul { 
@@ -252,12 +284,29 @@ button:active { background: #e2e8f0; }
     color: #666;
 }
 
+/* Fix Modal Width */
+.modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    
+    width: 90%;            /* Adaptive width */
+    max-width: 450px;      /* Increased to fit the practice buttons */
+}
+
+/* Allow buttons to wrap to a new line on small screens */
 #mode-selector {
     display: flex;
+    flex-wrap: wrap;       
     justify-content: center;
     gap: 10px;
     margin-bottom: 20px;
 }
+
+
+
 
 .mode-btn {
     padding: 8px 16px;
@@ -325,27 +374,7 @@ button:active { background: #e2e8f0; }
 }
 
 
-/* --- Menu Button & Footer Styles --- */
-#menu-btn {
-    position: absolute; 
-    top: 20px;
-    right: 20px;
-    background: none;
-    border: none;
-    font-size: 1.8rem; /* Slightly larger for the menu icon */
-    color: var(--gray);
-    cursor: pointer;
-    padding: 5px;
-    transition: transform 0.2s, color 0.2s;
-    display: flex;
-    align-items: center;
-    z-index: 10;
-}
 
-#menu-btn:hover {
-    transform: scale(1.15);
-    color: var(--blue);
-}
 
 /* --- Menu Modal Specifics --- */
 .menu-actions {

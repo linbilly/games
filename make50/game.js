@@ -81,6 +81,8 @@ const MODES = {
 
 // State trackers
 let consecutiveSolves = 0;
+let totalSolves = 0; // Tracks all-time solves for the session
+let maxCombo = 0;    // Tracks highest combo achieved
 let usedUndoThisRound = false;
 let roundStartTime = 0;
 let gameStarted = false;
@@ -247,25 +249,22 @@ function updateBackground() {
     document.body.style.backgroundColor = `hsl(45, ${saturation}%, ${lightness}%)`;
 }
 
-function showRewardText() {
+function showRewardText(bonusPercent) {
     const solveTime = (Date.now() - roundStartTime) / 1000;
     let messages = [];
     
-    if (solveTime < 30) messages.push("Speed Solve!");
+    if (solveTime < 30) messages.push("Speed!");
     if (!usedUndoThisRound) messages.push("Perfect!");
+    if (bonusPercent > 0) messages.push(`+${Math.round(bonusPercent * 100)}% Combo Bonus!`);
+    messages.push("+1 Solve"); 
 
-    // Combine all earned messages into one single string separated by bullets
     const combinedText = messages.join(" • ");
-
     const goldTile = document.querySelector('.tile.gold');
     const referenceRect = goldTile ? goldTile.getBoundingClientRect() : document.getElementById('stage').getBoundingClientRect();
 
-    // Create just ONE element
     const el = document.createElement('div');
     el.className = 'reward-float';
     el.innerText = combinedText;
-    
-    // Add +20px to push the starting position down directly into the tile
     el.style.top = `${referenceRect.top + 20}px`;
     
     document.body.appendChild(el);
@@ -381,9 +380,16 @@ function checkWinCondition() {
     const params = MODES[currentMode];
     if (activeTiles.length === 1 && activeTiles[0].value === params.target && activeTiles[0].comboCount === params.tiles) {
         
-        // Calculations
-        score += params.target + timeLeft; 
+        const baseScore = params.target + timeLeft;
+        // Apply 5% bonus for every consecutive solve BEFORE this current one
+        const bonusPercent = consecutiveSolves * 0.05; 
+        const bonusPoints = Math.floor(baseScore * bonusPercent);
+        
+        score += (baseScore + bonusPoints); 
+        
+        totalSolves++;
         consecutiveSolves++;
+        if (consecutiveSolves > maxCombo) maxCombo = consecutiveSolves;
         
         // Triggers
         document.getElementById('solve-count').innerText = `Solves: ${consecutiveSolves}`;
@@ -408,6 +414,8 @@ function checkWinCondition() {
 function startGame() {
     clearInterval(timerInterval);
     score = 0;
+    maxCombo = 0;
+    totalSolves = 0;
     timeLeft = 100;
     consecutiveSolves = 0; // Reset consecutive count
     gameStarted = false;   // Wait for first tap to start timer
@@ -433,11 +441,14 @@ function startGame() {
     render();
 }
 
-
-
 function endGame() {
     clearInterval(timerInterval);
+    
+    // Inject all final stats
     document.getElementById('final-score').innerText = score;
+    document.getElementById('final-solves').innerText = totalSolves; // NEW
+    document.getElementById('final-combo').innerText = maxCombo;     // NEW
+    
     document.body.style.backgroundColor = '#fcf9f2'; // Reset background on end
     
     document.getElementById('solution-text').innerText = currentSolutionStr;
@@ -474,14 +485,14 @@ async function saveToLeaderboard(name, newScore) {
             .insert([{ 
                 player_name: name, 
                 score: newScore, 
-                solves: consecutiveSolves, // NEW: Sending the solves
+                solves: totalSolves, 
+                max_combo: maxCombo, // NEW: Sending the combo
                 game_mode: currentMode 
             }]);
             
         if (error) throw error;
     } catch (error) {
         console.error("Supabase Error:", error.message);
-        alert("Couldn't save to the online leaderboard. Check your connection.");
     }
 }
 
@@ -494,7 +505,7 @@ async function renderLeaderboard() {
     try {
         const { data, error } = await supabaseClient
             .from('leaderboard')
-            .select('player_name, score, solves') // NEW: Select solves
+            .select('player_name, score, solves, max_combo') // NEW: Select max_combo
             .eq('game_mode', currentMode)
             .order('score', { ascending: false })
             .limit(5); 
@@ -505,8 +516,9 @@ async function renderLeaderboard() {
             list.innerHTML = '<li>No scores yet. Be the first!</li>';
         } else {
             list.innerHTML = data.map((entry, i) => {
-                const solveText = entry.solves ? `(${entry.solves} solves)` : '';
-                return `<li>#${i+1} - <strong>${entry.player_name}</strong>: ${entry.score} pts ${solveText}</li>`;
+                const solveText = entry.solves ? `${entry.solves} solves` : '';
+                const comboText = entry.max_combo ? ` | Max Combo: ${entry.max_combo}x` : '';
+                return `<li>#${i+1} - <strong>${entry.player_name}</strong>: ${entry.score} pts <br> <small>(${solveText}${comboText})</small></li>`;
             }).join('');
         }
     } catch (error) {
@@ -537,6 +549,34 @@ document.getElementById('quit-save-btn').onclick = () => {
     
     // Trigger the exact same Game Over flow as the timer running out
     endGame(); 
+};
+
+document.getElementById('skip-btn').onclick = () => {
+    if (!gameStarted) return; // Don't allow skipping before timer starts
+    
+    score -= 200;
+    consecutiveSolves = 0;
+    updateBackground(); // Resets to white because combo is 0
+    
+    // Quick visual penalty feedback
+    const el = document.createElement('div');
+    el.className = 'reward-float';
+    el.innerText = "-200 (Skip)";
+    el.style.color = "#c44949"; // Red text
+    
+    const scoreRect = document.getElementById('score').getBoundingClientRect();
+    el.style.left = `${scoreRect.left - 20}px`;
+    el.style.top = `${scoreRect.top + 30}px`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1500);
+
+    timeLeft = 100;
+    document.getElementById('timer').innerText = `${timeLeft}s`;
+    document.getElementById('solve-count').innerText = `Solves: ${totalSolves}`;
+    
+    render(); // Update score visually
+    generateTiles();
+    render();
 };
 
 // Initialize

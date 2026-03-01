@@ -15,6 +15,7 @@
 </head>
 <body>
     <div id="game-container">
+        <button id="skip-btn" title="Skip Round (-200 pts)">>></button>
         <button id="menu-btn" title="Menu">☰</button>
 
         <div id="header-titles">
@@ -48,8 +49,8 @@
             
             <div id="mode-selector">
                 <button class="mode-btn" data-mode="practice1">Practice 1</button>
-                <button class="mode-btn" data-mode="practice2">2</button>
-                <button class="mode-btn" data-mode="practice3">3</button>
+                <button class="mode-btn" data-mode="practice2">Practice 2</button>
+                <button class="mode-btn" data-mode="practice3">Practice 3</button>
                 <button class="mode-btn active" data-mode="make50">Make 50</button>
             </div>
 
@@ -68,24 +69,27 @@
     </div>
 
     <div id="game-over-modal" class="hidden">
-        <div class="modal-content">
-            <h2>Time's Up!</h2>
-            <p>Final Score: <span id="final-score">0</span></p>
-            
-            <p id="solution-display" class="hidden">Possible Solution:<br><strong><span id="solution-text"></span></strong></p>
-            
-            <div id="score-submission">
-                <input type="text" id="player-name" placeholder="Enter nickname..." maxlength="12" autocomplete="off">
-                <button id="submit-score-btn">Save Score</button>
-            </div>
+    <div class="modal-content">
+        <h2>Time's Up!</h2>
+        
+        <div id="final-stats-container">
+            <p>Score: <strong id="final-score">0</strong>     •     Solves: <strong id="final-solves">0</strong>     •     Max Combo: <strong id="final-combo">0</strong></p>
+        </div>
+        
+        <p id="solution-display" class="hidden">Possible Solution:<br><strong><span id="solution-text"></span></strong></p>
+        
+        <div id="score-submission">
+            <input type="text" id="player-name" placeholder="Enter nickname..." maxlength="12" autocomplete="off">
+            <button id="submit-score-btn">Save Score</button>
+        </div>
 
-            <div id="leaderboard-view" class="hidden">
-                <h3 id="leaderboard-title">Leaderboard</h3>
-                <ul id="leaderboard-list"></ul>
-                <button id="restart-btn">Play Again</button>
-            </div>
+        <div id="leaderboard-view" class="hidden">
+            <h3 id="leaderboard-title">Leaderboard</h3>
+            <ul id="leaderboard-list"></ul>
+            <button id="restart-btn">Play Again</button>
         </div>
     </div>
+</div>
 
     <script src="game.js"></script>
 </body>
