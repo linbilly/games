@@ -19,13 +19,6 @@
 
         <div id="header-titles">
             <h1 id="game-title">Make 50</h1>
-            <p id="game-desc">Use the math operators to combine the numbers to make 50</p>
-        </div>
-
-        <div id="mode-selector">
-            <button class="mode-btn" data-mode="easy">Easy</button>
-            <button class="mode-btn" data-mode="medium">Medium</button>
-            <button class="mode-btn active" data-mode="normal">Normal</button>
         </div>
 
         <header id="game-stats">
@@ -42,13 +35,22 @@
             <button class="op-btn" id="op-div" data-op="/">÷</button>
             <button id="undo-btn">Undo</button>
         </div>
-    </div> <footer>
+    </div> 
+    
+    <footer>
         Copyright &copy; Big W Games and Charlie Lin
     </footer>
 
     <div id="info-modal" class="hidden">
         <div class="modal-content info-content">
             <h2>Menu & Rules</h2>
+            
+            <div id="mode-selector">
+                <button class="mode-btn" data-mode="easy">Easy</button>
+                <button class="mode-btn" data-mode="medium">Medium</button>
+                <button class="mode-btn active" data-mode="make50">Make 50</button>
+            </div>
+
             <p><strong>Goal:</strong> Combine all the tiles to reach the target number!</p>
             <ul>
                 <li>Tap a number, tap an operator (+, −, ×, ÷), then tap another number to merge them.</li>

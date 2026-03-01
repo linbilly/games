@@ -75,10 +75,10 @@ function playWinSound() {
 const MODES = {
     easy:   { tiles: 3, target: 10, ops: ['+', '-'] },
     medium: { tiles: 3, target: 20, ops: ['+', '-', '*', '/'] },
-    normal: { tiles: 5, target: 50, ops: ['+', '-', '*', '/'] }
+    make50: { tiles: 5, target: 50, ops: ['+', '-', '*', '/'] }
 };
 
-let currentMode = 'normal';
+let currentMode = 'make50';
 let score = 0;
 let timeLeft = 100;
 let timerInterval;
@@ -177,7 +177,6 @@ function canReachTarget(arr, target, allowedOps) {
 function updateUIForMode() {
     const params = MODES[currentMode];
     document.getElementById('game-title').innerText = `Make ${params.target}`;
-    document.getElementById('game-desc').innerText = `Use the math operators to combine the numbers to make ${params.target}`;
     
     document.querySelectorAll('.op-btn').forEach(btn => {
         if (!params.ops.includes(btn.dataset.op)) {
@@ -242,6 +241,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentMode = btn.dataset.mode;
+        document.getElementById('info-modal').classList.add('hidden');
         startGame(); 
     };
 });
@@ -417,7 +417,8 @@ async function saveToLeaderboard(name, newScore) {
 
 async function renderLeaderboard() {
     const list = document.getElementById('leaderboard-list');
-    document.getElementById('leaderboard-title').innerText = `${currentMode.charAt(0).toUpperCase() + currentMode.slice(1)} Leaderboard`;
+    const displayTitle = currentMode === 'make50' ? 'Make 50' : currentMode.charAt(0).toUpperCase() + currentMode.slice(1);
+    document.getElementById('leaderboard-title').innerText = `${displayTitle} Leaderboard`;
     list.innerHTML = '<li>Loading scores...</li>';
     
     try {
