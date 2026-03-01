@@ -419,6 +419,8 @@ function startGame() {
     timeLeft = 100;
     consecutiveSolves = 0; // Reset consecutive count
     gameStarted = false;   // Wait for first tap to start timer
+
+    startBGM();
     
     // Reset UI
     document.body.style.backgroundColor = '#fcf9f2'; // Reset background to initial white/off-white
@@ -443,6 +445,7 @@ function startGame() {
 
 function endGame() {
     clearInterval(timerInterval);
+    stopBGM();
     
     // Inject all final stats
     document.getElementById('final-score').innerText = score;
@@ -578,6 +581,121 @@ document.getElementById('skip-btn').onclick = () => {
     generateTiles();
     render();
 };
+
+// --- Generative Adaptive Background Music ---
+let bgmTimerID;
+let isBGMActive = false;
+let nextNoteTime = 0;
+let bgmStep = 0; // Tracks our position in the 50-second loop
+
+// C Major Diatonic Scale (C3 to C6)
+const scaleFreqs = [
+    130.81, 146.83, 164.81, 174.61, 196.00, 220.00, 246.94, // 0-6   (C3-B3)
+    261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, // 7-13  (C4-B4)
+    523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, // 14-20 (C5-B5)
+    1046.50 // 21 (C6)
+];
+
+function startBGM() {
+    if (isBGMActive) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    isBGMActive = true;
+    nextNoteTime = audioCtx.currentTime + 0.1;
+    bgmStep = 0;
+    scheduleBGM();
+}
+
+function stopBGM() {
+    isBGMActive = false;
+    clearTimeout(bgmTimerID);
+}
+
+// Helper to easily spawn synth voices
+function playSynth(freq, time, duration, type, vol) {
+    if (!freq) return; // safeguard
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, time);
+
+    // Soft envelope to prevent audio popping
+    gain.gain.setValueAtTime(0, time);
+    gain.gain.linearRampToValueAtTime(vol, time + duration * 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + duration * 0.9);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    osc.start(time);
+    osc.stop(time + duration);
+}
+
+function scheduleBGM() {
+    if (!isBGMActive) return;
+    
+    const stepDuration = 0.25; // Constant 250ms tempo (4 notes per second)
+    
+    while (nextNoteTime < audioCtx.currentTime + 0.1) {
+        
+        // --- 50 Second Variation Logic ---
+        // 4 Chords: C Major, A Minor, F Major, G Major. (Each holds for 50 steps / 12.5 seconds)
+        const roots = [7, 5, 3, 4]; // Indices in the scaleFreqs array
+        const currentSection = Math.floor(bgmStep / 50);
+        const rootIndex = roots[currentSection];
+        
+        // 21-step melody pattern creates shifting variations over the 50-step chords
+        const melodyPattern = [0, 2, 4, 2, 7, 4, 2, 0, 1, 2, 4, -1, 0, 2, -3, 0, 2, 4, 0, 2, -1];
+        const patternOffset = melodyPattern[bgmStep % melodyPattern.length];
+        
+        let mainNoteIndex = rootIndex + patternOffset;
+        
+        // Keep notes within our safe 3-octave array
+        if (mainNoteIndex < 0) mainNoteIndex = 0;
+        if (mainNoteIndex > 21) mainNoteIndex = 21;
+        
+        // --- LAYER 0: Base Melody (Always plays) ---
+        playSynth(scaleFreqs[mainNoteIndex], nextNoteTime, stepDuration * 1.5, 'sine', 0.05);
+        
+        // --- LAYER 1: Thirds Harmony (Unlocks at Combo 2) ---
+        if (consecutiveSolves >= 2) {
+            let harmIndex = mainNoteIndex + 2; // Diatonic third above
+            if (harmIndex <= 21) playSynth(scaleFreqs[harmIndex], nextNoteTime, stepDuration * 1.5, 'triangle', 0.03);
+        }
+        
+        // --- LAYER 2: Bass Drone (Unlocks at Combo 4) ---
+        if (consecutiveSolves >= 4 && bgmStep % 8 === 0) {
+            // Drops a deep, 2-second root note on the downbeats
+            let bassFreq = scaleFreqs[rootIndex] / 2; 
+            playSynth(bassFreq, nextNoteTime, 2.0, 'sine', 0.08);
+        }
+        
+        // --- LAYER 3: High Twinkle Counter-Melody (Unlocks at Combo 6) ---
+        if (consecutiveSolves >= 6 && bgmStep % 2 !== 0) {
+            // Plays an octave higher specifically on the off-beats
+            let twinkleIndex = mainNoteIndex + 7; 
+            if (twinkleIndex <= 21) playSynth(scaleFreqs[twinkleIndex], nextNoteTime, stepDuration * 0.5, 'sine', 0.02);
+        }
+        
+        // --- LAYER 4: Sustained Chordal Pad (Unlocks at Combo 8) ---
+        if (consecutiveSolves >= 8 && bgmStep % 16 === 0) {
+            // Plays a lush, 4-second note a perfect fifth above the root
+            let padIndex = rootIndex + 4;
+            if (padIndex <= 21) playSynth(scaleFreqs[padIndex], nextNoteTime, 4.0, 'triangle', 0.04);
+        }
+
+        nextNoteTime += stepDuration;
+        bgmStep++;
+        
+        // Reset the loop exactly at 200 steps (50 seconds at 0.25s per step)
+        if (bgmStep >= 200) {
+            bgmStep = 0;
+        }
+    }
+    
+    // Wake up the scheduler again in 25ms
+    bgmTimerID = setTimeout(scheduleBGM, 25);
+}
 
 // Initialize
 startGame();
