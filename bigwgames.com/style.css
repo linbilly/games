@@ -18,6 +18,8 @@ body.theme-home header h1 {
 margin: 0; font-size: 2.5em;
 }
 
+
+
 /* Ensures the banner scales well on mobile and centers it */
 .banner-img {
 max-width: 100%; height: auto; max-height: 150px; display: block; margin: 0 auto;
@@ -36,11 +38,21 @@ color: #FF9800; font-size: 2.2em; margin-bottom: 15px;
 }
 
 body.theme-home .game-cards {
-display: flex; justify-content: space-around; gap: 30px;
+    display: flex; 
+    justify-content: space-around; 
+    gap: 30px;
+    flex-wrap: wrap; /* <--- This allows cards to stack when space is tight */
 }
 
 body.theme-home .card {
-background-color: white; padding: 30px; border-radius: 15px; box-shadow: 0 5px 10px rgba(0,0,0,0.1); width: 45%; transition: transform 0.3s;
+    background-color: white; 
+    padding: 30px; 
+    border-radius: 15px; 
+    box-shadow: 0 5px 10px rgba(0,0,0,0.1); 
+    width: 45%; 
+    min-width: 300px; /* <--- This forces the wrap once the screen gets narrow */
+    transition: transform 0.3s;
+    box-sizing: border-box; /* Ensures padding doesn't break the layout */
 }
 
 body.theme-home .card:hover {
