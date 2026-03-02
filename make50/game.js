@@ -103,6 +103,9 @@ let selectedOp = null;
 let lastTapTime = 0;      // NEW: Tracks double-taps
 let lastTapTileId = null; // NEW: Tracks double-taps
 
+let hintUsedThisRound = false;
+let highlightedTileIds = []; // Stores the IDs of the tiles to highlight
+
 // --- Logic: Math Solver (Now returns an array of visual steps) ---
 function findSolution(arr, target, allowedOps, currentSteps = []) {
     if (arr.length === 1) {
@@ -146,6 +149,8 @@ function findSolution(arr, target, allowedOps, currentSteps = []) {
 
 // --- Logic: Question Generation ---
 function generateTiles() {
+    highlightedTileIds = [];
+
     const params = MODES[currentMode];
     // Use the mode's pool if it exists, otherwise default
     const pool = params.pool || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10];
@@ -221,8 +226,12 @@ function render() {
         const el = document.createElement('div');
         let isGold = (activeTiles.length === 1 && tile.value === params.target && tile.comboCount === params.tiles);
         let comboClass = tile.comboCount <= 5 ? `combo-${tile.comboCount}` : 'combo-5';
+
+        let isHighlighted = highlightedTileIds.includes(tile.id) ? 'hint-highlight' : '';
         
-        el.className = `tile ${comboClass} ${isGold ? 'gold' : ''} ${tile.id === selectedTileId ? 'selected' : ''}`;
+        // Add isHighlighted to the class string
+        el.className = `tile ${comboClass} ${isGold ? 'gold' : ''} ${tile.id === selectedTileId ? 'selected' : ''} ${isHighlighted}`;
+        
         el.innerText = Number.isInteger(tile.value) ? tile.value : parseFloat(tile.value.toFixed(2));
         
         // --- Drag and Drop Logic ---
@@ -320,6 +329,12 @@ function handleTileClick(id) {
         timerInterval = setInterval(() => {
             timeLeft--;
             document.getElementById('timer').innerText = `${timeLeft}s`;
+            
+            // NEW: Show hint button at 20 seconds if not already used
+            if (timeLeft <= 20 && !hintUsedThisRound) {
+                document.getElementById('hint-btn').classList.remove('hidden');
+            }
+            
             if (timeLeft <= 0) endGame();
         }, 1000);
     }
@@ -343,6 +358,8 @@ document.querySelectorAll('.op-btn').forEach(btn => {
 });
 
 function mergeTiles(id1, id2, op) {
+    highlightedTileIds = [];
+
     history.push(JSON.parse(JSON.stringify(activeTiles)));
 
     const t1 = activeTiles.find(t => t.id === id1);
@@ -375,6 +392,8 @@ function mergeTiles(id1, id2, op) {
 }
 
 function breakUpTile(id) {
+    highlightedTileIds = [];
+
     const tile = activeTiles.find(t => t.id === id);
     if (!tile || tile.comboCount === 1) return;
     
@@ -392,6 +411,7 @@ function breakUpTile(id) {
 
 // Global Undo Button
 document.getElementById('undo-btn').onclick = () => {
+    highlightedTileIds = [];
     if (history.length > 0) {
         activeTiles = history.pop();
         selectedTileId = null;
@@ -657,6 +677,80 @@ document.getElementById('skip-btn').onclick = () => {
     render(); 
     generateTiles();
     render();
+};
+
+document.getElementById('hint-btn').onclick = () => {
+    if (hintUsedThisRound) return;
+    
+    // 1. Reset combo penalty (score remains untouched)
+    consecutiveSolves = 0;
+    document.getElementById('combo-count').innerText = `Combo: ${consecutiveSolves}`;
+    updateBackground();
+    
+    // 2. Hide button and flag as used
+    hintUsedThisRound = true;
+    document.getElementById('hint-btn').classList.add('hidden');
+    
+    // 3. Recalculate solution from the CURRENT board state
+    const params = MODES[currentMode];
+    let currentTestArr = activeTiles.map(t => ({ val: t.value, combo: t.comboCount }));
+    let currentSol = findSolution(currentTestArr, params.target, params.ops, []);
+    
+    let stepToHighlight = null;
+    let boardStateToUse = activeTiles;
+    
+    if (currentSol && currentSol.length > 0) {
+        // --- SOLVABLE STATE ---
+        // Use the next step from the current board state
+        stepToHighlight = currentSol[0];
+    } else {
+        // --- UNSOLVABLE STATE ---
+        // Revert board to original state if they have made moves
+        if (history.length > 0) {
+            activeTiles = history[0]; // The very first state recorded this round
+            history = []; // Clear history since we went back to the start
+            selectedTileId = null;
+            selectedOp = null;
+            
+            // Show a quick text float so they know the game auto-reverted
+            const el = document.createElement('div');
+            el.className = 'reward-float';
+            el.innerText = "Reverted to start!";
+            el.style.color = "#c44949"; 
+            const stageRect = document.getElementById('stage').getBoundingClientRect();
+            el.style.top = `${stageRect.top - 30}px`;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1500);
+            
+            playUndoSound(); 
+        }
+        
+        // Use the original valid solution generated at the start of the round
+        stepToHighlight = currentSolutionSteps[0];
+        boardStateToUse = activeTiles;
+    }
+    
+    // 4. Match the step values to physical tile IDs to highlight them
+    if (stepToHighlight) {
+        const val1 = stepToHighlight.aVal;
+        const val2 = stepToHighlight.bVal;
+        
+        let found1 = false;
+        let found2 = false;
+        highlightedTileIds = [];
+        
+        for (let tile of boardStateToUse) {
+            // Use < 0.001 to safely compare floating point numbers
+            if (!found1 && Math.abs(tile.value - val1) < 0.001) {
+                highlightedTileIds.push(tile.id);
+                found1 = true;
+            } else if (!found2 && Math.abs(tile.value - val2) < 0.001) {
+                highlightedTileIds.push(tile.id);
+                found2 = true;
+            }
+        }
+        render(); // Re-render the board with the new highlights
+    }
 };
 
 // --- Generative Adaptive Background Music ---
