@@ -201,33 +201,50 @@ function updateUIForMode() {
 
 function render() {
     document.getElementById('score').innerText = `Score: ${score}`;
+    document.getElementById('combo-count').innerText = `Combo: ${consecutiveSolves}`;
     const stage = document.getElementById('stage');
     stage.innerHTML = '';
     
     const params = MODES[currentMode];
 
-    activeTiles.forEach(tile => {
+    activeTiles.forEach((tile, index) => {
         const el = document.createElement('div');
-        
         let isGold = (activeTiles.length === 1 && tile.value === params.target && tile.comboCount === params.tiles);
         let comboClass = tile.comboCount <= 5 ? `combo-${tile.comboCount}` : 'combo-5';
         
         el.className = `tile ${comboClass} ${isGold ? 'gold' : ''} ${tile.id === selectedTileId ? 'selected' : ''}`;
         el.innerText = Number.isInteger(tile.value) ? tile.value : parseFloat(tile.value.toFixed(2));
         
-        // REPLACE your old el.onclick and el.ondblclick with this:
+        // --- Drag and Drop Logic ---
+        el.draggable = true;
+        el.ondragstart = (e) => {
+            e.dataTransfer.setData('text/plain', index);
+            setTimeout(() => el.classList.add('dragging'), 0);
+        };
+        el.ondragover = (e) => e.preventDefault(); // Required for dropping
+        el.ondrop = (e) => {
+            e.preventDefault();
+            const draggedIndex = parseInt(e.dataTransfer.getData('text/plain'));
+            if (draggedIndex !== index) {
+                // Swap the tiles in the array
+                const temp = activeTiles[draggedIndex];
+                activeTiles[draggedIndex] = activeTiles[index];
+                activeTiles[index] = temp;
+                render();
+            }
+        };
+        el.ondragend = () => el.classList.remove('dragging');
         
+        // Click Logic
         el.onclick = (e) => {
             const currentTime = new Date().getTime();
             const tapLength = currentTime - lastTapTime;
             
-            // If tapped twice within 300 milliseconds on the same tile
             if (tapLength < 300 && tapLength > 0 && lastTapTileId === tile.id) {
                 e.preventDefault(); 
                 breakUpTile(tile.id);
-                lastTapTime = 0; // Reset the timer
+                lastTapTime = 0; 
             } else {
-                // Otherwise, treat it as a single tap
                 lastTapTime = currentTime;
                 lastTapTileId = tile.id;
                 handleTileClick(tile.id);
@@ -249,25 +266,25 @@ function updateBackground() {
     document.body.style.backgroundColor = `hsl(45, ${saturation}%, ${lightness}%)`;
 }
 
-function showRewardText(bonusPercent) {
+function showRewardText() {
     const solveTime = (Date.now() - roundStartTime) / 1000;
     let messages = [];
     
-    if (solveTime < 30) messages.push("Speed!");
+    if (solveTime < 30) messages.push("Fast Solve!");
     if (!usedUndoThisRound) messages.push("Perfect!");
-    if (bonusPercent > 0) messages.push(`+${Math.round(bonusPercent * 100)}% Combo Bonus!`);
-    messages.push("+1 Solve"); 
+    // Removed "+1 solve"
 
-    const combinedText = messages.join(" • ");
     const goldTile = document.querySelector('.tile.gold');
     const referenceRect = goldTile ? goldTile.getBoundingClientRect() : document.getElementById('stage').getBoundingClientRect();
 
-    const el = document.createElement('div');
-    el.className = 'reward-float';
-    el.innerText = combinedText;
-    el.style.top = `${referenceRect.top + 20}px`;
-    
-    document.body.appendChild(el);
+    messages.forEach((text, i) => {
+        const el = document.createElement('div');
+        el.className = 'reward-float';
+        el.innerText = text;
+        // Space them out vertically so they read as 2 separate lines
+        el.style.top = `${referenceRect.top + 10 + (i * 25)}px`;
+        document.body.appendChild(el);
+    });
 }
 
 // Mode Selection Buttons
@@ -443,17 +460,16 @@ function startGame() {
     render();
 }
 
-function endGame() {
+function endGame(reason = "Time's Up!") {
     clearInterval(timerInterval);
     stopBGM();
     
-    // Inject all final stats
+    document.querySelector('#game-over-modal h2').innerText = reason; // Dynamic Title
+    
     document.getElementById('final-score').innerText = score;
-    document.getElementById('final-solves').innerText = totalSolves; // NEW
-    document.getElementById('final-combo').innerText = maxCombo;     // NEW
-    
-    document.body.style.backgroundColor = '#fcf9f2'; // Reset background on end
-    
+    document.getElementById('final-solves').innerText = totalSolves;
+    document.getElementById('final-combo').innerText = maxCombo;     
+    document.body.style.backgroundColor = '#fcf9f2'; 
     document.getElementById('solution-text').innerText = currentSolutionStr;
     document.getElementById('solution-display').classList.remove('hidden');
     document.getElementById('game-over-modal').classList.remove('hidden');
@@ -555,29 +571,35 @@ document.getElementById('quit-save-btn').onclick = () => {
 };
 
 document.getElementById('skip-btn').onclick = () => {
-    if (!gameStarted) return; // Don't allow skipping before timer starts
+    if (!gameStarted) return; 
+    
+    // Check if skipping causes a negative score
+    if (score - 200 < 0) {
+        endGame("Game Over! Try Again");
+        return;
+    }
     
     score -= 200;
     consecutiveSolves = 0;
-    updateBackground(); // Resets to white because combo is 0
+    updateBackground(); 
     
-    // Quick visual penalty feedback
+    // Fix Red floating "-" bug by targeting the stage center instead of the score
     const el = document.createElement('div');
     el.className = 'reward-float';
     el.innerText = "-200 (Skip)";
-    el.style.color = "#c44949"; // Red text
+    el.style.color = "#c44949"; 
     
-    const scoreRect = document.getElementById('score').getBoundingClientRect();
-    el.style.left = `${scoreRect.left - 20}px`;
-    el.style.top = `${scoreRect.top + 30}px`;
+    const stageRect = document.getElementById('stage').getBoundingClientRect();
+    el.style.top = `${stageRect.top}px`;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 1500);
 
     timeLeft = 100;
     document.getElementById('timer').innerText = `${timeLeft}s`;
     document.getElementById('solve-count').innerText = `Solves: ${totalSolves}`;
+    document.getElementById('combo-count').innerText = `Combo: ${consecutiveSolves}`;
     
-    render(); // Update score visually
+    render(); 
     generateTiles();
     render();
 };
@@ -586,19 +608,31 @@ document.getElementById('skip-btn').onclick = () => {
 let bgmTimerID;
 let isBGMActive = false;
 let nextNoteTime = 0;
-let bgmStep = 0; // Tracks our position in the 50-second loop
+let bgmStep = 0; 
+let sessionMelody = [];
 
-// C Major Diatonic Scale (C3 to C6)
-const scaleFreqs = [
-    130.81, 146.83, 164.81, 174.61, 196.00, 220.00, 246.94, // 0-6   (C3-B3)
-    261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, // 7-13  (C4-B4)
-    523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, // 14-20 (C5-B5)
-    1046.50 // 21 (C6)
+// A bright, happy Major scale (C Major + higher octaves)
+const majorScale = [
+    261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, // C4 to B4
+    523.25, 587.33, 659.25, 698.46, 783.99, 880.00          // C5 to A5
 ];
+
+// Generates a random happy 8-note melody sequence once per session
+function generateSessionMelody() {
+    sessionMelody = [];
+    for(let i=0; i<8; i++) {
+        // Pick random notes favoring the root, third, and fifth for a "happy" sound
+        let note = majorScale[Math.floor(Math.random() * majorScale.length)];
+        sessionMelody.push(note);
+    }
+}
 
 function startBGM() {
     if (isBGMActive) return;
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    if (sessionMelody.length === 0) generateSessionMelody();
+    
     isBGMActive = true;
     nextNoteTime = audioCtx.currentTime + 0.1;
     bgmStep = 0;
@@ -610,16 +644,14 @@ function stopBGM() {
     clearTimeout(bgmTimerID);
 }
 
-// Helper to easily spawn synth voices
-function playSynth(freq, time, duration, type, vol) {
-    if (!freq) return; // safeguard
+function playSynth(freq, time, duration, vol) {
+    if (!freq) return; 
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     
-    osc.type = type;
+    osc.type = 'triangle'; // Triangle is round and bubbly
     osc.frequency.setValueAtTime(freq, time);
 
-    // Soft envelope to prevent audio popping
     gain.gain.setValueAtTime(0, time);
     gain.gain.linearRampToValueAtTime(vol, time + duration * 0.1);
     gain.gain.exponentialRampToValueAtTime(0.001, time + duration * 0.9);
@@ -634,66 +666,27 @@ function playSynth(freq, time, duration, type, vol) {
 function scheduleBGM() {
     if (!isBGMActive) return;
     
-    const stepDuration = 0.25; // Constant 250ms tempo (4 notes per second)
+    // Starts slow (400ms per note). 
+    // Speeds up 10% per combo step: Math.pow(0.9, consecutiveSolves).
+    // Caps at a max speed of 120ms so it doesn't turn to mush.
+    let currentTempo = 0.40 * Math.pow(0.9, consecutiveSolves);
+    currentTempo = Math.max(0.12, currentTempo); 
     
     while (nextNoteTime < audioCtx.currentTime + 0.1) {
+        let noteToPlay = sessionMelody[bgmStep % sessionMelody.length];
         
-        // --- 50 Second Variation Logic ---
-        // 4 Chords: C Major, A Minor, F Major, G Major. (Each holds for 50 steps / 12.5 seconds)
-        const roots = [7, 5, 3, 4]; // Indices in the scaleFreqs array
-        const currentSection = Math.floor(bgmStep / 50);
-        const rootIndex = roots[currentSection];
+        // Play the melody
+        playSynth(noteToPlay, nextNoteTime, currentTempo * 1.5, 0.05);
         
-        // 21-step melody pattern creates shifting variations over the 50-step chords
-        const melodyPattern = [0, 2, 4, 2, 7, 4, 2, 0, 1, 2, 4, -1, 0, 2, -3, 0, 2, 4, 0, 2, -1];
-        const patternOffset = melodyPattern[bgmStep % melodyPattern.length];
-        
-        let mainNoteIndex = rootIndex + patternOffset;
-        
-        // Keep notes within our safe 3-octave array
-        if (mainNoteIndex < 0) mainNoteIndex = 0;
-        if (mainNoteIndex > 21) mainNoteIndex = 21;
-        
-        // --- LAYER 0: Base Melody (Always plays) ---
-        playSynth(scaleFreqs[mainNoteIndex], nextNoteTime, stepDuration * 1.5, 'sine', 0.05);
-        
-        // --- LAYER 1: Thirds Harmony (Unlocks at Combo 2) ---
-        if (consecutiveSolves >= 2) {
-            let harmIndex = mainNoteIndex + 2; // Diatonic third above
-            if (harmIndex <= 21) playSynth(scaleFreqs[harmIndex], nextNoteTime, stepDuration * 1.5, 'triangle', 0.03);
-        }
-        
-        // --- LAYER 2: Bass Drone (Unlocks at Combo 4) ---
-        if (consecutiveSolves >= 4 && bgmStep % 8 === 0) {
-            // Drops a deep, 2-second root note on the downbeats
-            let bassFreq = scaleFreqs[rootIndex] / 2; 
-            playSynth(bassFreq, nextNoteTime, 2.0, 'sine', 0.08);
-        }
-        
-        // --- LAYER 3: High Twinkle Counter-Melody (Unlocks at Combo 6) ---
-        if (consecutiveSolves >= 6 && bgmStep % 2 !== 0) {
-            // Plays an octave higher specifically on the off-beats
-            let twinkleIndex = mainNoteIndex + 7; 
-            if (twinkleIndex <= 21) playSynth(scaleFreqs[twinkleIndex], nextNoteTime, stepDuration * 0.5, 'sine', 0.02);
-        }
-        
-        // --- LAYER 4: Sustained Chordal Pad (Unlocks at Combo 8) ---
-        if (consecutiveSolves >= 8 && bgmStep % 16 === 0) {
-            // Plays a lush, 4-second note a perfect fifth above the root
-            let padIndex = rootIndex + 4;
-            if (padIndex <= 21) playSynth(scaleFreqs[padIndex], nextNoteTime, 4.0, 'triangle', 0.04);
+        // Add a soft underlying bass note every 4 steps to anchor the harmony
+        if (bgmStep % 4 === 0) {
+            playSynth(majorScale[0] / 2, nextNoteTime, currentTempo * 3, 0.06);
         }
 
-        nextNoteTime += stepDuration;
+        nextNoteTime += currentTempo;
         bgmStep++;
-        
-        // Reset the loop exactly at 200 steps (50 seconds at 0.25s per step)
-        if (bgmStep >= 200) {
-            bgmStep = 0;
-        }
     }
     
-    // Wake up the scheduler again in 25ms
     bgmTimerID = setTimeout(scheduleBGM, 25);
 }
 

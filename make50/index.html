@@ -15,7 +15,7 @@
 </head>
 <body>
     <div id="game-container">
-        <button id="skip-btn" title="Skip Round (-200 pts)">>></button>
+        <button id="skip-btn" title="Skip Round (-200 pts)">skip</button>
         <button id="menu-btn" title="Menu">☰</button>
 
         <div id="header-titles">
@@ -24,7 +24,8 @@
 
         <header id="game-stats">
             <div id="timer">100s</div>
-            <div id="solve-count">Solves: 0</div> <div id="score">Score: 0</div>
+            <div id="solve-count">Solves: 0</div> 
+            <div id="combo-count">Combo: 0</div> <div id="score">Score: 0</div>
         </header>
         <div id="instruction-overlay">Make 50 using all numbers shown</div>
 
@@ -58,7 +59,8 @@
             <ul>
                 <li>Tap a number, tap an operator (+, −, ×, ÷), then tap another number to merge them.</li>
                 <li><strong>Double-tap</strong> a combined tile to break it apart and undo the move.</li>
-                <li>Clear the board by combining all starting tiles into a single shiny gold tile!</li>
+                <li>Clear the board by combining all starting tiles into a single shiny gold tile.</li>
+                <li><strong>Skip</strong> a question you are stuck on, but it breaks a combo and -200 points. If <0 points, you lost the game!</li>
             </ul>
             
             <div class="menu-actions">

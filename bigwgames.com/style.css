@@ -61,8 +61,8 @@ body.theme-home .card h3 {
 font-size: 1.8em; color: #2196F3;
 }
 
-body.theme-home .card a {
-display: inline-block; background-color: #FFC107; color: #333; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; margin-top: 15px;
+body.theme-home .card a.button-link {
+    display: inline-block; background-color: #FFC107; color: #333; text-decoration: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; margin-top: 15px;
 }
 
 
@@ -329,4 +329,21 @@ body.theme-home .announcement-card a {
 
 body.theme-home .announcement-card a:hover {
     text-decoration: underline;
+}
+
+/* ===== Clickable Images and Titles ===== */
+body.theme-home .card .image-link {
+    display: block; /* Ensures the link wraps the image perfectly without extra space */
+}
+
+body.theme-home .card .title-link {
+    text-decoration: none; /* Removes the default blue underline */
+    display: inline-block;
+}
+
+/* Add a nice little fade effect when they hover over the image or title */
+body.theme-home .card .image-link:hover .card-img,
+body.theme-home .card .title-link:hover h3 {
+    opacity: 0.8;
+    transition: opacity 0.2s ease;
 }

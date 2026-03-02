@@ -3,12 +3,18 @@
     --text-dark: #4a4a4a;
     --text-light: #ffffff;
     
-    /* Progressively Darker Palette */
-    --gray:   #d1d8e0; /* Level 1: Light pastel gray */
-    --blue:   #7da2ce; /* Level 2: Medium-light blue */
-    --green:  #4a9b63; /* Level 3: Distinct, darker green */
-    --red:    #c44949; /* Level 4: Deep pastel red */
-    --yellow: #b07d1a; /* Level 5: Dark yellow / ochre (not 50) */
+    /* RESTORED UI COLORS */
+    --gray: #94a3b8;    /* Inconspicuous gray for top buttons */
+    --blue: #4a90e2;    /* Primary blue for active modes & combo text */
+    --red: #ef4444;     /* Red for skip hover & warnings */
+    --green: #22c55e;   /* Green for the submit score button */
+    
+    /* Warm Progress Palette */
+    --tile-1: #F9F6F2; /* Grey */
+    --tile-2: #FEFEC5; /* Yellow */
+    --tile-3: #FFD6A5; /* Orange */
+    --tile-4: #FF9689; /* Red */
+    --tile-5: #D8796E; /* Brown */
     
     --gold: linear-gradient(135deg, #ffd700, #ffec8b, #ffd700);
 }
@@ -69,16 +75,7 @@ body {
     text-shadow: 1px 1px 0px rgba(255,255,255,0.7);
 }
 
-header {
-    /* Switch from flex to grid */
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr; /* 3 equal columns */
-    align-items: center;
-    
-    font-size: clamp(1rem, 4vw, 1.25rem);
-    font-weight: 700;
-    margin-bottom: 20px;
-}
+
 
 /* Explicitly align the text inside each column */
 #timer {
@@ -127,6 +124,36 @@ header {
     transition: transform 0.1s ease, box-shadow 0.1s ease;
     box-sizing: border-box;
 }
+/* 1. Make the Operator symbols larger */
+.op-btn {
+    font-size: clamp(1.8rem, 6vw, 2.2rem); 
+    padding: 5px 0; 
+}
+
+/* 2. Remove the letter-spacing tweak from the skip button */
+#skip-btn { 
+    left: 20px; 
+    font-weight: 400; 
+    font-size: 1.2rem;
+}
+
+/* 3. Update Header Grid to 4 Columns */
+header {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr; /* Changed from 3 to 4 */
+    align-items: center;
+    font-size: clamp(0.9rem, 3.5vw, 1.1rem); /* Slightly smaller to fit 4 items */
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+#combo-count { text-align: center; color: var(--blue); }
+
+/* 4. Drag & Drop Visuals */
+.tile.dragging {
+    opacity: 0.5;
+    transform: scale(1.05);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+}
 
 /* --- THE THRESHOLD TRIGGER --- */
 /* When the screen is 380px or smaller, 60px tiles no longer fit on one line */
@@ -142,11 +169,11 @@ header {
 .tile.selected { outline: 3px solid #777; transform: scale(1.05); }
 
 /* Combo Colors (Levels 1 through 5) */
-.combo-1 { background-color: var(--gray); color: var(--text-dark); }
-.combo-2 { background-color: var(--blue); color: var(--text-dark); }
-.combo-3 { background-color: var(--green); color: var(--text-light); }
-.combo-4 { background-color: var(--red); color: var(--text-light); }
-.combo-5 { background-color: var(--yellow); color: var(--text-light); }
+.combo-1 { background-color: var(--tile-1); color: var(--text-dark); }
+.combo-2 { background-color: var(--tile-2); color: var(--text-dark); }
+.combo-3 { background-color: var(--tile-3); color: var(--text-dark); }
+.combo-4 { background-color: var(--tile-4); color: var(--text-dark); } /* Dark text reads better on this pastel red */
+.combo-5 { background-color: var(--tile-5); color: var(--text-light); } /* Light text for the darker brown */
 
 /* The Solution Tile (Level 5 + Equals 50) */
 .gold { 
@@ -228,11 +255,7 @@ button:active { background: #e2e8f0; }
 
 /* Pin to opposite sides */
 #menu-btn { right: 20px; }
-#skip-btn { 
-    left: 20px; 
-    font-weight: 700; 
-    letter-spacing: -2px; /* Pulls the >> characters slightly closer together */
-}
+
 
 /* Hover & Active States */
 #menu-btn:hover {
