@@ -6,6 +6,8 @@ const SUPABASE_URL = 'https://dxnxwwgamfylqcjahtzv.supabase.co'; // Replace with
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_VRwl-Fna636SBgiGpF-yGw_pGqe0VrS'; // Use your new publishable key
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
+
+
 function playComboSound(level) {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     const osc = audioCtx.createOscillator();
@@ -93,7 +95,7 @@ let timeLeft = 100;
 let timerInterval;
 let activeTiles = [];
 let history = []; 
-let currentSolutionStr = ""; // Tracks the solution equation
+let currentSolutionSteps = []; // Tracks the solution as an array of equation objects
 
 let selectedTileId = null;
 let selectedOp = null;
@@ -101,11 +103,11 @@ let selectedOp = null;
 let lastTapTime = 0;      // NEW: Tracks double-taps
 let lastTapTileId = null; // NEW: Tracks double-taps
 
-// --- Logic: Math Solver (Now returns the equation string) ---
-function findSolution(arr, target, allowedOps) {
+// --- Logic: Math Solver (Now returns an array of visual steps) ---
+function findSolution(arr, target, allowedOps, currentSteps = []) {
     if (arr.length === 1) {
-        if (Math.abs(arr[0].val - target) < 0.001) return arr[0].exp;
-        return null; // Return null if not a match
+        if (Math.abs(arr[0].val - target) < 0.001) return currentSteps;
+        return null;
     }
     
     for (let i = 0; i < arr.length; i++) {
@@ -115,16 +117,27 @@ function findSolution(arr, target, allowedOps) {
             let remaining = arr.filter((_, idx) => idx !== i && idx !== j);
             let a = arr[i], b = arr[j];
             let results = [];
+            let newCombo = a.combo + b.combo;
             
-            // Build the expression strings using proper math symbols
-            if (allowedOps.includes('+')) results.push({ val: a.val + b.val, exp: `(${a.exp} + ${b.exp})` });
-            if (allowedOps.includes('-')) results.push({ val: a.val - b.val, exp: `(${a.exp} − ${b.exp})` });
-            if (allowedOps.includes('*')) results.push({ val: a.val * b.val, exp: `(${a.exp} × ${b.exp})` });
-            if (allowedOps.includes('/') && Math.abs(b.val) > 0.001) results.push({ val: a.val / b.val, exp: `(${a.exp} ÷ ${b.exp})` });
+            if (allowedOps.includes('+')) results.push({ val: a.val + b.val, op: '+' });
+            if (allowedOps.includes('-')) results.push({ val: a.val - b.val, op: '−' });
+            if (allowedOps.includes('*')) results.push({ val: a.val * b.val, op: '×' });
+            if (allowedOps.includes('/') && Math.abs(b.val) > 0.001) results.push({ val: a.val / b.val, op: '÷' });
             
             for (let res of results) {
-                let solution = findSolution([...remaining, res], target, allowedOps);
-                if (solution) return solution; // Bubble the successful string up
+                // Save the equation data for this step
+                let stepObj = {
+                    aVal: a.val, aCombo: a.combo,
+                    bVal: b.val, bCombo: b.combo,
+                    op: res.op,
+                    resVal: res.val, resCombo: newCombo
+                };
+                
+                let solution = findSolution(
+                    [...remaining, { val: res.val, combo: newCombo }], 
+                    target, allowedOps, [...currentSteps, stepObj]
+                );
+                if (solution) return solution; 
             }
         }
     }
@@ -150,15 +163,12 @@ function generateTiles() {
             numbers.push(num);
         }
 
-        let testArr = numbers.map(n => ({ val: n, exp: n.toString() }));
-        foundSolution = findSolution(testArr, params.target, params.ops);
+        let testArr = numbers.map(n => ({ val: n, combo: 1 }));
+        let foundSolution = findSolution(testArr, params.target, params.ops);
 
         if (onesAndTwos <= 3 && foundSolution) {
             validSet = true;
-            if (foundSolution.startsWith('(') && foundSolution.endsWith(')')) {
-                foundSolution = foundSolution.slice(1, -1);
-            }
-            currentSolutionStr = `${foundSolution} = ${params.target}`;
+            currentSolutionSteps = foundSolution; // Save the array of steps
         }
     }
 
@@ -460,17 +470,62 @@ function startGame() {
     render();
 }
 
+function renderSolution() {
+    const container = document.getElementById('solution-text');
+    container.innerHTML = ''; 
+    
+    currentSolutionSteps.forEach(step => {
+        const row = document.createElement('div');
+        row.className = 'solution-row';
+        
+        // Helper to quickly generate the styled mini-tiles
+        const createTile = (val, combo, isRes) => {
+            const el = document.createElement('div');
+            let comboClass = combo <= 5 ? `combo-${combo}` : 'combo-5';
+            
+            const params = MODES[currentMode];
+            // If it's the final target tile, make it flash gold
+            if (isRes && combo === params.tiles && Math.abs(val - params.target) < 0.001) {
+                el.className = `mini-tile gold`;
+            } else {
+                el.className = `mini-tile ${comboClass}`;
+            }
+            
+            el.innerText = Number.isInteger(val) ? val : parseFloat(val.toFixed(2));
+            return el;
+        };
+
+        const opSpan = document.createElement('span');
+        opSpan.className = 'solution-op';
+        opSpan.innerText = step.op;
+        
+        const eqSpan = document.createElement('span');
+        eqSpan.className = 'solution-op';
+        eqSpan.innerText = '=';
+        
+        // Build the row: [Num1] op [Num2] = [Result]
+        row.appendChild(createTile(step.aVal, step.aCombo, false));
+        row.appendChild(opSpan);
+        row.appendChild(createTile(step.bVal, step.bCombo, false));
+        row.appendChild(eqSpan);
+        row.appendChild(createTile(step.resVal, step.resCombo, true));
+        
+        container.appendChild(row);
+    });
+}
+
 function endGame(reason = "Time's Up!") {
     clearInterval(timerInterval);
     stopBGM();
     
-    document.querySelector('#game-over-modal h2').innerText = reason; // Dynamic Title
-    
+    document.querySelector('#game-over-modal h2').innerText = reason; 
     document.getElementById('final-score').innerText = score;
     document.getElementById('final-solves').innerText = totalSolves;
     document.getElementById('final-combo').innerText = maxCombo;     
     document.body.style.backgroundColor = '#fcf9f2'; 
-    document.getElementById('solution-text').innerText = currentSolutionStr;
+    
+    renderSolution(); // NEW: Call the visual step renderer
+    
     document.getElementById('solution-display').classList.remove('hidden');
     document.getElementById('game-over-modal').classList.remove('hidden');
 }
