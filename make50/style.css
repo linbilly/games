@@ -130,12 +130,7 @@ body {
     padding: 5px 0; 
 }
 
-/* 2. Remove the letter-spacing tweak from the skip button */
-#skip-btn { 
-    left: 20px; 
-    font-weight: 400; 
-    font-size: 1.2rem;
-}
+
 
 /* 3. Update Header Grid to 4 Columns */
 header {
@@ -146,7 +141,6 @@ header {
     font-weight: 700;
     margin-bottom: 20px;
 }
-#combo-count { text-align: center; color: var(--blue); }
 
 /* 4. Drag & Drop Visuals */
 .tile.dragging {
@@ -213,7 +207,6 @@ button {
 
 button.selected-op { background: #cbd5e1; outline: 2px solid #94a3b8; }
 button:active { background: #e2e8f0; }
-#undo-btn { font-size: clamp(0.8rem, 3vw, 1rem); background: #ffe4e6; }
 
 /* Modal Settings */
 .hidden { display: none !important; }
@@ -229,16 +222,38 @@ button:active { background: #e2e8f0; }
     z-index: 100;
 }
 
-/* --- Restored Controls Grid --- */
+
+/* Update these specific blocks in your style.css */
+
+#combo-count { 
+    text-align: center; 
+    color: #000000; /* Now Black */
+}
+
+/* --- Controls Grid (Now 6 items) --- */
 #controls {
     display: grid;
-    grid-template-columns: repeat(5, 1fr); /* Back to 5 equal columns */
+    grid-template-columns: repeat(6, 1fr); /* Fits Skip + 4 Ops + Undo */
     gap: 2%; 
     margin-top: 20px;
 }
 
-/* --- Top Corner Buttons (Menu & Skip) --- */
-#menu-btn, #skip-btn {
+#skip-btn {
+    background: #FA8072; /* Salmon red */
+    color: white;
+    font-size: clamp(0.8rem, 3vw, 1rem); 
+    padding: 15px 0;
+    position: static; /* Overrides the old absolute positioning */
+}
+
+#undo-btn { 
+    background: #79BAEC; /* Light blue */
+    color: white;
+    font-size: clamp(0.8rem, 3vw, 1rem); 
+}
+
+/* Remove the combined skip-btn/menu-btn CSS, leave only menu-btn */
+#menu-btn, #music-btn {
     position: absolute; 
     top: 20px;
     background: none;
@@ -252,23 +267,47 @@ button:active { background: #e2e8f0; }
     align-items: center;
     z-index: 10;
 }
-
-/* Pin to opposite sides */
 #menu-btn { right: 20px; }
+#music-btn { left: 20px; }
 
+#music-btn {
+    font-family: Arial, sans-serif; /* Prevents OS from turning it into a colorful emoji */
+}
+
+/* The strike-through inherits the --gray color automatically */
+#music-btn.muted {
+    text-decoration: line-through;
+    text-decoration-thickness: 3px;
+    opacity: 0.6; /* Dims it slightly to reinforce that it is off */
+}
 
 /* Hover & Active States */
-#menu-btn:hover {
+#menu-btn:hover, #music-btn:hover {
     transform: scale(1.15);
     color: var(--blue);
 }
+
+#menu-btn:active, #music-btn:active {
+    transform: scale(0.95);
+}
+
+/* --- New Text Hint Style --- */
+#hint-display {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--blue);
+    text-align: center;
+    margin-bottom: 10px;
+    min-height: 1.5rem;
+}
+
 
 #skip-btn:hover {
     transform: scale(1.15);
     color: var(--red); /* Red on hover to warn them it's a penalty */
 }
 
-#skip-btn:active, #menu-btn:active {
+#skip-btn:active {
     transform: scale(0.95);
 }
 

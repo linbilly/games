@@ -15,7 +15,7 @@
 </head>
 <body>
     <div id="game-container">
-        <button id="skip-btn" title="Skip Round (-200 pts)">skip</button>
+        <button id="music-btn" title="Toggle Music">♪</button>
         <button id="menu-btn" title="Menu">☰</button>
 
         <div id="header-titles">
@@ -29,11 +29,14 @@
         </header>
         <div id="instruction-overlay">Make 50 using all numbers shown</div>
 
+        <div id="hint-display" class="hidden"></div>
+
         <div id="stage"></div>
 
         <button id="hint-btn" class="hidden">Hint?</button>
 
         <div id="controls">
+            <button id="skip-btn" title="Skip Round (-200 pts)">Skip</button>
             <button class="op-btn" data-op="+">+</button>
             <button class="op-btn" data-op="-">−</button>
             <button class="op-btn" id="op-mul" data-op="*">×</button>
@@ -43,7 +46,7 @@
     </div> 
     
     <footer>
-        Copyright &copy; Big W Games and Charlie Lin
+        Copyright &copy; <a href="https://bigwgames.com">Big W Games</a> and Charlie Lin
     </footer>
 
     <div id="info-modal" class="hidden">
@@ -93,8 +96,8 @@
         <div id="leaderboard-view" class="hidden">
             <h3 id="leaderboard-title">Leaderboard</h3>
             <ul id="leaderboard-list"></ul>
-            <button id="restart-btn">Play Again</button>
         </div>
+        <button id="restart-btn">Play Again</button>
     </div>
 </div>
 
