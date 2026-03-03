@@ -1,5 +1,3 @@
-// --- Audio System (Web Audio API) ---
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 // --- Supabase Setup ---
 const SUPABASE_URL = 'https://dxnxwwgamfylqcjahtzv.supabase.co'; // Replace with your URL
@@ -8,69 +6,13 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLI
 
 
 
-function playComboSound(level) {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const osc = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    
-    // Pitch goes up based on the combo level (Level 2 is higher than Level 1, etc.)
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(300 + (level * 150), audioCtx.currentTime);
-    
-    // Quick, satisfying "pop" envelope
-    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-    
-    osc.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.15);
-}
+// --- Audio System (MusicEngine) ---
+// Requires music_engine.js to be loaded before game.js
+const musicEngine = new MusicEngine();
 
-function playUndoSound() {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const osc = audioCtx.createOscillator();
-    const gainNode = audioCtx.createGain();
-    
-    // A lower, duller pop for breaking a tile apart
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(250, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(150, audioCtx.currentTime + 0.1);
-    
-    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-    
-    osc.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    
-    osc.start();
-    osc.stop(audioCtx.currentTime + 0.1);
-}
-
-function playWinSound() {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    
-    // Play a sparkly ascending arpeggio (A Major chord)
-    const notes = [440, 554.37, 659.25, 880]; 
-    notes.forEach((freq, i) => {
-        const osc = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-        
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.1);
-        
-        gainNode.gain.setValueAtTime(0, audioCtx.currentTime + i * 0.1);
-        gainNode.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + i * 0.1 + 0.05);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.1 + 0.4);
-        
-        osc.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        
-        osc.start(audioCtx.currentTime + i * 0.1);
-        osc.stop(audioCtx.currentTime + i * 0.1 + 0.4);
-    });
-}
+function playComboSound(level){ musicEngine.onCombo(level); }
+function playUndoSound(){ musicEngine.onUndo(); }
+function playWinSound(){ musicEngine.onWin(); }
 
 
 // --- Game State ---
@@ -104,7 +46,6 @@ let lastTapTime = 0;      // NEW: Tracks double-taps
 let lastTapTileId = null; // NEW: Tracks double-taps
 
 let hintUsedThisRound = false;
-let highlightedTileIds = []; // Stores the IDs of the tiles to highlight
 
 let isMusicEnabled = true; // NEW: Defaults to off
 
@@ -157,7 +98,7 @@ function findSolution(arr, target, allowedOps, currentSteps = []) {
 
 // --- Logic: Question Generation ---
 function generateTiles() {
-    highlightedTileIds = [];
+    
     document.getElementById('hint-display').classList.add('hidden');
     document.getElementById('hint-btn').classList.add('hidden');
 
@@ -236,11 +177,9 @@ function render() {
         const el = document.createElement('div');
         let isGold = (activeTiles.length === 1 && tile.value === params.target && tile.comboCount === params.tiles);
         let comboClass = tile.comboCount <= 5 ? `combo-${tile.comboCount}` : 'combo-5';
-
-        let isHighlighted = highlightedTileIds.includes(tile.id) ? 'hint-highlight' : '';
         
-        // Add isHighlighted to the class string
-        el.className = `tile ${comboClass} ${isGold ? 'gold' : ''} ${tile.id === selectedTileId ? 'selected' : ''} ${isHighlighted}`;
+        // FIX: Properly closed the template literal and ternary operator!
+        el.className = `tile ${comboClass} ${isGold ? 'gold' : ''} ${tile.id === selectedTileId ? 'selected' : ''}`;
         
         el.innerText = Number.isInteger(tile.value) ? tile.value : parseFloat(tile.value.toFixed(2));
     
@@ -300,7 +239,7 @@ function showRewardText() {
 // Mode Selection Buttons
 document.querySelectorAll('.mode-btn').forEach(btn => {
     btn.onclick = () => {
-        if (audioCtx.state === 'suspended') audioCtx.resume(); // Ensure audio unlocks on click
+        musicEngine.resume(); // Ensure audio unlocks on click
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentMode = btn.dataset.mode;
@@ -310,11 +249,15 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 });
 
 function handleTileClick(id) {
-    if (audioCtx.state === 'suspended') audioCtx.resume(); 
+    musicEngine.resume(); 
 
     // Start timer & hide instructions on first interaction
     if (!gameStarted) {
         gameStarted = true;
+
+        // SAFELY start the music engine here, only if they haven't muted it
+        if (isMusicEnabled) musicEngine.start();
+
         roundStartTime = Date.now();
         document.getElementById('instruction-overlay').classList.add('hidden');
         timerInterval = setInterval(() => {
@@ -349,7 +292,7 @@ document.querySelectorAll('.op-btn').forEach(btn => {
 });
 
 function mergeTiles(id1, id2, op) {
-    highlightedTileIds = [];
+    
 
     history.push(JSON.parse(JSON.stringify(activeTiles)));
 
@@ -383,7 +326,7 @@ function mergeTiles(id1, id2, op) {
 }
 
 function breakUpTile(id) {
-    highlightedTileIds = [];
+    
 
     const tile = activeTiles.find(t => t.id === id);
     if (!tile || tile.comboCount === 1) return;
@@ -402,7 +345,7 @@ function breakUpTile(id) {
 
 // Global Undo Button
 document.getElementById('undo-btn').onclick = () => {
-    highlightedTileIds = [];
+    
     if (history.length > 0) {
         activeTiles = history.pop();
         selectedTileId = null;
@@ -459,7 +402,6 @@ function startGame() {
     gameStarted = false;   // Wait for first tap to start timer
     hintUsedThisRound = false;
 
-    startBGM();
     
     // Reset UI
     document.body.style.backgroundColor = '#fcf9f2'; // Reset background to initial white/off-white
@@ -528,7 +470,7 @@ function renderSolution() {
 
 function endGame(reason = "Time's Up!") {
     clearInterval(timerInterval);
-    stopBGM();
+    musicEngine.stop();
     
     document.querySelector('#game-over-modal h2').innerText = reason; 
     document.getElementById('final-score').innerText = score;
@@ -625,7 +567,7 @@ document.getElementById('close-info-btn').onclick = () => {
     document.getElementById('info-modal').classList.add('hidden');
     
     // Resume audio if needed
-    if (audioCtx.state === 'suspended') audioCtx.resume(); 
+    musicEngine.resume(); 
 };
 
 // NEW: Quit and Save early
@@ -691,134 +633,21 @@ document.getElementById('hint-btn').onclick = () => {
 
 // --- Music Toggle Logic ---
 document.getElementById('music-btn').onclick = () => {
-    if (audioCtx.state === 'suspended') audioCtx.resume(); 
+    musicEngine.resume(); 
     
     isMusicEnabled = !isMusicEnabled; 
     const musicBtn = document.getElementById('music-btn');
     
     if (isMusicEnabled) {
         musicBtn.classList.remove('muted'); // Removes the strike-through
-        if (gameStarted) startBGM(); 
+        if (gameStarted) musicEngine.start(); 
     } else {
         musicBtn.classList.add('muted');    // Adds the strike-through
-        stopBGM(); 
+        musicEngine.stop(); 
     }
 };
 
-// --- Generative Adaptive Background Music ---
-let bgmTimerID;
-let isBGMActive = false;
-let nextNoteTime = 0;
-let bgmStep = 0; // Tracks our position in the 50-second loop
 
-// C Major Diatonic Scale (C3 to C6)
-const scaleFreqs = [
-    130.81, 146.83, 164.81, 174.61, 196.00, 220.00, 246.94, // 0-6   (C3-B3)
-    261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, // 7-13  (C4-B4)
-    523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, // 14-20 (C5-B5)
-    1046.50 // 21 (C6)
-];
-
-function startBGM() {
-    if (isBGMActive || !isMusicEnabled) return; // Prevent starting if muted
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    isBGMActive = true;
-    nextNoteTime = audioCtx.currentTime + 0.1;
-    bgmStep = 0;
-    scheduleBGM();
-}
-
-function stopBGM() {
-    isBGMActive = false;
-    clearTimeout(bgmTimerID);
-}
-
-// Helper to easily spawn synth voices
-function playSynth(freq, time, duration, type, vol) {
-    if (!freq) return; // safeguard
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, time);
-
-    // Soft envelope to prevent audio popping
-    gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(vol, time + duration * 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + duration * 0.9);
-
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    
-    osc.start(time);
-    osc.stop(time + duration);
-}
-
-function scheduleBGM() {
-    if (!isBGMActive) return;
-    
-    const stepDuration = 0.25; // Constant 250ms tempo (4 notes per second)
-    
-    while (nextNoteTime < audioCtx.currentTime + 0.1) {
-        
-        // --- 50 Second Variation Logic ---
-        // 4 Chords: C Major, A Minor, F Major, G Major. (Each holds for 50 steps / 12.5 seconds)
-        const roots = [7, 5, 3, 4]; // Indices in the scaleFreqs array
-        const currentSection = Math.floor(bgmStep / 50);
-        const rootIndex = roots[currentSection];
-        
-        // 21-step melody pattern creates shifting variations over the 50-step chords
-        const melodyPattern = [0, 2, 4, 2, 7, 4, 2, 0, 1, 2, 4, -1, 0, 2, -3, 0, 2, 4, 0, 2, -1];
-        const patternOffset = melodyPattern[bgmStep % melodyPattern.length];
-        
-        let mainNoteIndex = rootIndex + patternOffset;
-        
-        // Keep notes within our safe 3-octave array
-        if (mainNoteIndex < 0) mainNoteIndex = 0;
-        if (mainNoteIndex > 21) mainNoteIndex = 21;
-        
-        // --- LAYER 0: Base Melody (Always plays) ---
-        playSynth(scaleFreqs[mainNoteIndex], nextNoteTime, stepDuration * 1.5, 'sine', 0.05);
-        
-        // --- LAYER 1: Thirds Harmony (Unlocks at Combo 2) ---
-        if (consecutiveSolves >= 2) {
-            let harmIndex = mainNoteIndex + 2; // Diatonic third above
-            if (harmIndex <= 21) playSynth(scaleFreqs[harmIndex], nextNoteTime, stepDuration * 1.5, 'triangle', 0.03);
-        }
-        
-        // --- LAYER 2: Bass Drone (Unlocks at Combo 4) ---
-        if (consecutiveSolves >= 4 && bgmStep % 8 === 0) {
-            // Drops a deep, 2-second root note on the downbeats
-            let bassFreq = scaleFreqs[rootIndex] / 2; 
-            playSynth(bassFreq, nextNoteTime, 2.0, 'sine', 0.08);
-        }
-        
-        // --- LAYER 3: High Twinkle Counter-Melody (Unlocks at Combo 6) ---
-        if (consecutiveSolves >= 6 && bgmStep % 2 !== 0) {
-            // Plays an octave higher specifically on the off-beats
-            let twinkleIndex = mainNoteIndex + 7; 
-            if (twinkleIndex <= 21) playSynth(scaleFreqs[twinkleIndex], nextNoteTime, stepDuration * 0.5, 'sine', 0.02);
-        }
-        
-        // --- LAYER 4: Sustained Chordal Pad (Unlocks at Combo 8) ---
-        if (consecutiveSolves >= 8 && bgmStep % 16 === 0) {
-            // Plays a lush, 4-second note a perfect fifth above the root
-            let padIndex = rootIndex + 4;
-            if (padIndex <= 21) playSynth(scaleFreqs[padIndex], nextNoteTime, 4.0, 'triangle', 0.04);
-        }
-
-        nextNoteTime += stepDuration;
-        bgmStep++;
-        
-        // Reset the loop exactly at 200 steps (50 seconds at 0.25s per step)
-        if (bgmStep >= 200) {
-            bgmStep = 0;
-        }
-    }
-    
-    // Wake up the scheduler again in 25ms
-    bgmTimerID = setTimeout(scheduleBGM, 25);
-}
 
 // Initialize
 startGame();

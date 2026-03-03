@@ -200,7 +200,7 @@ button {
     border-radius: 12px;
     background: #f1f5f9;
     color: var(--text-dark);
-    padding: 15px 0;
+    padding: 15px 20px;
     cursor: pointer;
     transition: background 0.2s;
 }
@@ -612,4 +612,15 @@ footer {
 @keyframes pulseHint {
     0% { transform: scale(1); box-shadow: 0 0 15px 5px rgba(255, 152, 0, 0.4) !important; }
     100% { transform: scale(1.08); box-shadow: 0 0 25px 8px rgba(255, 152, 0, 0.9) !important; }
+}
+
+#restart-btn {
+    width: 100%;
+    background: var(--blue);
+    color: white;
+    margin-top: 20px;
+}
+
+#restart-btn:active {
+    background: #5c85b5;
 }
