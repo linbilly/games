@@ -47,7 +47,8 @@ let lastTapTileId = null; // NEW: Tracks double-taps
 
 let hintUsedThisRound = false;
 
-let isMusicEnabled = true; // NEW: Defaults to off
+const savedMusicPref = localStorage.getItem('make50_music_pref');
+let isMusicEnabled = savedMusicPref !== null ? savedMusicPref === 'true' : true;
 
 // --- Logic: Math Solver (Now returns an array of visual steps) ---
 function findSolution(arr, target, allowedOps, currentSteps = []) {
@@ -636,6 +637,7 @@ document.getElementById('music-btn').onclick = () => {
     musicEngine.resume(); 
     
     isMusicEnabled = !isMusicEnabled; 
+    localStorage.setItem('make50_music_pref', isMusicEnabled);
     const musicBtn = document.getElementById('music-btn');
     
     if (isMusicEnabled) {
@@ -648,6 +650,8 @@ document.getElementById('music-btn').onclick = () => {
 };
 
 
-
 // Initialize
+if (!isMusicEnabled) {
+    document.getElementById('music-btn').classList.add('muted');
+}
 startGame();

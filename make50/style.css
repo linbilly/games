@@ -354,8 +354,14 @@ button:active { background: #e2e8f0; }
     text-align: center;
     box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     
-    width: 90%;            /* Adaptive width */
-    max-width: 450px;      /* Increased to fit the practice buttons */
+    width: 90%;            
+    max-width: 450px;      
+    
+    /* NEW: Prevent modal from growing taller than the screen */
+    max-height: 90dvh; 
+    overflow-y: auto; 
+    display: flex;
+    flex-direction: column;
 }
 
 /* Allow buttons to wrap to a new line on small screens */
@@ -368,7 +374,22 @@ button:active { background: #e2e8f0; }
 }
 
 
+/* NEW: Scrollable Leaderboard List */
+#leaderboard-list {
+    max-height: 35vh; /* Takes up roughly a third of the screen */
+    overflow-y: auto; /* Adds a scrollbar automatically */
+    padding-right: 10px; /* Prevents text from rubbing against the scrollbar */
+    margin-bottom: 20px;
+}
 
+/* Optional: Make the scrollbar look clean on Webkit browsers (Chrome/Safari) */
+#leaderboard-list::-webkit-scrollbar {
+    width: 6px;
+}
+#leaderboard-list::-webkit-scrollbar-thumb {
+    background-color: var(--gray);
+    border-radius: 10px;
+}
 
 .mode-btn {
     padding: 8px 16px;
