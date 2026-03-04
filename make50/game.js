@@ -20,7 +20,8 @@ const MODES = {
     practice1: { name: 'Practice 1', tiles: 3, target: 10, ops: ['+', '-'], instr: 'Make 10 using all numbers' },
     practice2: { name: 'Practice 2', tiles: 3, target: 20, ops: ['+', '-', '*', '/'], instr: 'Make 20 using all numbers' },
     practice3: { name: 'Practice 3', tiles: 4, target: 50, ops: ['+', '-', '*', '/'], instr: 'Make 50 using all numbers', pool: [1, 2, 5, 10] },
-    make50:    { name: 'Make 50', tiles: 5, target: 50, ops: ['+', '-', '*', '/'], instr: 'Make 50 using all numbers shown' }
+    make50:    { name: 'Make 50', tiles: 5, target: 50, ops: ['+', '-', '*', '/'], instr: 'Make 50 using all numbers shown' }, 
+    challenge: { name: '10 Q Challenge', tiles: 5, target: 50, ops: ['+', '-', '*', '/'], instr: 'Finish 10 questions and challenge your friends!' }
 };
 
 // State trackers
@@ -46,6 +47,11 @@ let lastTapTime = 0;      // NEW: Tracks double-taps
 let lastTapTileId = null; // NEW: Tracks double-taps
 
 let hintUsedThisRound = false;
+
+let challengeQuestions = []; // Stores the 10 questions upfront
+let currentQuestionIndex = 0;
+let urlChallengeId = new URLSearchParams(window.location.search).get('challenge');
+let challengeCreatorName = "";
 
 const savedMusicPref = localStorage.getItem('make50_music_pref');
 let isMusicEnabled = savedMusicPref !== null ? savedMusicPref === 'true' : true;
@@ -99,51 +105,64 @@ function findSolution(arr, target, allowedOps, currentSteps = []) {
 
 // --- Logic: Question Generation ---
 function generateTiles() {
-    
     document.getElementById('hint-display').classList.add('hidden');
     document.getElementById('hint-btn').classList.add('hidden');
+    
+    // NEW: Check if we are done with the 10 questions
+    if (currentMode === 'challenge' && currentQuestionIndex >= 10) {
+        endGame("Challenge Completed!");
+        return;
+    }
 
     const params = MODES[currentMode];
-    // Use the mode's pool if it exists, otherwise default
-    const pool = params.pool || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10];
-    let validSet = false;
     let numbers = [];
-    let foundSolution = null;
 
+    if (currentMode === 'challenge') {
+        // If creating a brand new challenge, pre-generate 10 sets of numbers
+        if (challengeQuestions.length === 0 && !urlChallengeId) {
+            for(let q = 0; q < 10; q++) {
+                let foundSet = generateSingleValidSet(params);
+                challengeQuestions.push(foundSet);
+            }
+        }
+        // Pull the numbers from our pre-generated array
+        let currentQ = challengeQuestions[currentQuestionIndex];
+        numbers = currentQ.numbers;
+        currentSolutionSteps = currentQ.solution;
+        
+    } else {
+        // Normal game mode generation
+        let foundSet = generateSingleValidSet(params);
+        numbers = foundSet.numbers;
+        currentSolutionSteps = foundSet.solution;
+    }
+
+    activeTiles = numbers.map(num => ({
+        id: Math.random().toString(36).substr(2, 9),
+        value: num, comboCount: 1, leftChild: null, rightChild: null
+    }));
+    
+    history = []; selectedTileId = null; selectedOp = null;
+    usedUndoThisRound = false; roundStartTime = Date.now();
+}
+
+// Helper to clean up the generation logic
+function generateSingleValidSet(params) {
+    const pool = params.pool || [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10];
+    let validSet = false, numbers = [], foundSolution = null;
     while (!validSet) {
         numbers = [];
         let onesAndTwos = 0;
-        
         for (let i = 0; i < params.tiles; i++) {
             let num = pool[Math.floor(Math.random() * pool.length)];
             if (num === 1 || num === 2) onesAndTwos++;
             numbers.push(num);
         }
-
         let testArr = numbers.map(n => ({ val: n, combo: 1 }));
-        let foundSolution = findSolution(testArr, params.target, params.ops);
-
-        if (onesAndTwos <= 3 && foundSolution) {
-            validSet = true;
-            currentSolutionSteps = foundSolution; // Save the array of steps
-        }
+        foundSolution = findSolution(testArr, params.target, params.ops);
+        if (onesAndTwos <= 3 && foundSolution) validSet = true;
     }
-
-    activeTiles = numbers.map(num => ({
-        id: Math.random().toString(36).substr(2, 9),
-        value: num,
-        comboCount: 1,
-        leftChild: null,
-        rightChild: null
-    }));
-    
-    history = [];
-    selectedTileId = null;
-    selectedOp = null;
-    
-    // Reset round-specific trackers
-    usedUndoThisRound = false; 
-    roundStartTime = Date.now(); 
+    return { numbers, solution: foundSolution };
 }
 
 
@@ -387,6 +406,7 @@ function checkWinCondition() {
             
             timeLeft = 100; 
             document.getElementById('timer').innerText = `${timeLeft}s`; 
+            currentQuestionIndex++;
             generateTiles(); 
             render(); 
         }, 1200); 
@@ -488,23 +508,51 @@ function endGame(reason = "Time's Up!") {
 // --- Leaderboard & Nickname Submit (Supabase) ---
 document.getElementById('submit-score-btn').onclick = async () => {
     const btn = document.getElementById('submit-score-btn');
-    let name = document.getElementById('player-name').value.trim();
-    if (!name) name = "Anonymous";
+    let name = document.getElementById('player-name').value.trim() || "Anonymous";
+    btn.disabled = true; btn.innerText = "Saving...";
     
-    // Disable button to prevent double-submits
-    btn.disabled = true;
-    btn.innerText = "Saving...";
-    
-    await saveToLeaderboard(name, score);
+    if (currentMode === 'challenge') {
+        let currentChallengeId = urlChallengeId;
+        
+        // If you are the creator, upload the 10 questions to the database first!
+        if (!currentChallengeId) {
+            const { data, error } = await supabaseClient.from('challenges')
+                .insert([{ creator_name: name, questions: challengeQuestions }])
+                .select('id').single();
+            if (data) currentChallengeId = data.id;
+        }
+        
+        // Save score to challenge_scores
+        await supabaseClient.from('challenge_scores').insert([{ 
+            challenge_id: currentChallengeId, player_name: name, 
+            score: score, solves: totalSolves, max_combo: maxCombo 
+        }]);
+        
+        // Show the Share Link UI
+        const shareUrl = `${window.location.origin}${window.location.pathname}?challenge=${currentChallengeId}`;
+        document.getElementById('share-link').value = shareUrl;
+        document.getElementById('share-container').classList.remove('hidden');
+        
+        // Update Leaderboard specifically for this challenge
+        await renderChallengeLeaderboard(currentChallengeId);
+        
+    } else {
+        // Normal Make 50 Leaderboard saving (Keep your existing saveToLeaderboard call here)
+        await saveToLeaderboard(name, score);
+        await renderLeaderboard();
+    }
     
     document.getElementById('score-submission').classList.add('hidden');
     document.getElementById('leaderboard-view').classList.remove('hidden');
-    
-    await renderLeaderboard();
-    
-    // Reset button
-    btn.disabled = false;
-    btn.innerText = "Save Score";
+    btn.disabled = false; btn.innerText = "Save Score";
+};
+
+// Copy link functionality
+document.getElementById('copy-link-btn').onclick = () => {
+    const linkInput = document.getElementById('share-link');
+    linkInput.select();
+    navigator.clipboard.writeText(linkInput.value);
+    document.getElementById('copy-link-btn').innerText = "Copied!";
 };
 
 async function saveToLeaderboard(name, newScore) {
@@ -610,6 +658,7 @@ document.getElementById('skip-btn').onclick = () => {
     document.getElementById('combo-count').innerText = `Combo: ${consecutiveSolves}`;
     
     render(); 
+    currentQuestionIndex++;
     generateTiles();
     render();
 };
@@ -654,4 +703,136 @@ document.getElementById('music-btn').onclick = () => {
 if (!isMusicEnabled) {
     document.getElementById('music-btn').classList.add('muted');
 }
-startGame();
+
+// Check for a challenge link on load
+if (urlChallengeId) {
+    currentMode = 'challenge';
+    loadChallengeData(urlChallengeId);
+} else {
+    startGame();
+}
+
+async function loadChallengeData(id) {
+    document.getElementById('instruction-overlay').innerText = "Loading challenge...";
+    const { data, error } = await supabaseClient.from('challenges').select('*').eq('id', id).single();
+    if (data) {
+        challengeQuestions = data.questions;
+        challengeCreatorName = data.creator_name;
+        
+        MODES.challenge.name = `${challengeCreatorName}'s Challenge`;
+        
+        // NEW: Update the on-screen instruction text for the challenger!
+        MODES.challenge.instr = `${challengeCreatorName}'s challenge!`; 
+        
+        startGame();
+    } else {
+        alert("This challenge has expired or doesn't exist!");
+        urlChallengeId = null;
+        currentMode = 'make50';
+        startGame();
+    }
+}
+// --- NEW: Fetch and Display Challenge-Specific Scores ---
+async function renderChallengeLeaderboard(challengeId) {
+    const list = document.getElementById('leaderboard-list');
+    
+    // Set a custom title so players know they are looking at the specific challenge
+    const displayTitle = challengeCreatorName ? `${challengeCreatorName}'s Challenge` : "Challenge Leaderboard";
+    document.getElementById('leaderboard-title').innerText = displayTitle;
+    
+    list.innerHTML = '<li>Loading scores...</li>';
+    
+    try {
+        // Query the dedicated challenge_scores table using the specific challenge URL ID
+        const { data, error } = await supabaseClient
+            .from('challenge_scores')
+            .select('player_name, score, solves, max_combo') 
+            .eq('challenge_id', challengeId)
+            .order('score', { ascending: false })
+            .limit(10); // Show top 10 friends
+            
+        if (error) throw error;
+        
+        if (data.length === 0) {
+            list.innerHTML = '<li>No scores yet. Be the first to dominate!</li>';
+        } else {
+            list.innerHTML = data.map((entry, i) => {
+                const solveText = entry.solves ? `${entry.solves} solves` : '';
+                const comboText = entry.max_combo ? ` | Max Combo: ${entry.max_combo}x` : '';
+                return `<li>#${i+1} - <strong>${entry.player_name}</strong>: ${entry.score} pts <br> <small>(${solveText}${comboText})</small></li>`;
+            }).join('');
+        }
+    } catch (error) {
+        console.error("Supabase Error:", error.message);
+        list.innerHTML = '<li>Failed to load challenge leaderboard.</li>';
+    }
+}
+
+// --- Screenshot Generation Logic ---
+document.getElementById('screenshot-btn').onclick = async () => {
+    const btn = document.getElementById('screenshot-btn');
+    btn.innerText = "📸 Snapping photo...";
+
+    // 1. Target the modal wrapper
+    const targetElement = document.querySelector('#game-over-modal .modal-content');
+    
+    // 2. Save original states so we can restore them
+    const titleEl = document.querySelector('#game-over-modal h2');
+    const originalTitle = titleEl.innerText;
+    
+    // Elements to temporarily hide from the screenshot
+    const elementsToHide = [
+        document.getElementById('restart-btn'),
+        document.getElementById('share-container'),
+        document.getElementById('score-submission')
+    ];
+
+    // 3. Inject the "Hype" Annotation!
+    if (currentMode === 'challenge') {
+        const creator = challengeCreatorName ? challengeCreatorName : "this";
+        // Also fixed a tiny grammar quirk here to add the 's
+        titleEl.innerText = `I dominated ${creator}'s Challenge! 👑`;
+    } else {
+        titleEl.innerText = `I scored ${score} pts in Make 50! 🧠`;
+    }
+    
+    // Hide the buttons
+    elementsToHide.forEach(el => { if(el) el.style.display = 'none'; });
+
+    // --- NEW: Inject the Promotional Tagline ---
+    const promoTag = document.createElement('p');
+    promoTag.innerText = "Think you can do better? Try it at www.bigwgames.com/make50";
+    promoTag.style.fontWeight = "800";
+    promoTag.style.color = "#4a90e2"; // Matches your var(--blue)
+    promoTag.style.marginTop = "20px";
+    promoTag.style.fontSize = "1.1rem";
+    targetElement.appendChild(promoTag); // Drop it at the bottom of the modal
+    // ------------------------------------------
+
+    // 4. Take the high-res picture
+    try {
+        const canvas = await html2canvas(targetElement, {
+            backgroundColor: "#ffffff",
+            scale: 2 // Double resolution so it looks crisp on Retina displays
+        });
+        
+        // 5. Download the image to the user's device
+        const image = canvas.toDataURL("image/png");
+        const link = document.createElement('a');
+        link.download = `Make50_Score.png`;
+        link.href = image;
+        link.click();
+    } catch (err) {
+        console.error("Screenshot failed:", err);
+        alert("Oops! Couldn't capture the screenshot.");
+    }
+
+    // 6. Restore the UI perfectly
+    titleEl.innerText = originalTitle;
+    elementsToHide.forEach(el => { if(el) el.style.display = ''; });
+    
+    // --- NEW: Remove the promo tag from the live game UI ---
+    promoTag.remove(); 
+    
+    btn.innerText = "📸 Save Result to Camera Roll";
+};

@@ -14,6 +14,7 @@
     <script src="music_engine.js" defer></script>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
     
     <script src="game.js" defer></script>
 </head>
@@ -63,7 +64,10 @@
                     <button class="mode-btn" data-mode="practice2">Practice 2</button>
                     <button class="mode-btn" data-mode="practice3">Practice 3</button>
                     <button class="mode-btn active" data-mode="make50">Make 50</button>
+                    <button class="mode-btn" data-mode="challenge" style="background: var(--red); color: white;">Challenge friend</button>
                 </div>
+
+
 
                 <p><strong>Goal:</strong> Combine all the tiles to reach the target number!</p>
                 <ul>
@@ -104,6 +108,15 @@
                 <div id="leaderboard-view" class="hidden">
                     <h3 id="leaderboard-title">Leaderboard</h3>
                     <ul id="leaderboard-list"></ul>
+
+                    <div id="share-container" class="hidden" style="margin-top: 15px; background: #f1f5f9; padding: 15px; border-radius: 12px;">
+                        <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 0.9rem;">Challenge a friend to beat your score!</p>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="text" id="share-link" readonly style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 0.8rem;">
+                            <button id="copy-link-btn" style="background: var(--blue); color: white; padding: 10px 15px;">Copy</button>
+                        </div>
+                        <button id="screenshot-btn" style="background: #10b981; color: white; padding: 10px 15px; margin-top: 10px; width: 100%; border-radius: 8px;">📸 Save Result to Camera Roll</button>
+                    </div>
                 </div>
             </div>
             
