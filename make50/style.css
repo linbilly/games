@@ -672,3 +672,18 @@ footer {
 #restart-btn:active {
     background: #5c85b5;
 }
+
+/* NEW: Layout wrappers to prevent the game board from jumping */
+#message-zone {
+    min-height: 40px; /* Reserves exactly enough space for the text */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+#hint-zone {
+    min-height: 60px; /* Reserves exactly enough space for the Hint button */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}

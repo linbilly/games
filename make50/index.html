@@ -8,6 +8,20 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     
     <title>Make 50</title>
+
+    <meta property="og:title" content="Make 50 - The Math Puzzle Game">
+    <meta property="og:description" content="Think you can do better? Play Make 50 and challenge your friends!">
+    <meta property="og:url" content="https://www.bigwgames.com/make50/">
+    <meta property="og:type" content="website">
+    
+    <meta property="og:image" content="https://www.bigwgames.com/make50/icon-192.png">
+
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Make 50 - The Math Puzzle Game">
+    <meta name="twitter:description" content="Think you can do better? Play Make 50 and challenge your friends!">
+    <meta name="twitter:image" content="https://www.bigwgames.com/make50/icon-192.png">
+
+    
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     
@@ -32,13 +46,17 @@
             <div id="solve-count">Solves: 0</div> 
             <div id="combo-count">Combo: 0</div> <div id="score">Score: 0</div>
         </header>
-        <div id="instruction-overlay">Make 50 using all numbers shown</div>
 
-        <div id="hint-display" class="hidden"></div>
+        <div id="message-zone">
+            <div id="instruction-overlay">Make 50 using all numbers shown</div>
+            <div id="hint-display" class="hidden"></div>
+        </div>
 
         <div id="stage"></div>
 
-        <button id="hint-btn" class="hidden">Hint?</button>
+        <div id="hint-zone">
+            <button id="hint-btn" class="hidden">Hint?</button>
+        </div>
 
         <div id="controls">
             <button id="skip-btn" title="Skip Round (-200 pts)">Skip</button>
