@@ -45,10 +45,9 @@ body {
     width: 480px; 
     max-width: 95vw; 
     
-    /* CHANGE: Use dvh and remove the rigid 600px min-height */
-    height: auto;
+    /* THE FIX: A flexible minimum height so it stays a tall rectangle */
+    min-height: 75dvh; 
     max-height: 95dvh; 
-    min-height: auto; 
     
     border-radius: 24px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.05);
@@ -92,12 +91,14 @@ body {
 
 #stage {
     flex-grow: 1;
+    
+    /* THE FIX: Prop the game board open so it never collapses */
+    min-height: 250px; 
+    
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 10px;
-    
-    /* Default to NO WRAP so the tiles are forced to shrink as the screen gets smaller */
     flex-wrap: nowrap; 
 }
 
@@ -121,7 +122,7 @@ body {
     font-weight: 700;
     cursor: pointer;
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    /*transition: transform 0.1s ease, box-shadow 0.1s ease;*/
     box-sizing: border-box;
 }
 /* 1. Make the Operator symbols larger */
@@ -202,7 +203,7 @@ button {
     color: var(--text-dark);
     padding: 15px 20px;
     cursor: pointer;
-    transition: background 0.2s;
+    /*transition: background 0.2s;*/
 }
 
 button.selected-op { background: #cbd5e1; outline: 2px solid #94a3b8; }
@@ -233,9 +234,16 @@ button:active { background: #e2e8f0; }
 /* --- Controls Grid (Now 6 items) --- */
 #controls {
     display: grid;
-    grid-template-columns: repeat(6, 1fr); /* Fits Skip + 4 Ops + Undo */
+    /* FIX: minmax(0, 1fr) strictly forces all 6 columns to be exactly equal */
+    grid-template-columns: repeat(6, minmax(0, 1fr)); 
     gap: 2%; 
     margin-top: 20px;
+}
+
+/* NEW: Strip horizontal padding from bottom controls so they don't stretch */
+#controls button {
+    width: 100%;
+    padding: 15px 0; 
 }
 
 #skip-btn {
@@ -324,10 +332,7 @@ button:active { background: #e2e8f0; }
 }
 
 /* --- New Styles for Headers & Modes --- */
-#game-container {
-    height: auto; /* Allow container to grow with new content */
-    min-height: 600px;
-}
+
 
 #header-titles {
     text-align: center;
@@ -347,21 +352,40 @@ button:active { background: #e2e8f0; }
 }
 
 /* Fix Modal Width */
+/* Update this block (around line 220) */
 .modal-content {
     background: white;
-    padding: 30px;
+    padding: 25px; /* Slightly reduced padding to save space on small phones */
     border-radius: 20px;
     text-align: center;
     box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     
     width: 90%;            
     max-width: 450px;      
-    
-    /* NEW: Prevent modal from growing taller than the screen */
     max-height: 90dvh; 
-    overflow-y: auto; 
+    
     display: flex;
     flex-direction: column;
+    overflow: hidden; /* CRITICAL: Stops the main box from scrolling/stretching */
+}
+
+/* NEW: The universal scrolling body for all modals */
+.modal-scroll-area {
+    flex: 1; /* Takes up all available vertical space */
+    overflow-y: auto; /* Adds a scrollbar ONLY to this inner section */
+    padding-right: 5px; /* Breathing room for the scrollbar */
+    margin-bottom: 15px; /* Space before the pinned buttons */
+    
+    /* Optional: custom scrollbar styling */
+    scrollbar-width: thin; 
+}
+
+.modal-scroll-area::-webkit-scrollbar {
+    width: 6px;
+}
+.modal-scroll-area::-webkit-scrollbar-thumb {
+    background-color: var(--gray);
+    border-radius: 10px;
 }
 
 /* Allow buttons to wrap to a new line on small screens */
@@ -376,9 +400,12 @@ button:active { background: #e2e8f0; }
 
 /* NEW: Scrollable Leaderboard List */
 #leaderboard-list {
-    max-height: 35vh; /* Takes up roughly a third of the screen */
-    overflow-y: auto; /* Adds a scrollbar automatically */
-    padding-right: 10px; /* Prevents text from rubbing against the scrollbar */
+    /* FIX: Flex allows the list to dynamically shrink if the screen is tiny */
+    flex: 1; 
+    min-height: 50px; 
+    
+    overflow-y: auto; /* The scrollbar now only appears inside the list */
+    padding-right: 10px; 
     margin-bottom: 20px;
 }
 

@@ -53,24 +53,26 @@
         Copyright &copy; <a href="https://bigwgames.com">Big W Games</a> and Charlie Lin
     </footer>
 
-    <div id="info-modal" class="hidden">
+<div id="info-modal" class="hidden">
         <div class="modal-content info-content">
-            <h2>Menu & Rules</h2>
             
-            <div id="mode-selector">
-                <button class="mode-btn" data-mode="practice1">Practice 1</button>
-                <button class="mode-btn" data-mode="practice2">Practice 2</button>
-                <button class="mode-btn" data-mode="practice3">Practice 3</button>
-                <button class="mode-btn active" data-mode="make50">Make 50</button>
-            </div>
+            <div class="modal-scroll-area">
+                <h2>Menu & Rules</h2>
+                <div id="mode-selector">
+                    <button class="mode-btn" data-mode="practice1">Practice 1</button>
+                    <button class="mode-btn" data-mode="practice2">Practice 2</button>
+                    <button class="mode-btn" data-mode="practice3">Practice 3</button>
+                    <button class="mode-btn active" data-mode="make50">Make 50</button>
+                </div>
 
-            <p><strong>Goal:</strong> Combine all the tiles to reach the target number!</p>
-            <ul>
-                <li>Tap a number, tap an operator (+, −, ×, ÷), then tap another number to merge them.</li>
-                <li><strong>Double-tap</strong> a combined tile to break it apart and undo the move.</li>
-                <li>Clear the board by combining all starting tiles into a single shiny gold tile.</li>
-                <li><strong>Skip</strong> a question you are stuck on, but it breaks a combo and -200 points. If <0 points, you lost the game!</li>
-            </ul>
+                <p><strong>Goal:</strong> Combine all the tiles to reach the target number!</p>
+                <ul>
+                    <li>Tap a number, tap an operator (+, −, ×, ÷), then tap another number to merge them.</li>
+                    <li><strong>Double-tap</strong> a combined tile to break it apart and undo the move.</li>
+                    <li>Clear the board by combining all starting tiles into a single shiny gold tile.</li>
+                    <li><strong>Skip</strong> a question you are stuck on, but it breaks a combo and -200 points. If <0 points, you lost the game!</li>
+                </ul>
+            </div>
             
             <div class="menu-actions">
                 <button id="close-info-btn">Resume Game</button>
@@ -80,30 +82,34 @@
     </div>
 
     <div id="game-over-modal" class="hidden">
-    <div class="modal-content">
-        <h2>Time's Up!</h2>
-        
-        <div id="final-stats-container">
-            <p>Score: <strong id="final-score">0</strong>     •     Solves: <strong id="final-solves">0</strong>     •     Max Combo: <strong id="final-combo">0</strong></p>
-        </div>
-        
-        <div id="solution-display" class="hidden">
-            <p style="margin: 0 0 10px 0; font-weight: 700; color: var(--text-dark);">Possible Solution:</p>
-            <div id="solution-text"></div>
-        </div>
-        
-        <div id="score-submission">
-            <input type="text" id="player-name" placeholder="Enter nickname..." maxlength="12" autocomplete="off">
-            <button id="submit-score-btn">Save Score</button>
-        </div>
+        <div class="modal-content">
+            
+            <div class="modal-scroll-area">
+                <h2>Time's Up!</h2>
+                
+                <div id="final-stats-container">
+                    <p>Score: <strong id="final-score">0</strong> &nbsp;•&nbsp; Solves: <strong id="final-solves">0</strong> &nbsp;•&nbsp; Max Combo: <strong id="final-combo">0</strong></p>
+                </div>
+                
+                <div id="solution-display" class="hidden">
+                    <p style="margin: 0 0 10px 0; font-weight: 700; color: var(--text-dark);">Possible Solution:</p>
+                    <div id="solution-text"></div>
+                </div>
+                
+                <div id="score-submission">
+                    <input type="text" id="player-name" placeholder="Enter nickname..." maxlength="12" autocomplete="off">
+                    <button id="submit-score-btn">Save Score</button>
+                </div>
 
-        <div id="leaderboard-view" class="hidden">
-            <h3 id="leaderboard-title">Leaderboard</h3>
-            <ul id="leaderboard-list"></ul>
+                <div id="leaderboard-view" class="hidden">
+                    <h3 id="leaderboard-title">Leaderboard</h3>
+                    <ul id="leaderboard-list"></ul>
+                </div>
+            </div>
+            
+            <button id="restart-btn" style="flex-shrink: 0;">Play Again</button>
         </div>
-        <button id="restart-btn">Play Again</button>
     </div>
-</div>
 
 </body>
 </html>
