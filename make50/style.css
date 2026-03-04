@@ -662,15 +662,44 @@ footer {
     100% { transform: scale(1.08); box-shadow: 0 0 25px 8px rgba(255, 152, 0, 0.9) !important; }
 }
 
+/* --- End Game Actions (Side-by-Side) --- */
+.end-game-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-shrink: 0; /* Keeps it permanently pinned to the bottom */
+}
+
+.end-game-actions button {
+    flex: 1; /* Forces both buttons to be exactly 50% width */
+    margin-top: 0; 
+    padding: 12px 10px; 
+    font-size: clamp(0.85rem, 3.5vw, 1.1rem); /* Dynamically shrinks text on small phones */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+/* Primary restart button */
 #restart-btn {
-    width: 100%;
     background: var(--blue);
     color: white;
-    margin-top: 20px;
 }
 
 #restart-btn:active {
     background: #5c85b5;
+}
+
+/* Light yellow Combo-2 style for the screenshot button */
+#screenshot-btn {
+    background: var(--tile-2); /* The light yellow #FEFEC5 */
+    color: var(--text-dark); /* Black/Dark Grey text */
+    border: 2px solid #fef3c7; /* A subtle darker yellow border for definition */
+}
+
+#screenshot-btn:active {
+    background: #fef08a; /* Slightly darker yellow when pressed */
 }
 
 /* NEW: Layout wrappers to prevent the game board from jumping */

@@ -782,10 +782,9 @@ document.getElementById('screenshot-btn').onclick = async () => {
     
     // Elements to temporarily hide from the screenshot
     const elementsToHide = [
-        document.getElementById('restart-btn'),
+        document.querySelector('.end-game-actions'),     // FIX: Hides the entire button row at once!
         document.getElementById('share-link-container'), // Hide the URL box
-        document.getElementById('score-submission'),     // Hide the Name Input
-        document.getElementById('screenshot-btn')        // Hide the Camera button itself!
+        document.getElementById('score-submission')      // Hide the Name Input
     ];
 
     // 3. Inject the "Hype" Annotation dynamically based on the mode!
@@ -833,5 +832,5 @@ document.getElementById('screenshot-btn').onclick = async () => {
     elementsToHide.forEach(el => { if(el) el.style.display = ''; });
     promoTag.remove(); 
     
-    btn.innerText = "📸 Save Result to Camera Roll";
+    btn.innerText = "📸 Camera Roll";
 };
