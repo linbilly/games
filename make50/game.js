@@ -531,7 +531,7 @@ document.getElementById('submit-score-btn').onclick = async () => {
         // Show the Share Link UI
         const shareUrl = `${window.location.origin}${window.location.pathname}?challenge=${currentChallengeId}`;
         document.getElementById('share-link').value = shareUrl;
-        document.getElementById('share-container').classList.remove('hidden');
+        document.getElementById('share-link-container').classList.remove('hidden');
         
         // Update Leaderboard specifically for this challenge
         await renderChallengeLeaderboard(currentChallengeId);
@@ -768,7 +768,7 @@ async function renderChallengeLeaderboard(challengeId) {
     }
 }
 
-// --- Screenshot Generation Logic ---
+// --- Universal Screenshot Logic ---
 document.getElementById('screenshot-btn').onclick = async () => {
     const btn = document.getElementById('screenshot-btn');
     btn.innerText = "📸 Snapping photo...";
@@ -783,43 +783,44 @@ document.getElementById('screenshot-btn').onclick = async () => {
     // Elements to temporarily hide from the screenshot
     const elementsToHide = [
         document.getElementById('restart-btn'),
-        document.getElementById('share-container'),
-        document.getElementById('score-submission')
+        document.getElementById('share-link-container'), // Hide the URL box
+        document.getElementById('score-submission'),     // Hide the Name Input
+        document.getElementById('screenshot-btn')        // Hide the Camera button itself!
     ];
 
-    // 3. Inject the "Hype" Annotation!
+    // 3. Inject the "Hype" Annotation dynamically based on the mode!
     if (currentMode === 'challenge') {
         const creator = challengeCreatorName ? challengeCreatorName : "this";
-        // Also fixed a tiny grammar quirk here to add the 's
         titleEl.innerText = `I dominated ${creator}'s Challenge! 👑`;
     } else {
-        titleEl.innerText = `I scored ${score} pts in Make 50! 🧠`;
+        // Automatically grabs "Make 50" or "Practice 2", etc.
+        const modeName = MODES[currentMode].name; 
+        titleEl.innerText = `I scored ${score} pts in ${modeName}! 🧠`;
     }
     
-    // Hide the buttons
+    // Hide the interactive UI buttons
     elementsToHide.forEach(el => { if(el) el.style.display = 'none'; });
 
-    // --- NEW: Inject the Promotional Tagline ---
+    // 4. Inject the Promotional Tagline
     const promoTag = document.createElement('p');
     promoTag.innerText = "Think you can do better? Try it at www.bigwgames.com/make50";
     promoTag.style.fontWeight = "800";
-    promoTag.style.color = "#4a90e2"; // Matches your var(--blue)
+    promoTag.style.color = "#4a90e2"; 
     promoTag.style.marginTop = "20px";
     promoTag.style.fontSize = "1.1rem";
-    targetElement.appendChild(promoTag); // Drop it at the bottom of the modal
-    // ------------------------------------------
+    targetElement.appendChild(promoTag);
 
-    // 4. Take the high-res picture
+    // 5. Take the high-res picture
     try {
         const canvas = await html2canvas(targetElement, {
             backgroundColor: "#ffffff",
-            scale: 2 // Double resolution so it looks crisp on Retina displays
+            scale: 2 // Crisp Retina resolution
         });
         
-        // 5. Download the image to the user's device
+        // Download to device
         const image = canvas.toDataURL("image/png");
         const link = document.createElement('a');
-        link.download = `Make50_Score.png`;
+        link.download = `Make50_${currentMode}_Score.png`;
         link.href = image;
         link.click();
     } catch (err) {
@@ -827,11 +828,9 @@ document.getElementById('screenshot-btn').onclick = async () => {
         alert("Oops! Couldn't capture the screenshot.");
     }
 
-    // 6. Restore the UI perfectly
+    // 6. Restore UI
     titleEl.innerText = originalTitle;
     elementsToHide.forEach(el => { if(el) el.style.display = ''; });
-    
-    // --- NEW: Remove the promo tag from the live game UI ---
     promoTag.remove(); 
     
     btn.innerText = "📸 Save Result to Camera Roll";

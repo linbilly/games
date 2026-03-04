@@ -109,17 +109,16 @@
                     <h3 id="leaderboard-title">Leaderboard</h3>
                     <ul id="leaderboard-list"></ul>
 
-                    <div id="share-container" class="hidden" style="margin-top: 15px; background: #f1f5f9; padding: 15px; border-radius: 12px;">
-                        <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 0.9rem;">Challenge a friend to beat your score!</p>
-                        <div style="display: flex; gap: 5px;">
-                            <input type="text" id="share-link" readonly style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 0.8rem;">
-                            <button id="copy-link-btn" style="background: var(--blue); color: white; padding: 10px 15px;">Copy</button>
-                        </div>
-                        <button id="screenshot-btn" style="background: #10b981; color: white; padding: 10px 15px; margin-top: 10px; width: 100%; border-radius: 8px;">📸 Save Result to Camera Roll</button>
+                    <div id="share-link-container" class="hidden" style="margin-top: 15px; background: #f1f5f9; padding: 15px; border-radius: 12px;">
+                    <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 0.9rem; color: var(--text-dark);">Challenge a friend to beat your score!</p>
+                    <div style="display: flex; gap: 5px;">
+                        <input type="text" id="share-link" readonly style="flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 0.8rem;">
+                        <button id="copy-link-btn" style="background: var(--blue); color: white; padding: 10px 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Copy</button>
                     </div>
                 </div>
+                </div>
             </div>
-            
+            <button id="screenshot-btn" style="background: #10b981; color: white; padding: 10px 15px; margin-top: 10px; width: 100%; border-radius: 8px;">📸 Save Result to Camera Roll</button>
             <button id="restart-btn" style="flex-shrink: 0;">Play Again</button>
         </div>
     </div>
